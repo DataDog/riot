@@ -24,7 +24,6 @@ setup(
     packages=find_packages(exclude=["tests*"]),
     python_requires=">=3.6",
     install_requires=[],
-    tests_require=["pytest"],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
 )
