@@ -1,10 +1,10 @@
 name: CI
-on:
-  push:
-    branches:
-      - master
-  pull_request:
+on: [push]
 jobs:
+  build:
+    strategy:
+      matrix:
+        python-version: [3.5, 3.6, 3.7, 3.8]
   black:
     runs-on: ubuntu-latest
     steps:
@@ -17,6 +17,8 @@ jobs:
       - name: Setup Python
         # Default version is 3.x (latest)
         uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install Riot
         # Install Riot (".") + test dependencies
         run: pip install . pytest
