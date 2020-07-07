@@ -13,7 +13,6 @@ setup(
     author_email="dev@datadoghq.com",
     classifiers=[
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
@@ -23,7 +22,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache 2",
     packages=find_packages(exclude=["tests*"]),
-    python_requires=">=3.5",
+    python_requires=">=3.6",
     install_requires=[],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
