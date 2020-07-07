@@ -1,0 +1,20 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: jpetrucciani/black-check@19.10b0
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        # Default version is 3.x (latest)
+        uses: actions/setup-python@v2
+      - name: Install Riot
+        # Install Riot (".") + test dependencies
+        run: pip install . pytest
+      - name: Run tests
+        run: pytest tests/
