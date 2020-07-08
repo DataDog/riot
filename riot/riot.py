@@ -62,7 +62,7 @@ global_deps = [
 
 global_env = [("PYTEST_ADDOPTS", "--color=yes")]
 
-all_suites = [
+all_suites: t.List[Suite] = [
     Suite(
         name="tracer",
         command="pytest tests/test_tracer.py",
@@ -433,7 +433,7 @@ def run_suites(
         sys.exit(1)
 
 
-def list_suites(suites, pattern, out=sys.stdout):
+def list_suites(suites: t.List[Suite], pattern, out=sys.stdout):
     curr_suite = None
     for case in suites_iter(suites, pattern):
         if case.suite != curr_suite:
@@ -447,7 +447,7 @@ def list_suites(suites, pattern, out=sys.stdout):
         print(" %s %s %s" % (env_str, py_str, pkgs_str), file=out)
 
 
-def generate_base_venvs(suites, pattern, recreate, skip_deps):
+def generate_base_venvs(suites: t.List[Suite], pattern, recreate, skip_deps):
     """Generate all the required base venvs for `suites`.
     """
     # Find all the python versions used.
