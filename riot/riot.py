@@ -1,5 +1,5 @@
 import argparse
-import dataclasses
+import attr
 import itertools
 import logging
 import os
@@ -17,17 +17,15 @@ SHELL = "/bin/bash"
 ENCODING = "utf-8"
 
 
-@dataclasses.dataclass
+@attr.s(auto_attribs=True)
 class Suite:
     name: str
     command: str
-    cases: t.List[t.Any] = dataclasses.field(default_factory=list)
-    env: t.List[t.Tuple[str, t.Union[str, t.Callable]]] = dataclasses.field(
-        default_factory=list
-    )
+    cases: t.List[t.Any] = attr.ib(factory=list)
+    env: t.List[t.Tuple[str, t.Union[str, t.Callable]]] = attr.ib(factory=list)
 
 
-@dataclasses.dataclass
+@attr.s(auto_attribs=True)
 class Result:
     case: t.Any
     venv: str
