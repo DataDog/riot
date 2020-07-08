@@ -78,7 +78,7 @@ def test_suites_iter():
                         ("django", [">=2.0,<2.1", ">=2.1,<2.2"]),
                     ],
                 ),
-                Suite(
+                Case(
                     env=[("TEST_DATADOG_DJANGO_MIGRATION", [None, "1"])],
                     pys=[3.6, 3.7, 3.8],
                     pkgs=[

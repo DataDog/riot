@@ -1,4 +1,5 @@
 import argparse
+import dataclasses
 import itertools
 import logging
 import os
@@ -16,6 +17,24 @@ SHELL = "/bin/bash"
 ENCODING = "utf-8"
 
 
+@dataclasses.dataclass
+class Suite:
+    name: str
+    command: str
+    cases: t.List[t.Any] = dataclasses.field(default_factory=list)
+    env: t.List[t.Tuple[str, t.Union[str, t.Callable]]] = dataclasses.field(
+        default_factory=list
+    )
+
+
+@dataclasses.dataclass
+class Result:
+    case: t.Any
+    venv: str
+    pkgstr: str
+    code: t.Optional[int] = None
+
+
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
@@ -31,7 +50,7 @@ class CmdFailure(Exception):
 
 
 # It's easier to read `Suite`, `Case` rather than AttrDict or dict.
-CaseInstance = Case = Suite = AttrDict
+CaseInstance = Case = AttrDict
 
 global_deps = [
     "mock",
@@ -47,7 +66,6 @@ all_suites = [
     Suite(
         name="tracer",
         command="pytest tests/test_tracer.py",
-        env=dict(),
         cases=[
             Case(
                 pys=[2.7, 3.5, 3.6, 3.7, 3.8,],
@@ -149,7 +167,7 @@ all_suites = [
 ]
 
 
-def rmchars(chars: t.List[str], s: str):
+def rmchars(chars: str, s: str):
     for c in chars:
         s = s.replace(c, "")
     return s
@@ -268,7 +286,7 @@ def cases_iter(cases):
             yield case, env_cfg, py, pkg_cfg
 
 
-def suites_iter(suites, pattern, py=None):
+def suites_iter(suites: t.List[Suite], pattern, py=None):
     """Iterator over an iterable of suites.
 
     :param py: An optional python version to match against.
@@ -286,7 +304,7 @@ def suites_iter(suites, pattern, py=None):
 
 
 def run_suites(
-    suites,
+    suites: t.List[Suite],
     pattern,
     skip_base_install=False,
     recreate_venvs=False,
@@ -319,7 +337,7 @@ def run_suites(
             ["'%s'" % get_pep_dep(lib, version) for lib, version in pkgs.items()]
         )
         # Case result which will contain metadata about the test execution.
-        result = AttrDict(case=case, venv=venv, pkgstr=pkg_str)
+        result = Result(case=case, venv=venv, pkgstr=pkg_str)
 
         try:
             # Copy the base venv to use for this case.
