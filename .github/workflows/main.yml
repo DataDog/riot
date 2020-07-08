@@ -9,6 +9,14 @@ jobs:
       - uses: actions/setup-python@v2
       - run: pip install black
       - run: black --check .
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Default version is 3.x (latest)
+      - uses: actions/setup-python@v2
+      - run: pip install mypy
+      - run: mypy riot/ tests/
   test:
     strategy:
       matrix:
@@ -17,7 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup Python
-        # Default version is 3.x (latest)
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
