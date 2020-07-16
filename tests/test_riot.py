@@ -38,7 +38,6 @@ def test_suites_iter():
         Suite(
             name="tracer",
             command="pytest tests/test_tracer.py",
-            env=dict(),
             cases=[
                 Case(
                     pys=[2.7, 3.5, 3.6, 3.7, 3.8,],

@@ -22,131 +22,15 @@ class AttrDict(dict):
         self.__dict__ = self
 
 
+CaseInstance = Case = Suite = AttrDict
+
+
 class CmdFailure(Exception):
     def __init__(self, msg, completed_proc):
         self.msg = msg
         self.proc = completed_proc
         self.code = completed_proc.returncode
         super().__init__(self, msg)
-
-
-# It's easier to read `Suite`, `Case` rather than AttrDict or dict.
-CaseInstance = Case = Suite = AttrDict
-
-global_deps = [
-    "mock",
-    "opentracing",
-    "pytest<4",
-    "pytest-benchmark",
-    "pytest-django",
-]
-
-global_env = [("PYTEST_ADDOPTS", "--color=yes")]
-
-all_suites = [
-    Suite(
-        name="tracer",
-        command="pytest tests/test_tracer.py",
-        env=dict(),
-        cases=[
-            Case(
-                pys=[2.7, 3.5, 3.6, 3.7, 3.8,],
-                pkgs=[("msgpack", [None, "==0.5.0", ">=0.5,<0.6", ">=0.6.0,<1.0", ""])],
-            ),
-        ],
-    ),
-    Suite(
-        name="redis",
-        command="pytest tests/contrib/redis/",
-        cases=[
-            Case(
-                pys=[2.7, 3.5, 3.6, 3.7, 3.8,],
-                pkgs=[
-                    (
-                        "redis",
-                        [
-                            ">=2.10,<2.11",
-                            ">=3.0,<3.1",
-                            ">=3.2,<3.3",
-                            ">=3.4,<3.5",
-                            ">=3.5,<3.6",
-                            "",
-                        ],
-                    )
-                ],
-            ),
-        ],
-    ),
-    Suite(
-        name="profiling",
-        command="python -m tests.profiling.run pytest --capture=no --verbose tests/profiling/",
-        env=[
-            ("DD_PROFILE_TEST_GEVENT", lambda c: "1" if "gevent" in c.pkgs else None),
-        ],
-        cases=[
-            Case(pys=[2.7, 3.5, 3.6, 3.7, 3.8], pkgs=[("gevent", [None, ""])],),
-            # Min reqs tests
-            Case(
-                pys=[2.7],
-                pkgs=[
-                    ("gevent", ["==1.1.0"]),
-                    ("protobuf", ["==3.0.0"]),
-                    ("tenacity", ["==5.0.1"]),
-                ],
-            ),
-            Case(
-                pys=[3.5, 3.6, 3.7, 3.8],
-                pkgs=[
-                    ("gevent", ["==1.4.0"]),
-                    ("protobuf", ["==3.0.0"]),
-                    ("tenacity", ["==5.0.1"]),
-                ],
-            ),
-        ],
-    ),
-    Suite(
-        name="django",
-        command="pytest tests/contrib/django",
-        cases=[
-            Case(
-                env=[("TEST_DATADOG_DJANGO_MIGRATION", [None, "1"])],
-                pys=[2.7, 3.5, 3.6],
-                pkgs=[
-                    ("django-pylibmc", [">=0.6,<0.7"]),
-                    ("django-redis", [">=4.5,<4.6"]),
-                    ("pylibmc", [""]),
-                    ("python-memcached", [""]),
-                    ("django", [">=1.8,<1.9", ">=1.11,<1.12"]),
-                ],
-            ),
-            Case(
-                env=[("TEST_DATADOG_DJANGO_MIGRATION", [None, "1"])],
-                pys=[3.5],
-                pkgs=[
-                    ("django-pylibmc", [">=0.6,<0.7"]),
-                    ("django-redis", [">=4.5,<4.6"]),
-                    ("pylibmc", [""]),
-                    ("python-memcached", [""]),
-                    ("django", [">=2.0,<2.1", ">=2.1,<2.2"]),
-                ],
-            ),
-            Case(
-                env=[("TEST_DATADOG_DJANGO_MIGRATION", [None, "1"])],
-                pys=[3.6, 3.7, 3.8],
-                pkgs=[
-                    ("django-pylibmc", [">=0.6,<0.7"]),
-                    ("django-redis", [">=4.5,<4.6"]),
-                    ("pylibmc", [""]),
-                    ("python-memcached", [""]),
-                    (
-                        "django",
-                        [">=2.0,<2.1", ">=2.1,<2.2", ">=2.2,<2.3", ">=3.0,<3.1", ""],
-                    ),
-                ],
-            ),
-        ],
-    ),
-]
 
 
 def rmchars(chars: t.List[str], s: str):
@@ -484,6 +368,13 @@ def main():
         nargs="?",
         help="Regular expression used to match case names.",
     )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=argparse.FileType("rb"),
+        dest="file",
+        default="riotfile.py",
+    )
     parser.add_argument("-l", "--list", action="store_true", help="List the cases.")
     parser.add_argument(
         "-g",
@@ -527,14 +418,19 @@ def main():
 
     pattern = re.compile(args.case_matcher)
 
+    # Heh, major hack and security vulnerability.
+    # Assumes that global_deps, global_env and suites variables will be
+    # declared.
+    exec(args.file.read(), globals())
+
     try:
         if args.list:
-            list_suites(all_suites, pattern)
+            list_suites(suites, pattern)
         elif args.generate_base_venvs:
             generate_base_venvs(all_suites, pattern)
         else:
             run_suites(
-                suites=all_suites,
+                suites=suites,
                 pattern=pattern,
                 recreate_venvs=args.recreate_venvs,
                 skip_base_install=args.skip_base_install,
