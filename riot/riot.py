@@ -1,4 +1,5 @@
 import argparse
+import importlib.abc
 import importlib.util
 import itertools
 import logging
@@ -38,7 +39,7 @@ class CmdFailure(Exception):
 
 @attr.s
 class Riot:
-    suites: t.List[Suite] = attr.ib(factory=list)
+    suites: t.List[AttrDict] = attr.ib(factory=list)
     global_deps: t.List[str] = attr.ib(factory=list)
     global_env: t.List[t.Tuple[str, str]] = attr.ib(factory=list)
 
@@ -46,7 +47,10 @@ class Riot:
     def from_config_file(cls, path: str) -> "Riot":
         spec = importlib.util.spec_from_file_location("riotfile", path)
         config = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(config)
+
+        # DEV: MyPy has `ModuleSpec.loader` as `Optiona[_Loader`]` which doesn't have `exec_module`
+        # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
+        t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
 
         suites = getattr(config, "suites", [])
         global_deps = getattr(config, "global_deps", [])
