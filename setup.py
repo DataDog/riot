@@ -24,6 +24,7 @@ setup(
     packages=find_packages(exclude=["tests*"]),
     python_requires=">=3.6",
     install_requires=["attrs>=19.1.0"],
+    extras_require={"ddtrace": ["ddtrace"],},
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
 )
