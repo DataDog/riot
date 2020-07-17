@@ -1,4 +1,7 @@
-from riot import *
+import re
+
+from riot import Suite, Case
+from riot.riot import expand_specs, suites_iter
 
 
 def test_expand():

@@ -1,4 +1,6 @@
 import argparse
+import importlib.abc
+import importlib.util
 import itertools
 import logging
 import os
@@ -7,6 +9,8 @@ import shutil
 import subprocess
 import sys
 import typing as t
+
+import attr
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +35,220 @@ class CmdFailure(Exception):
         self.proc = completed_proc
         self.code = completed_proc.returncode
         super().__init__(self, msg)
+
+
+@attr.s
+class Session:
+    suites: t.List[AttrDict] = attr.ib(factory=list)
+    global_deps: t.List[str] = attr.ib(factory=list)
+    global_env: t.List[t.Tuple[str, str]] = attr.ib(factory=list)
+
+    @classmethod
+    def from_config_file(cls, path: str) -> "Session":
+        spec = importlib.util.spec_from_file_location("riotfile", path)
+        config = importlib.util.module_from_spec(spec)
+
+        # DEV: MyPy has `ModuleSpec.loader` as `Optional[_Loader`]` which doesn't have `exec_module`
+        # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
+        t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
+
+        suites = getattr(config, "suites", [])
+        global_deps = getattr(config, "global_deps", [])
+        global_env = getattr(config, "global_env", [])
+
+        return cls(suites=suites, global_deps=global_deps, global_env=global_env)
+
+    def run_suites(
+        self,
+        pattern,
+        skip_base_install=False,
+        recreate_venvs=False,
+        out=sys.stdout,
+        pass_env=False,
+    ):
+        """Runs the command for each case in `suites` in a unique virtual
+        environment.
+        """
+        results = []
+
+        # Generate the base virtual envs required for the test suites.
+        # TODO: errors currently go unhandled
+        self.generate_base_venvs(
+            pattern, recreate=recreate_venvs, skip_deps=skip_base_install
+        )
+
+        for case in suites_iter(self.suites, pattern=pattern):
+            base_venv = get_base_venv_path(case.py)
+
+            # Resolve the packages required for this case.
+            pkgs: t.Dict[str, str] = {
+                name: version for name, version in case.pkgs if version is not None
+            }
+
+            # Strip special characters for the venv directory name.
+            venv = "_".join(
+                ["%s%s" % (n, rmchars("<=>.,", v)) for n, v in pkgs.items()]
+            )
+            venv = "%s_%s" % (base_venv, venv)
+            pkg_str = " ".join(
+                ["'%s'" % get_pep_dep(lib, version) for lib, version in pkgs.items()]
+            )
+            # Case result which will contain metadata about the test execution.
+            result = AttrDict(case=case, venv=venv, pkgstr=pkg_str)
+
+            try:
+                # Copy the base venv to use for this case.
+                logger.info(
+                    "Copying base virtualenv '%s' into case virtual env '%s'.",
+                    base_venv,
+                    venv,
+                )
+                try:
+                    run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
+                except CmdFailure as e:
+                    raise CmdFailure(
+                        "Failed to create case virtual env '%s'\n%s"
+                        % (venv, e.proc.stdout),
+                        e.proc,
+                    )
+
+                # Install the case dependencies if there are any.
+                if pkg_str:
+                    logger.info("Installing case dependencies %s.", pkg_str)
+                    try:
+                        run_cmd_venv(venv, "pip install %s" % pkg_str)
+                    except CmdFailure as e:
+                        raise CmdFailure(
+                            "Failed to install case dependencies %s\n%s"
+                            % (pkg_str, e.proc.stdout),
+                            e.proc,
+                        )
+
+                # Generate the environment for the test case.
+                env = os.environ.copy() if pass_env else {}
+                env.update({k: v for k, v in self.global_env})
+
+                # Add in the suite env vars.
+                for k, v in case.suite.env if "env" in case.suite else []:
+                    resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
+                    if resolved_val is not None:
+                        if k in env:
+                            logger.debug("Suite overrides environment variable %s", k)
+                        env[k] = resolved_val
+
+                # Add in the case env vars.
+                for k, v in case.env:
+                    resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
+                    if resolved_val is not None:
+                        if k in env:
+                            logger.debug("Case overrides environment variable %s", k)
+                        env[k] = resolved_val
+
+                # Finally, run the test in the venv.
+                cmd = case.suite.command
+                env_str = " ".join("%s=%s" % (k, v) for k, v in env.items())
+                logger.info(
+                    "Running suite command '%s' with environment '%s'.", cmd, env_str
+                )
+                try:
+                    # Pipe the command output directly to `out` since we
+                    # don't need to store it.
+                    run_cmd_venv(venv, cmd, stdout=out, env=env)
+                except CmdFailure as e:
+                    raise CmdFailure(
+                        "Test failed with exit code %s" % e.proc.returncode, e.proc
+                    )
+            except CmdFailure as e:
+                result.code = e.code
+                print(e.msg, file=out)
+            except KeyboardInterrupt:
+                result.code = 1
+                break
+            except Exception as e:
+                logger.error("Test runner failed: %s", e, exc_info=True)
+                sys.exit(1)
+            else:
+                result.code = 0
+            finally:
+                results.append(result)
+
+        print("\n-------------------summary-------------------", file=out)
+        for r in results:
+            failed = r.code != 0
+            status_char = "❌" if failed else "✅"
+            env_str = get_env_str(case.env)
+            s = "%s %s: %s python%s %s" % (
+                status_char,
+                r.case.suite.name,
+                env_str,
+                r.case.py,
+                r.pkgstr,
+            )
+            print(s, file=out)
+
+        if any(True for r in results if r.code != 0):
+            sys.exit(1)
+
+    def list_suites(self, pattern, out=sys.stdout):
+        curr_suite = None
+        for case in suites_iter(self.suites, pattern):
+            if case.suite != curr_suite:
+                curr_suite = case.suite
+                print("%s:" % case.suite.name, file=out)
+            pkgs_str = " ".join(
+                "'%s'" % get_pep_dep(name, version) for name, version in case.pkgs
+            )
+            env_str = get_env_str(case.env)
+            py_str = "Python %s" % case.py
+            print(" %s %s %s" % (env_str, py_str, pkgs_str), file=out)
+
+    def generate_base_venvs(self, pattern, recreate, skip_deps):
+        """Generate all the required base venvs for `suites`.
+        """
+        # Find all the python versions used.
+        required_pys = set(
+            [case.py for case in suites_iter(self.suites, pattern=pattern)]
+        )
+
+        logger.info(
+            "Generating virtual environments for Python versions %s",
+            " ".join(str(s) for s in required_pys),
+        )
+
+        for py in required_pys:
+            try:
+                venv_path = create_base_venv(py, recreate=recreate)
+            except CmdFailure as e:
+                logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
+            except FileNotFoundError:
+                logger.error("Python version '%s' not found.", py)
+            else:
+                if skip_deps:
+                    logger.info("Skipping global deps install.")
+                    continue
+
+                # Install the global dependencies into the base venv.
+                global_deps_str = " ".join(["'%s'" % dep for dep in self.global_deps])
+                logger.info(
+                    "Installing base dependencies %s into virtualenv.", global_deps_str
+                )
+
+                try:
+                    run_cmd_venv(venv_path, "pip install %s" % global_deps_str)
+                except CmdFailure as e:
+                    logger.error(
+                        "Base dependencies failed to install, aborting!\n%s",
+                        e.proc.stdout,
+                    )
+                    sys.exit(1)
+
+                # Install the dev package into the base venv.
+                logger.info("Installing dev package.")
+                try:
+                    run_cmd_venv(venv_path, "pip install -e .")
+                except CmdFailure as e:
+                    logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
+                    sys.exit(1)
 
 
 def rmchars(chars: t.List[str], s: str):
@@ -169,196 +387,6 @@ def suites_iter(suites, pattern, py=None):
             yield CaseInstance(suite=suite, case=case, env=env, py=spy, pkgs=pkgs)
 
 
-def run_suites(
-    suites,
-    pattern,
-    skip_base_install=False,
-    recreate_venvs=False,
-    out=sys.stdout,
-    pass_env=False,
-):
-    """Runs the command for each case in `suites` in a unique virtual
-    environment.
-    """
-    results = []
-
-    # Generate the base virtual envs required for the test suites.
-    # TODO: errors currently go unhandled
-    generate_base_venvs(
-        suites, pattern, recreate=recreate_venvs, skip_deps=skip_base_install
-    )
-
-    for case in suites_iter(suites, pattern=pattern):
-        base_venv = get_base_venv_path(case.py)
-
-        # Resolve the packages required for this case.
-        pkgs: t.Dict[str, str] = {
-            name: version for name, version in case.pkgs if version is not None
-        }
-
-        # Strip special characters for the venv directory name.
-        venv = "_".join(["%s%s" % (n, rmchars("<=>.,", v)) for n, v in pkgs.items()])
-        venv = "%s_%s" % (base_venv, venv)
-        pkg_str = " ".join(
-            ["'%s'" % get_pep_dep(lib, version) for lib, version in pkgs.items()]
-        )
-        # Case result which will contain metadata about the test execution.
-        result = AttrDict(case=case, venv=venv, pkgstr=pkg_str)
-
-        try:
-            # Copy the base venv to use for this case.
-            logger.info(
-                "Copying base virtualenv '%s' into case virtual env '%s'.",
-                base_venv,
-                venv,
-            )
-            try:
-                run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
-            except CmdFailure as e:
-                raise CmdFailure(
-                    "Failed to create case virtual env '%s'\n%s"
-                    % (venv, e.proc.stdout),
-                    e.proc,
-                )
-
-            # Install the case dependencies if there are any.
-            if pkg_str:
-                logger.info("Installing case dependencies %s.", pkg_str)
-                try:
-                    run_cmd_venv(venv, "pip install %s" % pkg_str)
-                except CmdFailure as e:
-                    raise CmdFailure(
-                        "Failed to install case dependencies %s\n%s"
-                        % (pkg_str, e.proc.stdout),
-                        e.proc,
-                    )
-
-            # Generate the environment for the test case.
-            env = os.environ.copy() if pass_env else {}
-            env.update({k: v for k, v in global_env})
-
-            # Add in the suite env vars.
-            for k, v in case.suite.env if "env" in case.suite else []:
-                resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
-                if resolved_val is not None:
-                    if k in env:
-                        logger.debug("Suite overrides environment variable %s", k)
-                    env[k] = resolved_val
-
-            # Add in the case env vars.
-            for k, v in case.env:
-                resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
-                if resolved_val is not None:
-                    if k in env:
-                        logger.debug("Case overrides environment variable %s", k)
-                    env[k] = resolved_val
-
-            # Finally, run the test in the venv.
-            cmd = case.suite.command
-            env_str = " ".join("%s=%s" % (k, v) for k, v in env.items())
-            logger.info(
-                "Running suite command '%s' with environment '%s'.", cmd, env_str
-            )
-            try:
-                # Pipe the command output directly to `out` since we
-                # don't need to store it.
-                run_cmd_venv(venv, cmd, stdout=out, env=env)
-            except CmdFailure as e:
-                raise CmdFailure(
-                    "Test failed with exit code %s" % e.proc.returncode, e.proc
-                )
-        except CmdFailure as e:
-            result.code = e.code
-            print(e.msg, file=out)
-        except KeyboardInterrupt:
-            result.code = 1
-            break
-        except Exception as e:
-            logger.error("Test runner failed: %s", e, exc_info=True)
-            sys.exit(1)
-        else:
-            result.code = 0
-        finally:
-            results.append(result)
-
-    print("\n-------------------summary-------------------", file=out)
-    for r in results:
-        failed = r.code != 0
-        status_char = "❌" if failed else "✅"
-        env_str = get_env_str(case.env)
-        s = "%s %s: %s python%s %s" % (
-            status_char,
-            r.case.suite.name,
-            env_str,
-            r.case.py,
-            r.pkgstr,
-        )
-        print(s, file=out)
-
-    if any(True for r in results if r.code != 0):
-        sys.exit(1)
-
-
-def list_suites(suites, pattern, out=sys.stdout):
-    curr_suite = None
-    for case in suites_iter(suites, pattern):
-        if case.suite != curr_suite:
-            curr_suite = case.suite
-            print("%s:" % case.suite.name, file=out)
-        pkgs_str = " ".join(
-            "'%s'" % get_pep_dep(name, version) for name, version in case.pkgs
-        )
-        env_str = get_env_str(case.env)
-        py_str = "Python %s" % case.py
-        print(" %s %s %s" % (env_str, py_str, pkgs_str), file=out)
-
-
-def generate_base_venvs(suites, pattern, recreate, skip_deps):
-    """Generate all the required base venvs for `suites`.
-    """
-    # Find all the python versions used.
-    required_pys = set([case.py for case in suites_iter(suites, pattern=pattern)])
-
-    logger.info(
-        "Generating virtual environments for Python versions %s",
-        " ".join(str(s) for s in required_pys),
-    )
-
-    for py in required_pys:
-        try:
-            venv_path = create_base_venv(py, recreate=recreate)
-        except CmdFailure as e:
-            logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
-        except FileNotFoundError:
-            logger.error("Python version '%s' not found.", py)
-        else:
-            if skip_deps:
-                logger.info("Skipping global deps install.")
-                continue
-
-            # Install the global dependencies into the base venv.
-            global_deps_str = " ".join(["'%s'" % dep for dep in global_deps])
-            logger.info(
-                "Installing base dependencies %s into virtualenv.", global_deps_str
-            )
-
-            try:
-                run_cmd_venv(venv_path, "pip install %s" % global_deps_str)
-            except CmdFailure as e:
-                logger.error(
-                    "Base dependencies failed to install, aborting!\n%s", e.proc.stdout
-                )
-                sys.exit(1)
-
-            # Install the dev package into the base venv.
-            logger.info("Installing dev package.")
-            try:
-                run_cmd_venv(venv_path, "pip install -e .")
-            except CmdFailure as e:
-                logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
-                sys.exit(1)
-
-
 def main():
     parser = argparse.ArgumentParser(description="A simple Python test runner runner.")
     parser.add_argument(
@@ -369,11 +397,7 @@ def main():
         help="Regular expression used to match case names.",
     )
     parser.add_argument(
-        "-f",
-        "--file",
-        type=argparse.FileType("rb"),
-        dest="file",
-        default="riotfile.py",
+        "-f", "--file", type=str, dest="file", default="riotfile.py",
     )
     parser.add_argument("-l", "--list", action="store_true", help="List the cases.")
     parser.add_argument(
@@ -418,19 +442,16 @@ def main():
 
     pattern = re.compile(args.case_matcher)
 
-    # Heh, major hack and security vulnerability.
-    # Assumes that global_deps, global_env and suites variables will be
-    # declared.
-    exec(args.file.read(), globals())
+    # Load riotfile config
+    session = Session.from_config_file(args.file)
 
     try:
         if args.list:
-            list_suites(suites, pattern)
+            session.list_suites(pattern)
         elif args.generate_base_venvs:
-            generate_base_venvs(all_suites, pattern)
+            session.generate_base_venvs(pattern)
         else:
-            run_suites(
-                suites=suites,
+            session.run_suites(
                 pattern=pattern,
                 recreate_venvs=args.recreate_venvs,
                 skip_base_install=args.skip_base_install,
