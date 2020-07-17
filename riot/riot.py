@@ -38,13 +38,13 @@ class CmdFailure(Exception):
 
 
 @attr.s
-class Riot:
+class Session:
     suites: t.List[AttrDict] = attr.ib(factory=list)
     global_deps: t.List[str] = attr.ib(factory=list)
     global_env: t.List[t.Tuple[str, str]] = attr.ib(factory=list)
 
     @classmethod
-    def from_config_file(cls, path: str) -> "Riot":
+    def from_config_file(cls, path: str) -> "Session":
         spec = importlib.util.spec_from_file_location("riotfile", path)
         config = importlib.util.module_from_spec(spec)
 
@@ -443,15 +443,15 @@ def main():
     pattern = re.compile(args.case_matcher)
 
     # Load riotfile config
-    instance = Riot.from_config_file(args.file)
+    session = Session.from_config_file(args.file)
 
     try:
         if args.list:
-            instance.list_suites(pattern)
+            session.list_suites(pattern)
         elif args.generate_base_venvs:
-            instance.generate_base_venvs(pattern)
+            session.generate_base_venvs(pattern)
         else:
-            instance.run_suites(
+            session.run_suites(
                 pattern=pattern,
                 recreate_venvs=args.recreate_venvs,
                 skip_base_install=args.skip_base_install,

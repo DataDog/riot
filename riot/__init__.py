@@ -1,3 +1,3 @@
-__all__ = ["Riot", "Suite", "Case"]
+__all__ = ["Session", "Suite", "Case"]
 
-from .riot import Riot, Suite, Case
+from .riot import Session, Suite, Case
