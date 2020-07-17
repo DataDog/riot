@@ -48,7 +48,7 @@ class Session:
         spec = importlib.util.spec_from_file_location("riotfile", path)
         config = importlib.util.module_from_spec(spec)
 
-        # DEV: MyPy has `ModuleSpec.loader` as `Optiona[_Loader`]` which doesn't have `exec_module`
+        # DEV: MyPy has `ModuleSpec.loader` as `Optional[_Loader`]` which doesn't have `exec_module`
         # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
         t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
 
