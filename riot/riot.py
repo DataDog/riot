@@ -13,14 +13,22 @@ import typing as t
 import attr
 
 try:
-    import ddtrace
+    import ddtrace  # type: ignore
 
     tracer = ddtrace.tracer
-    ddtrace.config.service = "ddtracepy-ci"
+    ddtrace.config.service = "riot-ci"
 except ImportError:
 
     class NoopSpan:
+        error = 0
+
         def __enter__(self):
+            pass
+
+        def set_tag(self, *args, **kwargs):
+            pass
+
+        def set_tags(self, *args, **kwargs):
             pass
 
         def __exit__(self, type, value, traceback):
