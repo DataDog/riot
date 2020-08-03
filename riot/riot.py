@@ -86,12 +86,10 @@ class Session:
             }
 
             # Strip special characters for the venv directory name.
-            venv = "_".join(
-                ["%s%s" % (n, rmchars("<=>.,", v)) for n, v in pkgs.items()]
-            )
-            venv = "%s_%s" % (base_venv, venv)
+            venv = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
+            venv = f"{base_venv}_{venv}"
             pkg_str = " ".join(
-                ["'%s'" % get_pep_dep(lib, version) for lib, version in pkgs.items()]
+                [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
             )
             # Case result which will contain metadata about the test execution.
             result = AttrDict(case=case, venv=venv, pkgstr=pkg_str)
@@ -107,8 +105,7 @@ class Session:
                     run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
                 except CmdFailure as e:
                     raise CmdFailure(
-                        "Failed to create case virtual env '%s'\n%s"
-                        % (venv, e.proc.stdout),
+                        f"Failed to create case virtual env '{venv}'\n{e.proc.stdout}",
                         e.proc,
                     )
 
@@ -116,11 +113,10 @@ class Session:
                 if pkg_str:
                     logger.info("Installing case dependencies %s.", pkg_str)
                     try:
-                        run_cmd_venv(venv, "pip install %s" % pkg_str)
+                        run_cmd_venv(venv, f"pip install {pkg_str}")
                     except CmdFailure as e:
                         raise CmdFailure(
-                            "Failed to install case dependencies %s\n%s"
-                            % (pkg_str, e.proc.stdout),
+                            f"Failed to install case dependencies {pkg_str}\n{e.proc.stdout}",
                             e.proc,
                         )
 
@@ -146,7 +142,7 @@ class Session:
 
                 # Finally, run the test in the venv.
                 cmd = case.suite.command
-                env_str = " ".join("%s=%s" % (k, v) for k, v in env.items())
+                env_str = " ".join(f"{k}={v}" for k, v in env.items())
                 logger.info(
                     "Running suite command '%s' with environment '%s'.", cmd, env_str
                 )
@@ -156,7 +152,7 @@ class Session:
                     run_cmd_venv(venv, cmd, stdout=out, env=env)
                 except CmdFailure as e:
                     raise CmdFailure(
-                        "Test failed with exit code %s" % e.proc.returncode, e.proc
+                        f"Test failed with exit code {e.proc.returncode}", e.proc
                     )
             except CmdFailure as e:
                 result.code = e.code
@@ -177,13 +173,7 @@ class Session:
             failed = r.code != 0
             status_char = "❌" if failed else "✅"
             env_str = get_env_str(case.env)
-            s = "%s %s: %s python%s %s" % (
-                status_char,
-                r.case.suite.name,
-                env_str,
-                r.case.py,
-                r.pkgstr,
-            )
+            s = f"{status_char} {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
@@ -194,13 +184,13 @@ class Session:
         for case in suites_iter(self.suites, pattern):
             if case.suite != curr_suite:
                 curr_suite = case.suite
-                print("%s:" % case.suite.name, file=out)
+                print(f"{case.suite.name}:", file=out)
             pkgs_str = " ".join(
-                "'%s'" % get_pep_dep(name, version) for name, version in case.pkgs
+                f"'{get_pep_dep(name, version)}'" for name, version in case.pkgs
             )
             env_str = get_env_str(case.env)
-            py_str = "Python %s" % case.py
-            print(" %s %s %s" % (env_str, py_str, pkgs_str), file=out)
+            py_str = f"Python {case.py}"
+            print(f" {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(self, pattern, recreate, skip_deps):
         """Generate all the required base venvs for `suites`.
@@ -228,13 +218,13 @@ class Session:
                     continue
 
                 # Install the global dependencies into the base venv.
-                global_deps_str = " ".join(["'%s'" % dep for dep in self.global_deps])
+                global_deps_str = " ".join([f"'{dep}'" for dep in self.global_deps])
                 logger.info(
                     "Installing base dependencies %s into virtualenv.", global_deps_str
                 )
 
                 try:
-                    run_cmd_venv(venv_path, "pip install %s" % global_deps_str)
+                    run_cmd_venv(venv_path, f"pip install {global_deps_str}")
                 except CmdFailure as e:
                     logger.error(
                         "Base dependencies failed to install, aborting!\n%s",
@@ -251,7 +241,7 @@ class Session:
                     sys.exit(1)
 
 
-def rmchars(chars: t.List[str], s: str):
+def rmchars(chars: str, s: str):
     for c in chars:
         s = s.replace(c, "")
     return s
@@ -262,18 +252,19 @@ def get_pep_dep(libname: str, version: str):
 
     ref: https://www.python.org/dev/peps/pep-0508/
     """
-    return "%s%s" % (libname, version)
+    return f"{libname}{version}"
 
 
 def get_env_str(envs: t.List[t.Tuple]):
-    return " ".join("%s=%s" % (k, v) for k, v in envs)
+    return " ".join(f"{k}={v}" for k, v in envs)
 
 
 def get_base_venv_path(pyversion):
     """Given a python version return the base virtual environment path relative
     to the current directory.
     """
-    return ".venv_py%s" % str(pyversion).replace(".", "")
+    pyversion = str(pyversion).replace(".", "")
+    return f".riot/.venv_py{pyversion}"
 
 
 def run_cmd(*args, **kwargs):
@@ -306,7 +297,7 @@ def create_base_venv(pyversion, path=None, recreate=True):
         logger.info("Skipping creating virtualenv %s as it already exists.", path)
         return path
 
-    py_ex = "python%s" % pyversion
+    py_ex = f"python{pyversion}"
     py_ex = shutil.which(py_ex)
 
     if not py_ex:
@@ -316,7 +307,7 @@ def create_base_venv(pyversion, path=None, recreate=True):
         logger.info("Found Python interpreter '%s'.", py_ex)
 
     logger.info("Creating virtualenv '%s' with Python '%s'.", path, py_ex)
-    r = run_cmd(["virtualenv", "--python=%s" % py_ex, path], stdout=subprocess.PIPE)
+    r = run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
     return path
 
 
@@ -324,12 +315,12 @@ def get_venv_command(venv_path, cmd):
     """Return the command string used to execute `cmd` in virtual env located
     at `venv_path`.
     """
-    return "source %s/bin/activate && %s" % (venv_path, cmd)
+    return f"source {venv_path}/bin/activate && {cmd}"
 
 
 def run_cmd_venv(venv, cmd, **kwargs):
     env = kwargs.get("env") or {}
-    env_str = " ".join("%s=%s" % (k, v) for k, v in env.items())
+    env_str = " ".join(f"{k}={v}" for k, v in env.items())
     cmd = get_venv_command(venv, cmd)
 
     logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
