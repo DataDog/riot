@@ -1,10 +1,8 @@
-import argparse
 import importlib.abc
 import importlib.util
 import itertools
 import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -376,83 +374,3 @@ def suites_iter(suites, pattern, py=None):
             if py and spy != py:
                 continue
             yield CaseInstance(suite=suite, case=case, env=env, py=spy, pkgs=pkgs)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="A simple Python test runner runner.")
-    parser.add_argument(
-        "case_matcher",
-        type=str,
-        default=".*",
-        nargs="?",
-        help="Regular expression used to match case names.",
-    )
-    parser.add_argument(
-        "-f", "--file", type=str, dest="file", default="riotfile.py",
-    )
-    parser.add_argument("-l", "--list", action="store_true", help="List the cases.")
-    parser.add_argument(
-        "-g",
-        "--generate-base-venvs",
-        action="store_true",
-        help="Generates the base virtual environments containing the dev package.",
-    )
-    parser.add_argument(
-        "--pass-env",
-        default=os.getenv("PASS_ENV"),
-        help="Pass the current environment to the test cases.",
-    )
-    parser.add_argument(
-        "-s",
-        "--skip-base-install",
-        default=os.getenv("SKIP_BASE_INSTALL"),
-        action="store_true",
-        dest="skip_base_install",
-        help="Skip installing the dev package and global dependencies into the environment.",
-    )
-    parser.add_argument(
-        "-r",
-        "--recreate-venvs",
-        default=os.getenv("RECREATE_VENVS"),
-        action="store_true",
-        dest="recreate_venvs",
-        help="Forces the recreation of virtual environments if they already exist.",
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_const", dest="loglevel", const=logging.INFO
-    )
-    parser.add_argument(
-        "-d", "--debug", action="store_const", dest="loglevel", const=logging.DEBUG
-    )
-    args = parser.parse_args()
-
-    if args.loglevel:
-        logging.basicConfig(level=args.loglevel)
-
-    logger.debug("Parsed arguments: %r.", args)
-
-    pattern = re.compile(args.case_matcher)
-
-    # Load riotfile config
-    session = Session.from_config_file(args.file)
-
-    try:
-        if args.list:
-            session.list_suites(pattern)
-        elif args.generate_base_venvs:
-            session.generate_base_venvs(pattern)
-        else:
-            session.run_suites(
-                pattern=pattern,
-                recreate_venvs=args.recreate_venvs,
-                skip_base_install=args.skip_base_install,
-                pass_env=args.pass_env,
-            )
-    except KeyboardInterrupt as e:
-        pass
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
