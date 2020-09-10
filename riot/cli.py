@@ -1,6 +1,6 @@
 __all__ = ["main"]
 
-import importlib.metadata
+import pkg_resources
 import logging
 import re
 
@@ -10,8 +10,8 @@ from .riot import Session
 
 
 try:
-    __version__ = importlib.metadata.version("riot")
-except importlib.metadata.PackageNotFoundError:
+    __version__ = pkg_resources.get_distribution("riot").version
+except pkg_resources.DistributionNotFound:
     # package is not installed
     __version__ = "dev"
 
