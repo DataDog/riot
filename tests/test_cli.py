@@ -3,10 +3,10 @@ import os
 import re
 import shutil
 import typing
-from unittest import mock
 
 
 import click.testing
+import mock
 import pytest
 
 import riot.cli
