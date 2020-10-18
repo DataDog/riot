@@ -17,7 +17,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
     ],
-    entry_points={"console_scripts": ["riot = riot.__main__"]},
+    entry_points={"console_scripts": ["riot = riot.__main__:main"]},
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="Apache 2",
