@@ -64,8 +64,8 @@ class Session:
         out=sys.stdout,
         pass_env=False,
     ):
-        """Runs the command for each case in `suites` in a unique virtual
-        environment.
+        """Runs the command for each case in `suites` in a virtual environment
+        determined by its dependencies.
         """
         results = []
 
@@ -83,32 +83,38 @@ class Session:
                 name: version for name, version in case.pkgs if version is not None
             }
 
-            # Strip special characters for the venv directory name.
-            venv = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
-            venv = f"{base_venv}_{venv}"
-            pkg_str = " ".join(
-                [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
-            )
+            if pkgs:
+                # Strip special characters for the venv directory name.
+                venv_postfix = "_".join(
+                    [f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()]
+                )
+                venv = f"{base_venv}_{venv_postfix}"
+                pkg_str = " ".join(
+                    [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
+                )
+            else:
+                venv = base_venv
+                pkg_str = ""
+
             # Case result which will contain metadata about the test execution.
             result = AttrDict(case=case, venv=venv, pkgstr=pkg_str)
 
             try:
-                # Copy the base venv to use for this case.
-                logger.info(
-                    "Copying base virtualenv '%s' into case virtual env '%s'.",
-                    base_venv,
-                    venv,
-                )
-                try:
-                    run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
-                except CmdFailure as e:
-                    raise CmdFailure(
-                        f"Failed to create case virtual env '{venv}'\n{e.proc.stdout}",
-                        e.proc,
+                if pkgs:
+                    # Copy the base venv to use for this case.
+                    logger.info(
+                        "Copying base virtualenv '%s' into case virtual env '%s'.",
+                        base_venv,
+                        venv,
                     )
+                    try:
+                        run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
+                    except CmdFailure as e:
+                        raise CmdFailure(
+                            f"Failed to create case virtual env '{venv}'\n{e.proc.stdout}",
+                            e.proc,
+                        )
 
-                # Install the case dependencies if there are any.
-                if pkg_str:
                     logger.info("Installing case dependencies %s.", pkg_str)
                     try:
                         run_cmd_venv(venv, f"pip install {pkg_str}")
@@ -152,9 +158,6 @@ class Session:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
                     )
-            except CmdFailure as e:
-                result.code = e.code
-                print(e.msg, file=out)
             except KeyboardInterrupt:
                 result.code = 1
                 break
@@ -191,8 +194,7 @@ class Session:
             print(f" {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(self, pattern, recreate, skip_deps):
-        """Generate all the required base venvs for `suites`.
-        """
+        """Generate all the required base venvs for `suites`."""
         # Find all the python versions used.
         required_pys = set(
             [case.py for case in suites_iter(self.suites, pattern=pattern)]
