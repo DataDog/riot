@@ -15,7 +15,8 @@ jobs:
       - uses: actions/checkout@v2
       # Default version is 3.x (latest)
       - uses: actions/setup-python@v2
-      - run: pip install mypy
+      # We need to install pytest to get mypy definitions
+      - run: pip install mypy pytest
       - run: mypy riot/ tests/
   test:
     strategy:
@@ -30,6 +31,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install Riot
         # Install Riot (".") + test dependencies
-        run: pip install . pytest
+        run: pip install . mock pytest
       - name: Run tests
         run: pytest tests/
