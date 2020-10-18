@@ -191,8 +191,7 @@ class Session:
             print(f" {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(self, pattern, recreate, skip_deps):
-        """Generate all the required base venvs for `suites`.
-        """
+        """Generate all the required base venvs for `suites`."""
         # Find all the python versions used.
         required_pys = set(
             [case.py for case in suites_iter(self.suites, pattern=pattern)]
