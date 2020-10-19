@@ -5,23 +5,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # Default version is 3.x (latest)
       - uses: actions/setup-python@v2
-      - run: pip install black==19.10b0
-      - run: black --check .
+        with:
+          python-version: '3.8'
+      - name: Install Riot
+        run: pip install .
+      - run: riot -v run check_format
   mypy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # Default version is 3.x (latest)
       - uses: actions/setup-python@v2
-      # We need to install pytest to get mypy definitions
-      - run: pip install mypy pytest
-      - run: mypy riot/ tests/
+        with:
+          python-version: '3.8'
+      - name: Install Riot
+        run: pip install .
+      - run: riot -v run typing
   test:
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.6, 3.7, 3.8, 3.9]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -30,7 +33,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Riot
-        # Install Riot (".") + test dependencies
-        run: pip install . mock pytest
+        run: pip install .
       - name: Run tests
-        run: pytest tests/
+        run: riot -v run --python=${{ matrix.python-version }} test

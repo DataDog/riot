@@ -119,7 +119,13 @@ def test_run_suites(cli: click.testing.CliRunner):
             run_suites.assert_called_once()
             kwargs = run_suites.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate_venvs", "skip_base_install", "pass_env"]
+                [
+                    "pattern",
+                    "recreate_venvs",
+                    "skip_base_install",
+                    "pass_env",
+                    "pythons",
+                ]
             )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] == False
@@ -142,7 +148,13 @@ def test_run_suites_with_long_args(cli: click.testing.CliRunner):
             run_suites.assert_called_once()
             kwargs = run_suites.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate_venvs", "skip_base_install", "pass_env"]
+                [
+                    "pattern",
+                    "recreate_venvs",
+                    "skip_base_install",
+                    "pass_env",
+                    "pythons",
+                ]
             )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] == True
@@ -162,7 +174,13 @@ def test_run_suites_with_short_args(cli: click.testing.CliRunner):
             run_suites.assert_called_once()
             kwargs = run_suites.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate_venvs", "skip_base_install", "pass_env"]
+                [
+                    "pattern",
+                    "recreate_venvs",
+                    "skip_base_install",
+                    "pass_env",
+                    "pythons",
+                ]
             )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] == True
@@ -182,7 +200,13 @@ def test_run_suites_with_pattern(cli: click.testing.CliRunner):
             run_suites.assert_called_once()
             kwargs = run_suites.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate_venvs", "skip_base_install", "pass_env"]
+                [
+                    "pattern",
+                    "recreate_venvs",
+                    "skip_base_install",
+                    "pass_env",
+                    "pythons",
+                ]
             )
             assert kwargs["pattern"].pattern == "^pattern.*"
             assert kwargs["recreate_venvs"] == False
@@ -195,7 +219,8 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner):
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
-                riot.cli.main, ["generate", "--recreate-venvs", "--skip-base-install"],
+                riot.cli.main,
+                ["generate", "--recreate-venvs", "--skip-base-install"],
             )
             # Success, but no output because we mock generate_base_venvs
             assert result.exit_code == 0
@@ -203,7 +228,9 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner):
 
             generate_base_venvs.assert_called_once()
             kwargs = generate_base_venvs.call_args.kwargs
-            assert set(kwargs.keys()) == set(["pattern", "recreate", "skip_deps"])
+            assert set(kwargs.keys()) == set(
+                ["pattern", "recreate", "skip_deps", "pythons"]
+            )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate"] == True
             assert kwargs["skip_deps"] == True
@@ -220,7 +247,9 @@ def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner):
 
             generate_base_venvs.assert_called_once()
             kwargs = generate_base_venvs.call_args.kwargs
-            assert set(kwargs.keys()) == set(["pattern", "recreate", "skip_deps"])
+            assert set(kwargs.keys()) == set(
+                ["pattern", "recreate", "skip_deps", "pythons"]
+            )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate"] == True
             assert kwargs["skip_deps"] == True
@@ -237,7 +266,9 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
 
             generate_base_venvs.assert_called_once()
             kwargs = generate_base_venvs.call_args.kwargs
-            assert set(kwargs.keys()) == set(["pattern", "recreate", "skip_deps"])
+            assert set(kwargs.keys()) == set(
+                ["pattern", "recreate", "skip_deps", "pythons"]
+            )
             assert kwargs["pattern"].pattern == "^pattern.*"
             assert kwargs["recreate"] == False
             assert kwargs["skip_deps"] == False

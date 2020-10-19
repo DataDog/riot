@@ -43,7 +43,13 @@ def test_suites_iter():
             command="pytest tests/test_tracer.py",
             cases=[
                 Case(
-                    pys=[2.7, 3.5, 3.6, 3.7, 3.8,],
+                    pys=[
+                        2.7,
+                        3.5,
+                        3.6,
+                        3.7,
+                        3.8,
+                    ],
                     pkgs=[("msgpack", [None, "==0.5.0", ">=0.5,<0.6", ">=0.6.0,<1.0"])],
                 ),
             ],
@@ -80,7 +86,7 @@ def test_suites_iter():
                         ("django", [">=2.0,<2.1", ">=2.1,<2.2"]),
                     ],
                 ),
-                Suite(
+                Case(
                     env=[("TEST_DATADOG_DJANGO_MIGRATION", [None, "1"])],
                     pys=[3.6, 3.7, 3.8],
                     pkgs=[
