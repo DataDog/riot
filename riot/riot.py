@@ -197,6 +197,9 @@ class Session:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
                     )
+            except CmdFailure as e:
+                result.code = e.code
+                print(e.msg, file=out)
             except KeyboardInterrupt:
                 result.code = 1
                 break
@@ -213,7 +216,7 @@ class Session:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
             env_str = get_env_str(case.env)
-            s = f"{status_char} {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
+            s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
