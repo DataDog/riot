@@ -23,6 +23,9 @@ RECREATE_VENVS_ARG = click.option(
 SKIP_BASE_INSTALL_ARG = click.option(
     "-s", "--skip-base-install", "skip_base_install", is_flag=True, default=False
 )
+PYTHON_VERSIONS_ARG = click.option(
+    "-p", "--python", "pythons", type=float, default=[], multiple=True
+)
 
 
 @click.group()
@@ -56,13 +59,15 @@ def list_suites(ctx, pattern):
 @main.command(help="Generate virtual environments")
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
+@PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @click.pass_context
-def generate(ctx, recreate_venvs, skip_base_install, pattern):
+def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
     ctx.obj["session"].generate_base_venvs(
         pattern=re.compile(pattern),
         recreate=recreate_venvs,
         skip_deps=skip_base_install,
+        pythons=pythons,
     )
 
 
@@ -70,12 +75,14 @@ def generate(ctx, recreate_venvs, skip_base_install, pattern):
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
+@PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @click.pass_context
-def run(ctx, recreate_venvs, skip_base_install, pass_env, pattern):
+def run(ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern):
     ctx.obj["session"].run_suites(
         pattern=re.compile(pattern),
         recreate_venvs=recreate_venvs,
         skip_base_install=skip_base_install,
         pass_env=pass_env,
+        pythons=pythons,
     )
