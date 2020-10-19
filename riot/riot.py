@@ -24,7 +24,40 @@ class AttrDict(dict):
         self.__dict__ = self
 
 
-CaseInstance = Case = Suite = AttrDict
+PkgSpec = t.Tuple[str, t.List[str]]
+EnvSpec = t.Tuple[str, t.List[str]]
+
+
+@attr.s
+class Case:
+    pys: t.List[float] = attr.ib()
+    pkgs: t.List[PkgSpec] = attr.ib(default=[])
+    env: t.List[EnvSpec] = attr.ib(default=[])
+
+
+@attr.s
+class Suite:
+    name: str = attr.ib()
+    command: str = attr.ib()
+    cases: t.List[Case] = attr.ib()
+    env: t.List[EnvSpec] = attr.ib(default=[])
+
+
+@attr.s
+class CaseInstance:
+    py: float = attr.ib()
+    case: Case = attr.ib()
+    suite: Suite = attr.ib()
+    pkgs: t.List[PkgSpec] = attr.ib()
+    env: t.List[EnvSpec] = attr.ib()
+
+
+@attr.s
+class CaseResult:
+    case: CaseInstance = attr.ib()
+    venv: str = attr.ib()
+    pkgstr: str = attr.ib()
+    code: int = attr.ib(default=1)
 
 
 class CmdFailure(Exception):
@@ -37,7 +70,7 @@ class CmdFailure(Exception):
 
 @attr.s
 class Session:
-    suites: t.List[AttrDict] = attr.ib(factory=list)
+    suites: t.List[Suite] = attr.ib(factory=list)
     global_deps: t.List[str] = attr.ib(factory=list)
     global_env: t.List[t.Tuple[str, str]] = attr.ib(factory=list)
 
@@ -58,10 +91,10 @@ class Session:
 
     def run_suites(
         self,
-        pattern,
+        pattern: t.Pattern,
         skip_base_install=False,
         recreate_venvs=False,
-        out=sys.stdout,
+        out: t.TextIO = sys.stdout,
         pass_env=False,
         pythons=[],
     ):
@@ -70,8 +103,6 @@ class Session:
         """
         results = []
 
-        # Generate the base virtual envs required for the test suites.
-        # TODO: errors currently go unhandled
         self.generate_base_venvs(
             pattern,
             recreate=recreate_venvs,
@@ -98,7 +129,7 @@ class Session:
                 [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
             )
             # Case result which will contain metadata about the test execution.
-            result = AttrDict(case=case, venv=venv, pkgstr=pkg_str)
+            result = CaseResult(case=case, venv=venv, pkgstr=pkg_str)
 
             try:
                 # Copy the base venv to use for this case.
@@ -131,7 +162,7 @@ class Session:
                 env.update({k: v for k, v in self.global_env})
 
                 # Add in the suite env vars.
-                for k, v in case.suite.env if "env" in case.suite else []:
+                for k, v in case.suite.env:
                     resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
                     if resolved_val is not None:
                         if k in env:
@@ -177,7 +208,7 @@ class Session:
         print("\n-------------------summary-------------------", file=out)
         for r in results:
             failed = r.code != 0
-            status_char = "❌" if failed else "✅"
+            status_char = "✖️" if failed else "✔️"
             env_str = get_env_str(case.env)
             s = f"{status_char} {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
             print(s, file=out)
@@ -198,18 +229,19 @@ class Session:
             py_str = f"Python {case.py}"
             print(f" {env_str} {py_str} {pkgs_str}", file=out)
 
-    def generate_base_venvs(self, pattern, recreate, skip_deps, pythons):
+    def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
         """Generate all the required base venvs for `suites`."""
         # Find all the python versions used.
         required_pys = set(
             [case.py for case in suites_iter(self.suites, pattern=pattern)]
         )
         # Apply Python filters.
-        required_pys = required_pys.intersection(pythons)
+        if pythons:
+            required_pys = required_pys.intersection(pythons)
 
         logger.info(
             "Generating virtual environments for Python versions %s",
-            " ".join(str(s) for s in required_pys),
+            ",".join(str(s) for s in required_pys),
         )
 
         for py in required_pys:
@@ -301,7 +333,7 @@ def create_base_venv(pyversion, path=None, recreate=True):
     path = path or get_base_venv_path(pyversion)
 
     if os.path.isdir(path) and not recreate:
-        logger.info("Skipping creating virtualenv %s as it already exists.", path)
+        logger.info("Skipping creation of virtualenv '%s' as it already exists.", path)
         return path
 
     py_ex = f"python{pyversion}"
@@ -350,15 +382,15 @@ def expand_specs(specs):
     return all_vals
 
 
-def case_iter(case):
-    # We could itertools.product here again, but I think this is clearer.
-    for env_cfg in expand_specs(case.env) if "env" in case else [[]]:
+def case_iter(case: Case):
+    # We could itertools.product here again but I think this is clearer.
+    for env_cfg in expand_specs(case.env):
         for py in case.pys:
             for pkg_cfg in expand_specs(case.pkgs):
                 yield env_cfg, py, pkg_cfg
 
 
-def cases_iter(cases):
+def cases_iter(cases: t.Iterable[Case]):
     """Iterator over all case instances of a suite.
 
     Yields the dependencies unique to the instance of the suite.
@@ -368,11 +400,11 @@ def cases_iter(cases):
             yield case, env_cfg, py, pkg_cfg
 
 
-def suites_iter(suites, pattern, py=None):
+def suites_iter(suites: t.Iterable[Suite], pattern: t.Pattern, py=None):
     """Iterator over an iterable of suites.
 
-    :param py: An optional python version to match against.
     :param pattern: An optional pattern to match suite names against.
+    :param py: An optional python version to match against.
     """
     for suite in suites:
         if not pattern.match(suite.name):
