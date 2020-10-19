@@ -63,6 +63,7 @@ class Session:
         recreate_venvs=False,
         out=sys.stdout,
         pass_env=False,
+        pythons=[],
     ):
         """Runs the command for each case in `suites` in a unique virtual
         environment.
@@ -72,10 +73,17 @@ class Session:
         # Generate the base virtual envs required for the test suites.
         # TODO: errors currently go unhandled
         self.generate_base_venvs(
-            pattern, recreate=recreate_venvs, skip_deps=skip_base_install
+            pattern,
+            recreate=recreate_venvs,
+            skip_deps=skip_base_install,
+            pythons=pythons,
         )
 
         for case in suites_iter(self.suites, pattern=pattern):
+            if pythons and case.py not in pythons:
+                logger.debug("Skipping case %s due to Python version", case)
+                continue
+
             base_venv = get_base_venv_path(case.py)
 
             # Resolve the packages required for this case.
@@ -190,12 +198,14 @@ class Session:
             py_str = f"Python {case.py}"
             print(f" {env_str} {py_str} {pkgs_str}", file=out)
 
-    def generate_base_venvs(self, pattern, recreate, skip_deps):
+    def generate_base_venvs(self, pattern, recreate, skip_deps, pythons):
         """Generate all the required base venvs for `suites`."""
         # Find all the python versions used.
         required_pys = set(
             [case.py for case in suites_iter(self.suites, pattern=pattern)]
         )
+        # Apply Python filters.
+        required_pys = required_pys.intersection(pythons)
 
         logger.info(
             "Generating virtual environments for Python versions %s",
