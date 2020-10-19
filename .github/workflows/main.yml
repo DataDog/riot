@@ -5,19 +5,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # Default version is 3.x (latest)
       - uses: actions/setup-python@v2
-      - run: pip install black==20.8b1
-      - run: black --check .
+        with:
+          python-version: '3.8'
+      - name: Install Riot
+        run: pip install .
+      - run: riot -v run check_format
   mypy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # Default version is 3.x (latest)
       - uses: actions/setup-python@v2
-      # We need to install pytest to get mypy definitions
-      - run: pip install mypy pytest
-      - run: mypy riot/ tests/
+        with:
+          python-version: '3.8'
+      - name: Install Riot
+        run: pip install .
+      - run: riot -v run typing
   test:
     strategy:
       matrix:
@@ -32,4 +35,4 @@ jobs:
       - name: Install Riot
         run: pip install .
       - name: Run tests
-        run: riot run --python=${{ matrix.python-version }} test
+        run: riot -v run --python=${{ matrix.python-version }} test

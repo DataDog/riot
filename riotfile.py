@@ -19,4 +19,24 @@ suites = [
             ),
         ],
     ),
+    Suite(
+        name="check_format",
+        command="black --check .",
+        cases=[
+            Case(
+                pys=[3.8],
+                pkgs=[("black", ["==20.8b1"])],
+            ),
+        ],
+    ),
+    Suite(
+        name="typing",
+        command="mypy riot/ tests/",
+        cases=[
+            Case(
+                pys=[3.8],
+                pkgs=[("mypy", [""])],
+            ),
+        ],
+    ),
 ]
