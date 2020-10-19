@@ -23,7 +23,11 @@ setup(
     license="Apache 2",
     packages=find_packages(exclude=["tests*"]),
     python_requires=">=3.6",
-    install_requires=["attrs>=19.1.0", "click>=7,<8", "virtualenv"],
+    install_requires=[
+        "attrs>=19.1.0",
+        "click>=7,<8",
+        "virtualenv",
+    ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
 )

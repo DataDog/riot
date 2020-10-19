@@ -236,7 +236,8 @@ class Session:
             [case.py for case in suites_iter(self.suites, pattern=pattern)]
         )
         # Apply Python filters.
-        required_pys = required_pys.intersection(pythons)
+        if pythons:
+            required_pys = required_pys.intersection(pythons)
 
         logger.info(
             "Generating virtual environments for Python versions %s",
