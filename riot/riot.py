@@ -156,7 +156,9 @@ class Session:
 
                     logger.info("Installing case dependencies %s.", pkg_str)
                     try:
-                        run_cmd_venv(venv, f"pip install {pkg_str}")
+                        run_cmd_venv(
+                            venv, f"pip --disable-pip-version-check install {pkg_str}"
+                        )
                     except CmdFailure as e:
                         raise CmdFailure(
                             f"Failed to install case dependencies {pkg_str}\n{e.proc.stdout}",
@@ -269,7 +271,10 @@ class Session:
                 )
 
                 try:
-                    run_cmd_venv(venv_path, f"pip install {global_deps_str}")
+                    run_cmd_venv(
+                        venv_path,
+                        f"pip --disable-pip-version-check install {global_deps_str}",
+                    )
                 except CmdFailure as e:
                     logger.error(
                         "Base dependencies failed to install, aborting!\n%s",
@@ -280,7 +285,9 @@ class Session:
                 # Install the dev package into the base venv.
                 logger.info("Installing dev package.")
                 try:
-                    run_cmd_venv(venv_path, "pip install -e .")
+                    run_cmd_venv(
+                        venv_path, "pip --disable-pip-version-check install -e ."
+                    )
                 except CmdFailure as e:
                     logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
                     sys.exit(1)
