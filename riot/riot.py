@@ -217,7 +217,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            env_str = get_env_str(case.env)
+            env_str = get_env_str(r.case.env)
             s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
             print(s, file=out)
 
