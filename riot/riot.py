@@ -98,8 +98,8 @@ class Session:
         pass_env=False,
         pythons=[],
     ):
-        """Runs the command for each case in `suites` in a unique virtual
-        environment.
+        """Runs the command for each case in `suites` in a virtual environment
+        determined by its dependencies.
         """
         results = []
 
@@ -122,35 +122,43 @@ class Session:
                 name: version for name, version in case.pkgs if version is not None
             }
 
-            # Strip special characters for the venv directory name.
-            venv = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
-            venv = f"{base_venv}_{venv}"
-            pkg_str = " ".join(
-                [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
-            )
+            if pkgs:
+                # Strip special characters for the venv directory name.
+                venv_postfix = "_".join(
+                    [f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()]
+                )
+                venv = f"{base_venv}_{venv_postfix}"
+                pkg_str = " ".join(
+                    [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
+                )
+            else:
+                venv = base_venv
+                pkg_str = ""
+
             # Case result which will contain metadata about the test execution.
             result = CaseResult(case=case, venv=venv, pkgstr=pkg_str)
 
             try:
-                # Copy the base venv to use for this case.
-                logger.info(
-                    "Copying base virtualenv '%s' into case virtual env '%s'.",
-                    base_venv,
-                    venv,
-                )
-                try:
-                    run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
-                except CmdFailure as e:
-                    raise CmdFailure(
-                        f"Failed to create case virtual env '{venv}'\n{e.proc.stdout}",
-                        e.proc,
+                if pkgs:
+                    # Copy the base venv to use for this case.
+                    logger.info(
+                        "Copying base virtualenv '%s' into case virtual env '%s'.",
+                        base_venv,
+                        venv,
                     )
+                    try:
+                        run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
+                    except CmdFailure as e:
+                        raise CmdFailure(
+                            f"Failed to create case virtual env '{venv}'\n{e.proc.stdout}",
+                            e.proc,
+                        )
 
-                # Install the case dependencies if there are any.
-                if pkg_str:
                     logger.info("Installing case dependencies %s.", pkg_str)
                     try:
-                        run_cmd_venv(venv, f"pip install {pkg_str}")
+                        run_cmd_venv(
+                            venv, f"pip --disable-pip-version-check install {pkg_str}"
+                        )
                     except CmdFailure as e:
                         raise CmdFailure(
                             f"Failed to install case dependencies {pkg_str}\n{e.proc.stdout}",
@@ -210,7 +218,7 @@ class Session:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
             env_str = get_env_str(case.env)
-            s = f"{status_char} {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
+            s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
@@ -263,7 +271,10 @@ class Session:
                 )
 
                 try:
-                    run_cmd_venv(venv_path, f"pip install {global_deps_str}")
+                    run_cmd_venv(
+                        venv_path,
+                        f"pip --disable-pip-version-check install {global_deps_str}",
+                    )
                 except CmdFailure as e:
                     logger.error(
                         "Base dependencies failed to install, aborting!\n%s",
@@ -274,7 +285,9 @@ class Session:
                 # Install the dev package into the base venv.
                 logger.info("Installing dev package.")
                 try:
-                    run_cmd_venv(venv_path, "pip install -e .")
+                    run_cmd_venv(
+                        venv_path, "pip --disable-pip-version-check install -e ."
+                    )
                 except CmdFailure as e:
                     logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
                     sys.exit(1)
