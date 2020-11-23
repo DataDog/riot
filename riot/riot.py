@@ -24,38 +24,70 @@ class AttrDict(dict):
         self.__dict__ = self
 
 
-PkgSpec = t.Tuple[str, t.List[str]]
-EnvSpec = t.Tuple[str, t.List[str]]
+@attr.s
+class Venv:
+    name: t.Optional[str] = attr.ib(default=None)
+    command: t.Optional[str] = attr.ib(default=None)
+    pys: t.List[float] = attr.ib(default=[])
+    pkgs: t.Dict[str, t.List[str]] = attr.ib(default={})
+    env: t.Dict[str, t.List[str]] = attr.ib(default={})
+    venvs: t.List["Venv"] = attr.ib(default=[])
+
+    def resolve(self, parents: t.List["Venv"]) -> "Venv":
+        if not parents:
+            return self
+        else:
+            venv = Venv()
+            for parent in parents + [self]:
+                if parent.name:
+                    venv.name = parent.name
+                if parent.pys:
+                    venv.pys = parent.pys
+                if parent.command:
+                    venv.command = parent.command
+                venv.env.update(parent.env)
+                venv.pkgs.update(parent.pkgs)
+            return venv
+
+    def expand(self, parents: t.List["Venv"]):
+        for venv in self.venvs:
+            for venv_inst in venv.expand(parents + [self]):
+                if venv_inst:
+                    yield venv_inst
+        else:
+            resolved = self.resolve(parents)
+
+            # If the venv doesn't have a command or python then skip it.
+            if not resolved.command or not resolved.pys:
+                logger.debug("Venv %r is not runnable, skipping.", self)
+                return
+
+            # Expand out the instances for the venv.
+            for env in expand_specs(resolved.env):
+                for py in resolved.pys:
+                    for pkgs in expand_specs(resolved.pkgs):
+                        yield VenvInstance(
+                            name=resolved.name,
+                            command=resolved.command,
+                            py=py,
+                            env=env,
+                            pkgs=pkgs,
+                        )
 
 
 @attr.s
-class Case:
-    pys: t.List[float] = attr.ib()
-    pkgs: t.List[PkgSpec] = attr.ib(default=[])
-    env: t.List[EnvSpec] = attr.ib(default=[])
-
-
-@attr.s
-class Suite:
-    name: str = attr.ib()
-    command: str = attr.ib()
-    cases: t.List[Case] = attr.ib()
-    env: t.List[EnvSpec] = attr.ib(default=[])
-
-
-@attr.s
-class CaseInstance:
+class VenvInstance:
+    name: t.Optional[str] = attr.ib()
     py: float = attr.ib()
-    case: Case = attr.ib()
-    suite: Suite = attr.ib()
-    pkgs: t.List[PkgSpec] = attr.ib()
-    env: t.List[EnvSpec] = attr.ib()
+    command: str = attr.ib()
+    pkgs: t.Dict[str, t.List[str]] = attr.ib()
+    env: t.Dict[str, t.List[str]] = attr.ib()
 
 
 @attr.s
-class CaseResult:
-    case: CaseInstance = attr.ib()
-    venv: str = attr.ib()
+class VenvResult:
+    venv: VenvInstance = attr.ib()
+    venv_name: str = attr.ib()
     pkgstr: str = attr.ib()
     code: int = attr.ib(default=1)
 
@@ -70,9 +102,7 @@ class CmdFailure(Exception):
 
 @attr.s
 class Session:
-    suites: t.List[Suite] = attr.ib(factory=list)
-    global_deps: t.List[str] = attr.ib(factory=list)
-    global_env: t.List[t.Tuple[str, str]] = attr.ib(factory=list)
+    venvs: t.List[Venv] = attr.ib(factory=list)
 
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
@@ -83,13 +113,12 @@ class Session:
         # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
         t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
 
-        suites = getattr(config, "suites", [])
-        global_deps = getattr(config, "global_deps", [])
-        global_env = getattr(config, "global_env", [])
+        venvs = getattr(config, "venvs", [])
+        return cls(
+            venvs=venvs,
+        )
 
-        return cls(suites=suites, global_deps=global_deps, global_env=global_env)
-
-    def run_suites(
+    def run(
         self,
         pattern: t.Pattern,
         skip_base_install=False,
@@ -99,9 +128,6 @@ class Session:
         cmdargs=None,
         pythons=[],
     ):
-        """Runs the command for each case in `suites` in a virtual environment
-        determined by its dependencies.
-        """
         results = []
 
         self.generate_base_venvs(
@@ -111,16 +137,16 @@ class Session:
             pythons=pythons,
         )
 
-        for case in suites_iter(self.suites, pattern=pattern):
-            if pythons and case.py not in pythons:
-                logger.debug("Skipping case %s due to Python version", case)
+        for venv in venvs_iter(self.venvs, pattern=pattern):
+            if pythons and venv.py not in pythons:
+                logger.debug("Skipping venv %s due to Python version", venv)
                 continue
 
-            base_venv = get_base_venv_path(case.py)
+            base_venv = get_base_venv_path(venv.py)
 
-            # Resolve the packages required for this case.
+            # Resolve the packages required for this venv.
             pkgs: t.Dict[str, str] = {
-                name: version for name, version in case.pkgs if version is not None
+                name: version for name, version in venv.pkgs if version is not None
             }
 
             if pkgs:
@@ -128,74 +154,66 @@ class Session:
                 venv_postfix = "_".join(
                     [f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()]
                 )
-                venv = f"{base_venv}_{venv_postfix}"
+                venv_name = f"{base_venv}_{venv_postfix}"
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
             else:
-                venv = base_venv
+                venv_name = base_venv
                 pkg_str = ""
 
-            # Case result which will contain metadata about the test execution.
-            result = CaseResult(case=case, venv=venv, pkgstr=pkg_str)
+            # Result which will be updated with the test outcome.
+            result = VenvResult(venv=venv, venv_name=venv_name, pkgstr=pkg_str)
 
             try:
                 if pkgs:
-                    # Copy the base venv to use for this case.
+                    # Copy the base venv to use for this venv.
                     logger.info(
-                        "Copying base virtualenv '%s' into case virtual env '%s'.",
+                        "Copying base virtualenv '%s' into virtualenv '%s'.",
                         base_venv,
-                        venv,
+                        venv_name,
                     )
                     try:
-                        run_cmd(["cp", "-r", base_venv, venv], stdout=subprocess.PIPE)
+                        run_cmd(
+                            ["cp", "-r", base_venv, venv_name], stdout=subprocess.PIPE
+                        )
                     except CmdFailure as e:
                         raise CmdFailure(
-                            f"Failed to create case virtual env '{venv}'\n{e.proc.stdout}",
+                            f"Failed to create virtualenv '{venv_name}'\n{e.proc.stdout}",
                             e.proc,
                         )
 
-                    logger.info("Installing case dependencies %s.", pkg_str)
+                    logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
                         run_cmd_venv(
-                            venv, f"pip --disable-pip-version-check install {pkg_str}"
+                            venv_name,
+                            f"pip --disable-pip-version-check install {pkg_str}",
                         )
                     except CmdFailure as e:
                         raise CmdFailure(
-                            f"Failed to install case dependencies {pkg_str}\n{e.proc.stdout}",
+                            f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
                             e.proc,
                         )
 
-                # Generate the environment for the test case.
+                # Generate the environment for the instance.
                 env = os.environ.copy() if pass_env else {}
-                env.update({k: v for k, v in self.global_env})
 
-                # Add in the suite env vars.
-                for k, v in case.suite.env:
+                # Add in the instance env vars.
+                for k, v in venv.env:
                     resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
                     if resolved_val is not None:
                         if k in env:
-                            logger.debug("Suite overrides environment variable %s", k)
-                        env[k] = resolved_val
-
-                # Add in the case env vars.
-                for k, v in case.env:
-                    resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
-                    if resolved_val is not None:
-                        if k in env:
-                            logger.debug("Case overrides environment variable %s", k)
+                            logger.debug("Venv overrides environment variable %s", k)
                         env[k] = resolved_val
 
                 # Finally, run the test in the venv.
-                cmd = case.suite.command
+                cmd = venv.command
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
-                logger.info(
-                    "Running suite command '%s' with environment '%s'.", cmd, env_str
-                )
+                logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv, cmd, stdout=out, env=env, cmdargs=cmdargs)
+                    run_cmd_venv(venv_name, cmd, stdout=out, env=env, cmdargs=cmdargs)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -218,31 +236,27 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            env_str = get_env_str(r.case.env)
-            s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
+            env_str = get_env_str(r.venv.env)
+            s = f"{status_char}  {r.venv.name}: {env_str} python{r.venv.py} {r.pkgstr}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_suites(self, pattern, out=sys.stdout):
-        curr_suite = None
-        for case in suites_iter(self.suites, pattern):
-            if case.suite != curr_suite:
-                curr_suite = case.suite
-                print(f"{case.suite.name}:", file=out)
+    def list_venvs(self, pattern, out=sys.stdout):
+        for venv in venvs_iter(self.venvs, pattern):
             pkgs_str = " ".join(
-                f"'{get_pep_dep(name, version)}'" for name, version in case.pkgs
+                f"'{get_pep_dep(name, version)}'" for name, version in venv.pkgs
             )
-            env_str = get_env_str(case.env)
-            py_str = f"Python {case.py}"
+            env_str = get_env_str(venv.env)
+            py_str = f"Python {venv.py}"
             print(f" {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
-        """Generate all the required base venvs for `suites`."""
+        """Generate all the required base venvs."""
         # Find all the python versions used.
         required_pys = set(
-            [case.py for case in suites_iter(self.suites, pattern=pattern)]
+            [venv.py for venv in venvs_iter(self.venvs, pattern=pattern)]
         )
         # Apply Python filters.
         if pythons:
@@ -264,24 +278,6 @@ class Session:
                 if skip_deps:
                     logger.info("Skipping global deps install.")
                     continue
-
-                # Install the global dependencies into the base venv.
-                global_deps_str = " ".join([f"'{dep}'" for dep in self.global_deps])
-                logger.info(
-                    "Installing base dependencies %s into virtualenv.", global_deps_str
-                )
-
-                try:
-                    run_cmd_venv(
-                        venv_path,
-                        f"pip --disable-pip-version-check install {global_deps_str}",
-                    )
-                except CmdFailure as e:
-                    logger.error(
-                        "Base dependencies failed to install, aborting!\n%s",
-                        e.proc.stdout,
-                    )
-                    sys.exit(1)
 
                 # Install the dev package into the base venv.
                 logger.info("Installing dev package.")
@@ -395,43 +391,26 @@ def expand_specs(specs):
     """
     all_vals = []
 
-    for name, vals in specs:
+    for name, vals in specs.items():
         all_vals.append([(name, val) for val in vals])
 
     all_vals = itertools.product(*all_vals)
     return all_vals
 
 
-def case_iter(case: Case):
-    # We could itertools.product here again but I think this is clearer.
-    for env_cfg in expand_specs(case.env):
-        for py in case.pys:
-            for pkg_cfg in expand_specs(case.pkgs):
-                yield env_cfg, py, pkg_cfg
+def venvs_iter(venvs: t.Iterable[Venv], pattern: t.Pattern, py=None):
+    """Iterator over an iterable of venvs.
 
-
-def cases_iter(cases: t.Iterable[Case]):
-    """Iterator over all case instances of a suite.
-
-    Yields the dependencies unique to the instance of the suite.
-    """
-    for case in cases:
-        for env_cfg, py, pkg_cfg in case_iter(case):
-            yield case, env_cfg, py, pkg_cfg
-
-
-def suites_iter(suites: t.Iterable[Suite], pattern: t.Pattern, py=None):
-    """Iterator over an iterable of suites.
-
-    :param pattern: An optional pattern to match suite names against.
+    :param pattern: An optional pattern to match Venv names against.
     :param py: An optional python version to match against.
     """
-    for suite in suites:
-        if not pattern.match(suite.name):
-            logger.debug("Skipping suite '%s' due to mismatch.", suite.name)
-            continue
-
-        for case, env, spy, pkgs in cases_iter(suite.cases):
-            if py and spy != py:
+    for base_venv in venvs:
+        for venv in base_venv.expand([]):
+            if py and venv.py != py:
                 continue
-            yield CaseInstance(suite=suite, case=case, env=env, py=spy, pkgs=pkgs)
+
+            if not pattern.match(venv.name):
+                logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
+                continue
+
+            yield venv

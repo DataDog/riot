@@ -1,42 +1,34 @@
-from riot import Case, Suite
+from riot import Venv
 
-global_deps = [
-    "mock",
-    "pytest",
-]
-
-global_env = [("PYTEST_ADDOPTS", "--color=yes")]
-
-suites = [
-    Suite(
+venvs = [
+    Venv(
         name="test",
-        command="pytest tests/",
-        cases=[
-            Case(
-                env=[("LC_ALL", ["C.UTF-8"]), ("LANG", ["C.UTF-8"])],
-                pys=[3.6, 3.7, 3.8, 3.9],
-                pkgs=[],
-            ),
-        ],
+        command="pytest --color=yes tests/",
+        env={
+            "LC_ALL": ["C.UTF-8"],
+            "LANG": ["C.UTF-8"],
+        },
+        pys=[3.6, 3.7, 3.8, 3.9],
+        pkgs={
+            "pytest": [""],
+            "mock": [""],
+        },
     ),
-    Suite(
+    Venv(
         name="check_format",
         command="black --check .",
-        cases=[
-            Case(
-                pys=[3.8],
-                pkgs=[("black", ["==20.8b1"])],
-            ),
-        ],
+        pys=[3.8],
+        pkgs={
+            "black": ["==20.8b1"],
+        },
     ),
-    Suite(
+    Venv(
         name="typing",
         command="mypy riot/ tests/",
-        cases=[
-            Case(
-                pys=[3.8],
-                pkgs=[("mypy", [""])],
-            ),
-        ],
+        pys=[3.8],
+        pkgs={
+            "mypy": [""],
+            "pytest": [""],
+        },
     ),
 ]

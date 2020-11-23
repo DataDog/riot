@@ -52,8 +52,8 @@ def main(ctx, riotfile, log_level):
 @main.command("list", help="List sessions")
 @PATTERN_ARG
 @click.pass_context
-def list_suites(ctx, pattern):
-    ctx.obj["session"].list_suites(re.compile(pattern))
+def list_venvs(ctx, pattern):
+    ctx.obj["session"].list_venvs(re.compile(pattern))
 
 
 @main.command(help="Generate virtual environments")
@@ -71,7 +71,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
     )
 
 
-@main.command(help="Run suites")
+@main.command(help="Run")
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
@@ -80,7 +80,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @PATTERN_ARG
 @click.pass_context
 def run(ctx, recreate_venvs, skip_base_install, pass_env, cmdargs, pythons, pattern):
-    ctx.obj["session"].run_suites(
+    ctx.obj["session"].run(
         pattern=re.compile(pattern),
         recreate_venvs=recreate_venvs,
         skip_base_install=skip_base_install,
