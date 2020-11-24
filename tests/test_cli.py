@@ -1,6 +1,5 @@
 import contextlib
 import os
-import re
 import shutil
 import typing
 
@@ -42,28 +41,28 @@ def without_riotfile(
 
 
 def test_main(cli: click.testing.CliRunner):
-    """Running main with no command returns usage"""
+    """Running main with no command returns usage."""
     result = cli.invoke(riot.cli.main)
     assert result.exit_code == 0
     assert result.stdout.startswith("Usage: main")
 
 
 def test_main_help(cli: click.testing.CliRunner):
-    """Running main with --help returns usage"""
+    """Running main with --help returns usage."""
     result = cli.invoke(riot.cli.main, ["--help"])
     assert result.exit_code == 0
     assert result.stdout.startswith("Usage: main")
 
 
 def test_main_version(cli: click.testing.CliRunner):
-    """Running main with --version returns version string"""
+    """Running main with --version returns version string."""
     result = cli.invoke(riot.cli.main, ["--version"])
     assert result.exit_code == 0
     assert result.stdout.startswith("main, version ")
 
 
 def test_list_empty(cli: click.testing.CliRunner):
-    """Running list with an empty riotfile prints nothing"""
+    """Running list with an empty riotfile prints nothing."""
     with with_riotfile(cli, "empty_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list"])
         assert result.exit_code == 0
@@ -71,7 +70,7 @@ def test_list_empty(cli: click.testing.CliRunner):
 
 
 def test_list_no_riotfile(cli: click.testing.CliRunner):
-    """Running list with no riotfile fails with an error"""
+    """Running list with no riotfile fails with an error."""
     with without_riotfile(cli):
         result = cli.invoke(riot.cli.main, ["list"])
         assert result.exit_code == 2
@@ -82,7 +81,7 @@ def test_list_no_riotfile(cli: click.testing.CliRunner):
 
 
 def test_list_default_pattern(cli: click.testing.CliRunner):
-    """Running list with no pattern passes through the default pattern"""
+    """Running list with no pattern passes through the default pattern."""
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["list"])
@@ -95,7 +94,7 @@ def test_list_default_pattern(cli: click.testing.CliRunner):
 
 
 def test_list_with_pattern(cli: click.testing.CliRunner):
-    """Running list with a pattern passes through the pattern"""
+    """Running list with a pattern passes through the pattern."""
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["list", "^pattern.*"])
@@ -108,7 +107,7 @@ def test_list_with_pattern(cli: click.testing.CliRunner):
 
 
 def test_run(cli: click.testing.CliRunner):
-    """Running run with default options"""
+    """Running run with default options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["run"])
@@ -129,13 +128,13 @@ def test_run(cli: click.testing.CliRunner):
                 ]
             )
             assert kwargs["pattern"].pattern == ".*"
-            assert kwargs["recreate_venvs"] == False
-            assert kwargs["skip_base_install"] == False
-            assert kwargs["pass_env"] == False
+            assert kwargs["recreate_venvs"] is False
+            assert kwargs["skip_base_install"] is False
+            assert kwargs["pass_env"] is False
 
 
 def test_run_with_long_args(cli: click.testing.CliRunner):
-    """Running run with long option names uses those options"""
+    """Running run with long option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
@@ -159,13 +158,13 @@ def test_run_with_long_args(cli: click.testing.CliRunner):
                 ]
             )
             assert kwargs["pattern"].pattern == ".*"
-            assert kwargs["recreate_venvs"] == True
-            assert kwargs["skip_base_install"] == True
-            assert kwargs["pass_env"] == True
+            assert kwargs["recreate_venvs"] is True
+            assert kwargs["skip_base_install"] is True
+            assert kwargs["pass_env"] is True
 
 
 def test_run_with_short_args(cli: click.testing.CliRunner):
-    """Running run with short option names uses those options"""
+    """Running run with short option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["run", "-r", "-s"])
@@ -186,13 +185,13 @@ def test_run_with_short_args(cli: click.testing.CliRunner):
                 ]
             )
             assert kwargs["pattern"].pattern == ".*"
-            assert kwargs["recreate_venvs"] == True
-            assert kwargs["skip_base_install"] == True
-            assert kwargs["pass_env"] == False
+            assert kwargs["recreate_venvs"] is True
+            assert kwargs["skip_base_install"] is True
+            assert kwargs["pass_env"] is False
 
 
 def test_run_with_pattern(cli: click.testing.CliRunner):
-    """Running run with pattern passes in that pattern"""
+    """Running run with pattern passes in that pattern."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["run", "^pattern.*"])
@@ -213,13 +212,13 @@ def test_run_with_pattern(cli: click.testing.CliRunner):
                 ]
             )
             assert kwargs["pattern"].pattern == "^pattern.*"
-            assert kwargs["recreate_venvs"] == False
-            assert kwargs["skip_base_install"] == False
-            assert kwargs["pass_env"] == False
+            assert kwargs["recreate_venvs"] is False
+            assert kwargs["skip_base_install"] is False
+            assert kwargs["pass_env"] is False
 
 
 def test_generate_suites_with_long_args(cli: click.testing.CliRunner):
-    """Generatening generate with long option names uses those options"""
+    """Generatening generate with long option names uses those options."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
@@ -236,12 +235,12 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner):
                 ["pattern", "recreate", "skip_deps", "pythons"]
             )
             assert kwargs["pattern"].pattern == ".*"
-            assert kwargs["recreate"] == True
-            assert kwargs["skip_deps"] == True
+            assert kwargs["recreate"] is True
+            assert kwargs["skip_deps"] is True
 
 
 def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner):
-    """Generatening generate with short option names uses those options"""
+    """Generatening generate with short option names uses those options."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["generate", "-r", "-s"])
@@ -255,12 +254,12 @@ def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner):
                 ["pattern", "recreate", "skip_deps", "pythons"]
             )
             assert kwargs["pattern"].pattern == ".*"
-            assert kwargs["recreate"] == True
-            assert kwargs["skip_deps"] == True
+            assert kwargs["recreate"] is True
+            assert kwargs["skip_deps"] is True
 
 
 def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
-    """Generatening generate with pattern passes in that pattern"""
+    """Generatening generate with pattern passes in that pattern."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["generate", "^pattern.*"])
@@ -274,8 +273,8 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
                 ["pattern", "recreate", "skip_deps", "pythons"]
             )
             assert kwargs["pattern"].pattern == "^pattern.*"
-            assert kwargs["recreate"] == False
-            assert kwargs["skip_deps"] == False
+            assert kwargs["recreate"] is False
+            assert kwargs["skip_deps"] is False
 
 
 @pytest.mark.parametrize(
@@ -290,7 +289,7 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
 def test_run_suites_cmdargs_not_set(
     cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
 ):
-    """Running command with optional infix cmdargs"""
+    """Running command with optional infix cmdargs."""
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
             f.write(
