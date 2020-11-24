@@ -218,7 +218,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            env_str = get_env_str(case.env)
+            env_str = get_env_str(r.case.env)
             s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
             print(s, file=out)
 
@@ -308,7 +308,7 @@ def get_pep_dep(libname: str, version: str):
     return f"{libname}{version}"
 
 
-def get_env_str(envs: t.List[t.Tuple]):
+def get_env_str(envs: t.List[EnvSpec]):
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
