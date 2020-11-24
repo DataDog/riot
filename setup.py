@@ -26,7 +26,6 @@ setup(
     package_data={"riot": ["py.typed"]},
     python_requires=">=3.6",
     install_requires=[
-        "attrs>=19.1.0",
         "click>=7,<8",
         "virtualenv",
     ],

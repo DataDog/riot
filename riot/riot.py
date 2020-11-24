@@ -1,3 +1,4 @@
+import dataclasses
 import importlib.abc
 import importlib.util
 import itertools
@@ -7,8 +8,6 @@ import shutil
 import subprocess
 import sys
 import typing as t
-
-import attr
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +32,14 @@ class AttrDict(t.Dict[_K, _V]):
         self.__dict__ = self
 
 
-@attr.s
+@dataclasses.dataclass
 class Venv:
-    name: t.Optional[str] = attr.ib(default=None)
-    command: t.Optional[str] = attr.ib(default=None)
-    pys: t.List[float] = attr.ib(factory=list)
-    pkgs: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
-    env: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
-    venvs: t.List["Venv"] = attr.ib(factory=list)
+    name: t.Optional[str] = None
+    command: t.Optional[str] = None
+    pys: t.List[float] = dataclasses.field(default_factory=list)
+    pkgs: t.Dict[str, t.List[str]] = dataclasses.field(default_factory=dict)
+    env: t.Dict[str, t.List[str]] = dataclasses.field(default_factory=dict)
+    venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
 
     def resolve(self, parents: t.List["Venv"]) -> "Venv":
         if not parents:
@@ -92,21 +91,21 @@ class Venv:
                         )
 
 
-@attr.s
+@dataclasses.dataclass
 class VenvInstance:
-    name: t.Optional[str] = attr.ib()
-    py: float = attr.ib()
-    command: str = attr.ib()
-    env: t.Tuple[t.Tuple[str, str]] = attr.ib()
-    pkgs: t.Tuple[t.Tuple[str, str]] = attr.ib()
+    name: t.Optional[str]
+    py: float
+    command: str
+    env: t.Tuple[t.Tuple[str, str]]
+    pkgs: t.Tuple[t.Tuple[str, str]]
 
 
-@attr.s
+@dataclasses.dataclass
 class VenvInstanceResult:
-    instance: VenvInstance = attr.ib()
-    venv_name: str = attr.ib()
-    pkgstr: str = attr.ib()
-    code: int = attr.ib(default=1)
+    instance: VenvInstance
+    venv_name: str
+    pkgstr: str
+    code: int = 1
 
 
 class CmdFailure(Exception):
@@ -117,9 +116,9 @@ class CmdFailure(Exception):
         super().__init__(self, msg)
 
 
-@attr.s
+@dataclasses.dataclass
 class Session:
-    venv: Venv = attr.ib()
+    venv: Venv
 
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
