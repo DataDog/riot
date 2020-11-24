@@ -291,9 +291,35 @@ def test_run_suites_cmdargs_not_set(
     cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
 ):
     """Running command with optional infix cmdargs"""
-    with mock.patch("subprocess.run") as subprocess_run:
-        subprocess_run.return_value.returncode = 0
-        with with_riotfile(cli, "cmdargs_riotfile.py"):
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write("""
+from riot import Suite, Case
+
+
+suites = [
+    Suite(
+        name="test_nocmdargs",
+        command="echo no cmdargs",
+        cases=[
+            Case(
+                pys=[3.8],
+            ),
+        ],
+    ),
+    Suite(
+        name="test_cmdargs",
+        command="echo cmdargs={cmdargs}",
+        cases=[
+            Case(
+                pys=[3.8],
+            ),
+        ],
+    ),
+]
+            """)
+        with mock.patch("subprocess.run") as subprocess_run:
+            subprocess_run.return_value.returncode = 0
             args = ["run", name]
             if cmdargs:
                 args += ["--cmdargs", cmdargs]
