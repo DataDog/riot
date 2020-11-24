@@ -16,4 +16,5 @@ project = "riot"
 extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.autodoc",
+    "reno.sphinxext",
 ]

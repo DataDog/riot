@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 SHELL = "/bin/bash"
-ENCODING = "utf-8"
+ENCODING = sys.getdefaultencoding()
 
 
 if t.TYPE_CHECKING or sys.version_info[:2] >= (3, 9):
@@ -190,14 +190,13 @@ class Session:
                         venv_name,
                     )
                     try:
-                        run_cmd(
-                            ["cp", "-r", base_venv, venv_name], stdout=subprocess.PIPE
-                        )
-                    except CmdFailure as e:
-                        raise CmdFailure(
-                            f"Failed to create virtualenv '{venv_name}'\n{e.proc.stdout}",
-                            e.proc,
-                        )
+                        shutil.copytree(base_venv, venv_name)
+                    except FileNotFoundError:
+                        logger.info("Base virtualenv '%s' does not exist", venv_name)
+                        continue
+                    except FileExistsError:
+                        # Assume the venv already exists and works fine
+                        logger.info("Virtualenv '%s' already exists", venv_name)
 
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
@@ -259,8 +258,10 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, out=sys.stdout):
+    def list_venvs(self, pattern, pythons=None, out=sys.stdout):
         for inst in self.venv.instances(pattern=pattern):
+            if pythons and inst.py not in pythons:
+                continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
