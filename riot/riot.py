@@ -59,7 +59,9 @@ class Venv:
             return venv
 
     def instances(
-        self, pattern: t.Pattern[str], parents: t.List["Venv"] = [],
+        self,
+        pattern: t.Pattern[str],
+        parents: t.List["Venv"] = [],
     ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
             if venv.name and not pattern.match(venv.name):

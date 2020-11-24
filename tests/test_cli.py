@@ -249,7 +249,8 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
-                riot.cli.main, ["generate", "--recreate-venvs", "--skip-base-install"],
+                riot.cli.main,
+                ["generate", "--recreate-venvs", "--skip-base-install"],
             )
             # Success, but no output because we mock generate_base_venvs
             assert result.exit_code == 0
