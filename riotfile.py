@@ -5,7 +5,7 @@ venv = Venv(
     venvs=[
         Venv(
             name="test",
-            command="pytest --color=yes --cov=riot/ --cov=tests/ --cov-append --cov-report= {cmdargs} tests/",
+            command="pytest {cmdargs}",
             env={
                 "LC_ALL": "C.UTF-8",
                 "LANG": "C.UTF-8",
