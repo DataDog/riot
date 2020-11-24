@@ -51,15 +51,15 @@ class Venv:
 
     def instances(
         self,
-        parents: t.List["Venv"],
         pattern: t.Pattern,
+        parents: t.List["Venv"] = [],
     ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
             if not pattern.match(venv.name):
                 logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
                 continue
             else:
-                for inst in venv.instances(parents + [self], pattern):
+                for inst in venv.instances(parents=parents + [self], pattern=pattern):
                     if inst:
                         yield inst
         else:
@@ -143,7 +143,7 @@ class Session:
             pythons=pythons,
         )
 
-        for inst in self.venv.instances([], pattern=pattern):
+        for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
                 logger.debug("Skipping venv instance %s due to Python version", inst)
                 continue
@@ -252,7 +252,7 @@ class Session:
             sys.exit(1)
 
     def list_venvs(self, pattern, out=sys.stdout):
-        for inst in self.venv.instances([], pattern):
+        for inst in self.venv.instances(pattern=pattern):
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
@@ -263,9 +263,7 @@ class Session:
     def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
         """Generate all the required base venvs."""
         # Find all the python versions used.
-        required_pys = set(
-            [inst.py for inst in self.venv.instances([], pattern=pattern)]
-        )
+        required_pys = set([inst.py for inst in self.venv.instances(pattern=pattern)])
         # Apply Python filters.
         if pythons:
             required_pys = required_pys.intersection(pythons)
