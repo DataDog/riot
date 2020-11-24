@@ -11,7 +11,6 @@ import typing as t
 
 logger = logging.getLogger(__name__)
 
-
 SHELL = "/bin/bash"
 ENCODING = sys.getdefaultencoding()
 
@@ -32,14 +31,28 @@ class AttrDict(t.Dict[_K, _V]):
         self.__dict__ = self
 
 
+def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
+    return {k: to_list(v) for k, v in d.items()}
+
+
+def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
+    return [x] if not isinstance(x, list) else x
+
+
 @dataclasses.dataclass
 class Venv:
+    pys: dataclasses.InitVar[t.List[float]] = None
+    pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
+    env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     name: t.Optional[str] = None
     command: t.Optional[str] = None
-    pys: t.List[float] = dataclasses.field(default_factory=list)
-    pkgs: t.Dict[str, t.List[str]] = dataclasses.field(default_factory=dict)
-    env: t.Dict[str, t.List[str]] = dataclasses.field(default_factory=dict)
     venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self, pys, pkgs, env):
+        """Normalize the data."""
+        self.pys = to_list(pys) if pys is not None else []
+        self.pkgs = rm_singletons(pkgs) if pkgs else {}
+        self.env = rm_singletons(env) if env else {}
 
     def resolve(self, parents: t.List["Venv"]) -> "Venv":
         if not parents:
