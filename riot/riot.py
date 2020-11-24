@@ -224,8 +224,9 @@ class Session:
             finally:
                 results.append(result)
 
-        @staticmethod
         def is_warning(output):
+            if output is None:
+                return False
             lower_output = output.lower()
             return any(
                 warning in lower_output
@@ -247,22 +248,17 @@ class Session:
 
             if failed:
                 num_failed += 1
-                click.echo(
-                    click.style("x", fg="red", bold=True), click.style(s, fg="red")
-                )
+                s = f"{click.style('x', fg='red', bold=True)} {click.style(s, fg='red')}"
+                click.echo(s)
             else:
                 num_passed += 1
                 if is_warning(r.output):
                     num_warnings += 1
-                    click.echo(
-                        click.style("⚠", fg="yellow", bold=True),
-                        click.style(s, fg="yellow"),
-                    )
+                    s = f"{click.style('⚠', fg='yellow', bold=True)} {click.style(s, fg='yellow')}"
+                    click.echo(s)
                 else:
-                    click.echo(
-                        click.style("✓", fg="green", bold=True),
-                        click.style(s, fg="green"),
-                    )
+                    s = f"{click.style('✓', fg='green', bold=True)} {click.style(s, fg='green')}"
+                    click.echo(s)
 
         s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
         click.echo(click.style(s_num, fg="blue", bold=True))
