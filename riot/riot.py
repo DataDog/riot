@@ -152,7 +152,7 @@ class Session:
         recreate_venvs: bool = False,
         out: t.TextIO = sys.stdout,
         pass_env: bool = False,
-        cmdargs: t.Optional[str] = None,
+        cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[str]] = None,
     ) -> None:
         results = []
@@ -355,18 +355,18 @@ def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[str] = None,
+    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
 
-    # insert command args if passed
-    if cmdargs is not None:
-        if not isinstance(args, str):
-            # FIXME(jd): make it work
-            raise RuntimeError("Cannot use cmdargs with non-string command")
-        args = args.format(cmdargs=cmdargs)
+    if cmdargs and not isinstance(args, str):
+        # FIXME(jd): make it work
+        raise RuntimeError("Cannot use cmdargs with non-string command")
+
+    if isinstance(args, str):
+        args = args.format(cmdargs=(" ".join(cmdargs) if cmdargs else ""))
 
     logger.debug("Running command %s", args)
     # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
@@ -413,7 +413,7 @@ def run_cmd_venv(
     venv: str,
     args: str,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[str] = None,
+    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
     env: t.Dict[str, str] = None,
 ) -> _T_CompletedProcess:
