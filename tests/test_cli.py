@@ -290,7 +290,7 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
 def test_run_suites_cmdargs_not_set(
     cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
 ):
-    """Running command including cmdargs but cmdargs not set"""
+    """Running command with optional infix cmdargs"""
     with mock.patch("subprocess.run") as subprocess_run:
         subprocess_run.return_value.returncode = 0
         with with_riotfile(cli, "cmdargs_riotfile.py"):
