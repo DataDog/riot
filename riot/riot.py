@@ -28,10 +28,10 @@ class AttrDict(dict):
 class Venv:
     name: t.Optional[str] = attr.ib(default=None)
     command: t.Optional[str] = attr.ib(default=None)
-    pys: t.List[float] = attr.ib(default=[])
-    pkgs: t.Dict[str, t.List[str]] = attr.ib(default={})
-    env: t.Dict[str, t.List[str]] = attr.ib(default={})
-    venvs: t.List["Venv"] = attr.ib(default=[])
+    pys: t.List[float] = attr.ib(factory=list)
+    pkgs: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
+    env: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
+    venvs: t.List["Venv"] = attr.ib(factory=list)
 
     def resolve(self, parents: t.List["Venv"]) -> "Venv":
         if not parents:
