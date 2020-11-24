@@ -39,7 +39,7 @@ venv = Venv(
         ),
         Venv(
             name="typing",
-            command="mypy riot/ tests/",
+            command="mypy",
             pkgs={
                 "mypy": [""],
                 "pytest": [""],
