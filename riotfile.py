@@ -46,5 +46,13 @@ venv = Venv(
                 "pytest": [""],
             },
         ),
+        Venv(
+            pys=[3.6, 3.7, 3.8, 3.9],
+            name="codecov",
+            command="bash <(curl -s https://codecov.io/bash)",
+            pkgs={
+                "coverage": [""],
+            },
+        ),
     ],
 )
