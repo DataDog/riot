@@ -59,6 +59,7 @@ class CaseResult:
     venv: str = attr.ib()
     pkgstr: str = attr.ib()
     code: int = attr.ib(default=1)
+    output: str = ""
 
 
 class CmdFailure(Exception):
@@ -195,7 +196,8 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv, cmd, stdout=out, env=env)
+                    output = run_cmd_venv(venv, cmd, stdout=out, env=env)
+                    CaseResult.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -239,21 +241,20 @@ class Session:
 
         for r in results:
             failed = r.code != 0
-            status_char = "✖️" if failed else "✔️"
             env_str = get_env_str(case.env)
-            s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
+            s = f"{r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
+
             if(failed):
                 num_failed += 1
-                click.echo(click.style(s, fg="red"))
+                click.echo(click.style("x", fg="red", bold=True), click.style(s, fg="red"))
             else:
                 num_passed += 1
-                if(is_warning(r)):
+                if(is_warning(r.output)):
                     num_warnings += 1
-                    status_char = "⚠"
-                    s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
-                    click.echo(click.style(s, fg="yellow"))
+                    click.echo(click.style("⚠", fg="yellow", bold=True), click.style(s, fg="yellow"))
                 else:
-                    click.echo(click.style(s, fg="green"))
+                    click.echo(click.style("✓", fg="green", bold=True), click.style(s, fg="green"))
+
         s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
         click.echo(click.style(s_num, fg="blue", bold=True))
 
@@ -463,4 +464,5 @@ def suites_iter(suites: t.Iterable[Suite], pattern: t.Pattern, py=None):
         for case, env, spy, pkgs in cases_iter(suite.cases):
             if py and spy != py:
                 continue
+
             yield CaseInstance(suite=suite, case=case, env=env, py=spy, pkgs=pkgs)
