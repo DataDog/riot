@@ -295,29 +295,30 @@ def test_run_suites_cmdargs_not_set(
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Suite, Case
+from riot import Venv
 
-
-suites = [
-    Suite(
-        name="test_nocmdargs",
-        command="echo no cmdargs",
-        cases=[
-            Case(
-                pys=[3.8],
-            ),
-        ],
-    ),
-    Suite(
-        name="test_cmdargs",
-        command="echo cmdargs={cmdargs}",
-        cases=[
-            Case(
-                pys=[3.8],
-            ),
-        ],
-    ),
-]
+venv = Venv(
+    venvs=[
+        Venv(
+            name="test_nocmdargs",
+            command="echo no cmdargs",
+            cases=[
+                Case(
+                    pys=[3.8],
+                ),
+            ],
+        ),
+        Venv(
+            name="test_cmdargs",
+            command="echo cmdargs={cmdargs}",
+            cases=[
+                Case(
+                    pys=[3.8],
+                ),
+            ],
+        ),
+    ]
+)
             """
             )
         with mock.patch("subprocess.run") as subprocess_run:
@@ -333,3 +334,55 @@ suites = [
 
             cmd = subprocess_run.call_args_list[-1].args[0]
             assert cmd.endswith(cmdrun)
+
+
+def test_nested_venv(cli: click.testing.CliRunner):
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+venvs = [
+    Venv(
+        pys=[3],
+        pkgs={
+            "pytest": [""],
+        },
+        venvs=[
+            Venv(
+                name="success",
+                command="pytest test_success.py",
+            ),
+            Venv(
+                name="failure",
+                command="pytest test_failure.py",
+            ),
+        ],
+    ),
+]"""
+            )
+
+        with open("test_success.py", "w") as f:
+            f.write(
+                """
+def test_success():
+    assert 1 == 1
+            """
+            )
+
+        with open("test_failure.py", "w") as f:
+            f.write(
+                """
+def test_failure():
+    assert 1 == 0
+            """
+            )
+
+        result = cli.invoke(riot.cli.main, ["run", "-s", "success"])
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+        result = cli.invoke(riot.cli.main, ["run", "-s", "failure"])
+        assert result.exit_code == 1
+        assert result.stdout == ""
