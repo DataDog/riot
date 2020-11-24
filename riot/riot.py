@@ -191,14 +191,13 @@ class Session:
                         venv_name,
                     )
                     try:
-                        run_cmd(
-                            ["cp", "-r", base_venv, venv_name], stdout=subprocess.PIPE
-                        )
-                    except CmdFailure as e:
-                        raise CmdFailure(
-                            f"Failed to create virtualenv '{venv_name}'\n{e.proc.stdout}",
-                            e.proc,
-                        )
+                        shutil.copytree(base_venv, venv_name)
+                    except FileNotFoundError:
+                        logger.info("Base virtualenv '%s' does not exist", venv_name)
+                        continue
+                    except FileExistsError:
+                        # Assume the venv already exists and works fine
+                        logger.info("Virtualenv '%s' already exists", venv_name)
 
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
