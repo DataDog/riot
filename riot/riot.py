@@ -31,8 +31,8 @@ class AttrDict(t.Dict[_K, _V]):
         self.__dict__ = self
 
 
-def rm_singletons(d: t.Dict[_K, t.Union[str, t.List[str]]]) -> t.Dict[_K, t.List[str]]:
-    return {k: [v] if isinstance(v, str) else v for k, v in d.items()}
+def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
+    return {k: to_list(v) for k, v in d.items()}
 
 
 def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
