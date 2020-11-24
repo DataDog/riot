@@ -13,7 +13,6 @@ setup(
     author_email="dev@datadoghq.com",
     classifiers=[
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
@@ -24,7 +23,7 @@ setup(
     license="Apache 2",
     packages=find_packages(exclude=["tests*"]),
     package_data={"riot": ["py.typed"]},
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=[
         "click>=7,<8",
         "virtualenv",

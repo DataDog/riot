@@ -21,6 +21,20 @@ jobs:
       - name: Install Riot
         run: pip install .
       - run: riot -v run typing
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: Install Riot
+        run: pip install .
+      - run: riot -v run docs
+      - uses: actions/upload-artifact@v2
+        with:
+          name: docs
+          path: docs/_build
   flake8:
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +48,7 @@ jobs:
   test:
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [3.7, 3.8, 3.9]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -47,6 +61,4 @@ jobs:
       - name: Run tests
         run: riot -v run --python=${{ matrix.python-version }} test
       - name: Coverage
-        run: |
-          pip install coverage
-          bash <(curl -s https://codecov.io/bash)
+        run: riot -v run --python=${{ matrix.python-version }} codecov

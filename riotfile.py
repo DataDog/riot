@@ -10,7 +10,7 @@ venv = Venv(
                 "LC_ALL": ["C.UTF-8"],
                 "LANG": ["C.UTF-8"],
             },
-            pys=[3.6, 3.7, 3.8, 3.9],
+            pys=[3.7, 3.8, 3.9],
             pkgs={
                 "pytest": [""],
                 "pytest-cov": [""],
@@ -44,6 +44,21 @@ venv = Venv(
             pkgs={
                 "mypy": [""],
                 "pytest": [""],
+            },
+        ),
+        Venv(
+            pys=[3.6, 3.7, 3.8, 3.9],
+            name="codecov",
+            command="bash <(curl -s https://codecov.io/bash)",
+            pkgs={
+                "coverage": [""],
+            },
+        ),
+        Venv(
+            name="docs",
+            command="sphinx-build -W -b html docs docs/_build/",
+            pkgs={
+                "sphinx": ["==3.3"],
             },
         ),
     ],
