@@ -61,6 +61,4 @@ jobs:
       - name: Run tests
         run: riot -v run --python=${{ matrix.python-version }} test
       - name: Coverage
-        run: |
-          pip install coverage
-          bash <(curl -s https://codecov.io/bash)
+        run: riot -v run --python=${{ matrix.python-version }} codecov

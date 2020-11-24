@@ -12,7 +12,6 @@
 
 
 project = "riot"
-copyright = "2020, Datadog"
 
 extensions = [
     "sphinx.ext.doctest",
