@@ -307,7 +307,7 @@ def get_pep_dep(libname: str, version: str):
     return f"{libname}{version}"
 
 
-def get_env_str(envs: t.List[t.Tuple]):
+def get_env_str(envs: t.List[EnvSpec]):
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
