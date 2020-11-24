@@ -124,6 +124,7 @@ def test_run_suites(cli: click.testing.CliRunner):
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
+                    "cmdargs",
                     "pythons",
                 ]
             )
@@ -153,6 +154,7 @@ def test_run_suites_with_long_args(cli: click.testing.CliRunner):
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
+                    "cmdargs",
                     "pythons",
                 ]
             )
@@ -179,6 +181,7 @@ def test_run_suites_with_short_args(cli: click.testing.CliRunner):
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
+                    "cmdargs",
                     "pythons",
                 ]
             )
@@ -205,6 +208,7 @@ def test_run_suites_with_pattern(cli: click.testing.CliRunner):
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
+                    "cmdargs",
                     "pythons",
                 ]
             )
@@ -272,3 +276,32 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
             assert kwargs["pattern"].pattern == "^pattern.*"
             assert kwargs["recreate"] == False
             assert kwargs["skip_deps"] == False
+
+
+@pytest.mark.parametrize(
+    "name,cmdargs,cmdrun",
+    [
+        ("test_cmdargs", None, "echo cmdargs="),
+        ("test_cmdargs", "-k filter", "echo cmdargs=-k filter"),
+        ("test_nocmdargs", None, "echo no cmdargs"),
+        ("test_nocmdargs", "-k filter", "echo no cmdargs"),
+    ],
+)
+def test_run_suites_cmdargs_not_set(
+    cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
+):
+    """Running command including cmdargs but cmdargs not set"""
+    with mock.patch("subprocess.run") as subprocess_run:
+        subprocess_run.return_value.returncode = 0
+        with with_riotfile(cli, "cmdargs_riotfile.py"):
+            args = ["run", name]
+            if cmdargs:
+                args += ["--cmdargs", cmdargs]
+            result = cli.invoke(riot.cli.main, args)
+            assert result.exit_code == 0
+            assert result.stdout == ""
+
+            subprocess_run.assert_called()
+
+            cmd = subprocess_run.call_args_list[-1].args[0]
+            assert cmd.endswith(cmdrun)
