@@ -1,3 +1,3 @@
-__all__ = ["Session", "Suite", "Case"]
+__all__ = ["Session", "Venv"]
 
-from .riot import Session, Suite, Case
+from .riot import Session, Venv

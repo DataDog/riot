@@ -83,41 +83,41 @@ def test_list_no_riotfile(cli: click.testing.CliRunner):
 
 def test_list_default_pattern(cli: click.testing.CliRunner):
     """Running list with no pattern passes through the default pattern"""
-    with mock.patch("riot.cli.Session.list_suites") as list_suites:
+    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["list"])
             # Success, but no output because we don't have a matching pattern
             assert result.exit_code == 0
             assert result.stdout == ""
 
-            list_suites.assert_called_once()
-            assert list_suites.call_args.args[0].pattern == ".*"
+            list_venvs.assert_called_once()
+            assert list_venvs.call_args.args[0].pattern == ".*"
 
 
 def test_list_with_pattern(cli: click.testing.CliRunner):
     """Running list with a pattern passes through the pattern"""
-    with mock.patch("riot.cli.Session.list_suites") as list_suites:
+    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["list", "^pattern.*"])
             # Success, but no output because we don't have a matching pattern
             assert result.exit_code == 0
             assert result.stdout == ""
 
-            list_suites.assert_called_once()
-            assert list_suites.call_args.args[0].pattern == "^pattern.*"
+            list_venvs.assert_called_once()
+            assert list_venvs.call_args.args[0].pattern == "^pattern.*"
 
 
-def test_run_suites(cli: click.testing.CliRunner):
+def test_run(cli: click.testing.CliRunner):
     """Running run with default options"""
-    with mock.patch("riot.cli.Session.run_suites") as run_suites:
+    with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["run"])
-            # Success, but no output because we mock run_suites
+            # Success, but no output because we mock run
             assert result.exit_code == 0
             assert result.stdout == ""
 
-            run_suites.assert_called_once()
-            kwargs = run_suites.call_args.kwargs
+            run.assert_called_once()
+            kwargs = run.call_args.kwargs
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
@@ -134,20 +134,20 @@ def test_run_suites(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] == False
 
 
-def test_run_suites_with_long_args(cli: click.testing.CliRunner):
+def test_run_with_long_args(cli: click.testing.CliRunner):
     """Running run with long option names uses those options"""
-    with mock.patch("riot.cli.Session.run_suites") as run_suites:
+    with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
                 riot.cli.main,
                 ["run", "--recreate-venvs", "--skip-base-install", "--pass-env"],
             )
-            # Success, but no output because we mock run_suites
+            # Success, but no output because we mock run
             assert result.exit_code == 0
             assert result.stdout == ""
 
-            run_suites.assert_called_once()
-            kwargs = run_suites.call_args.kwargs
+            run.assert_called_once()
+            kwargs = run.call_args.kwargs
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
@@ -164,17 +164,17 @@ def test_run_suites_with_long_args(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] == True
 
 
-def test_run_suites_with_short_args(cli: click.testing.CliRunner):
+def test_run_with_short_args(cli: click.testing.CliRunner):
     """Running run with short option names uses those options"""
-    with mock.patch("riot.cli.Session.run_suites") as run_suites:
+    with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["run", "-r", "-s"])
-            # Success, but no output because we mock run_suites
+            # Success, but no output because we mock run
             assert result.exit_code == 0
             assert result.stdout == ""
 
-            run_suites.assert_called_once()
-            kwargs = run_suites.call_args.kwargs
+            run.assert_called_once()
+            kwargs = run.call_args.kwargs
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
@@ -191,17 +191,17 @@ def test_run_suites_with_short_args(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] == False
 
 
-def test_run_suites_with_pattern(cli: click.testing.CliRunner):
+def test_run_with_pattern(cli: click.testing.CliRunner):
     """Running run with pattern passes in that pattern"""
-    with mock.patch("riot.cli.Session.run_suites") as run_suites:
+    with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["run", "^pattern.*"])
-            # Success, but no output because we mock run_suites
+            # Success, but no output because we mock run
             assert result.exit_code == 0
             assert result.stdout == ""
 
-            run_suites.assert_called_once()
-            kwargs = run_suites.call_args.kwargs
+            run.assert_called_once()
+            kwargs = run.call_args.kwargs
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
@@ -295,29 +295,30 @@ def test_run_suites_cmdargs_not_set(
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Suite, Case
+from riot import Venv
 
-
-suites = [
-    Suite(
-        name="test_nocmdargs",
-        command="echo no cmdargs",
-        cases=[
-            Case(
-                pys=[3.8],
-            ),
-        ],
-    ),
-    Suite(
-        name="test_cmdargs",
-        command="echo cmdargs={cmdargs}",
-        cases=[
-            Case(
-                pys=[3.8],
-            ),
-        ],
-    ),
-]
+venv = Venv(
+    venvs=[
+        Venv(
+            name="test_nocmdargs",
+            command="echo no cmdargs",
+            venvs=[
+                Venv(
+                    pys=[3.8],
+                ),
+            ],
+        ),
+        Venv(
+            name="test_cmdargs",
+            command="echo cmdargs={cmdargs}",
+            venvs=[
+                Venv(
+                    pys=[3.8],
+                ),
+            ],
+        ),
+    ]
+)
             """
             )
         with mock.patch("subprocess.run") as subprocess_run:
@@ -325,7 +326,7 @@ suites = [
             args = ["run", name]
             if cmdargs:
                 args += ["--cmdargs", cmdargs]
-            result = cli.invoke(riot.cli.main, args)
+            result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
             assert result.exit_code == 0
             assert result.stdout == ""
 
@@ -333,3 +334,54 @@ suites = [
 
             cmd = subprocess_run.call_args_list[-1].args[0]
             assert cmd.endswith(cmdrun)
+
+
+def test_nested_venv(cli: click.testing.CliRunner):
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+venv = Venv(
+    pys=[3],
+    pkgs={
+        "pytest": [""],
+    },
+    venvs=[
+        Venv(
+            name="success",
+            command="pytest test_success.py",
+        ),
+        Venv(
+            name="failure",
+            command="pytest test_failure.py",
+        ),
+    ],
+)
+            """
+            )
+
+        with open("test_success.py", "w") as f:
+            f.write(
+                """
+def test_success():
+    assert 1 == 1
+            """
+            )
+
+        with open("test_failure.py", "w") as f:
+            f.write(
+                """
+def test_failure():
+    assert 1 == 0
+            """
+            )
+
+        result = cli.invoke(riot.cli.main, ["run", "-s", "success"])
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+        result = cli.invoke(riot.cli.main, ["run", "-s", "failure"])
+        assert result.exit_code == 1
+        assert result.stdout == ""
