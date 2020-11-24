@@ -343,24 +343,23 @@ def test_nested_venv(cli: click.testing.CliRunner):
                 """
 from riot import Venv
 
-venvs = [
-    Venv(
-        pys=[3],
-        pkgs={
-            "pytest": [""],
-        },
-        venvs=[
-            Venv(
-                name="success",
-                command="pytest test_success.py",
-            ),
-            Venv(
-                name="failure",
-                command="pytest test_failure.py",
-            ),
-        ],
-    ),
-]"""
+venv = Venv(
+    pys=[3],
+    pkgs={
+        "pytest": [""],
+    },
+    venvs=[
+        Venv(
+            name="success",
+            command="pytest test_success.py",
+        ),
+        Venv(
+            name="failure",
+            command="pytest test_failure.py",
+        ),
+    ],
+)
+            """
             )
 
         with open("test_success.py", "w") as f:

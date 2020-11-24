@@ -49,17 +49,25 @@ class Venv:
                 venv.pkgs.update(parent.pkgs)
             return venv
 
-    def expand(self, parents: t.List["Venv"]):
+    def expand(
+        self,
+        parents: t.List["Venv"],
+        pattern: t.Pattern,
+    ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
-            for venv_inst in venv.expand(parents + [self]):
-                if venv_inst:
-                    yield venv_inst
+            if not pattern.match(venv.name):
+                logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
+                continue
+            else:
+                for venv_inst in venv.expand(parents + [self], pattern):
+                    if venv_inst:
+                        yield venv_inst
         else:
             resolved = self.resolve(parents)
 
             # If the venv doesn't have a command or python then skip it.
             if not resolved.command or not resolved.pys:
-                logger.debug("Venv %r is not runnable, skipping.", self)
+                logger.debug("Skipping venv %r as it's not runnable.", self)
                 return
 
             # Expand out the instances for the venv.
@@ -80,12 +88,12 @@ class VenvInstance:
     name: t.Optional[str] = attr.ib()
     py: float = attr.ib()
     command: str = attr.ib()
-    pkgs: t.Dict[str, t.List[str]] = attr.ib()
-    env: t.Dict[str, t.List[str]] = attr.ib()
+    env: t.List[t.Tuple[str, str]] = attr.ib()
+    pkgs: t.List[t.Tuple[str, str]] = attr.ib()
 
 
 @attr.s
-class VenvResult:
+class VenvInstanceResult:
     venv: VenvInstance = attr.ib()
     venv_name: str = attr.ib()
     pkgstr: str = attr.ib()
@@ -102,7 +110,7 @@ class CmdFailure(Exception):
 
 @attr.s
 class Session:
-    venvs: t.List[Venv] = attr.ib(factory=list)
+    venv: Venv = attr.ib()
 
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
@@ -113,10 +121,8 @@ class Session:
         # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
         t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
 
-        venvs = getattr(config, "venvs", [])
-        return cls(
-            venvs=venvs,
-        )
+        venv = getattr(config, "venv", Venv())
+        return cls(venv=venv)
 
     def run(
         self,
@@ -137,7 +143,7 @@ class Session:
             pythons=pythons,
         )
 
-        for venv in venvs_iter(self.venvs, pattern=pattern):
+        for venv in self.venv.expand([], pattern=pattern):
             if pythons and venv.py not in pythons:
                 logger.debug("Skipping venv %s due to Python version", venv)
                 continue
@@ -163,7 +169,9 @@ class Session:
                 pkg_str = ""
 
             # Result which will be updated with the test outcome.
-            result = VenvResult(venv=venv, venv_name=venv_name, pkgstr=pkg_str)
+            result = VenvInstanceResult(
+                venv=venv_inst, venv_name=venv_name, pkgstr=pkg_str
+            )
 
             try:
                 if pkgs:
@@ -244,20 +252,18 @@ class Session:
             sys.exit(1)
 
     def list_venvs(self, pattern, out=sys.stdout):
-        for venv in venvs_iter(self.venvs, pattern):
+        for venv in self.venv.expand([], pattern):
             pkgs_str = " ".join(
-                f"'{get_pep_dep(name, version)}'" for name, version in venv.pkgs
+                f"'{get_pep_dep(name, version)}'" for name, version in venv.pkgs.items()
             )
             env_str = get_env_str(venv.env)
             py_str = f"Python {venv.py}"
-            print(f" {env_str} {py_str} {pkgs_str}", file=out)
+            print(f"{venv.name} {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
         """Generate all the required base venvs."""
         # Find all the python versions used.
-        required_pys = set(
-            [venv.py for venv in venvs_iter(self.venvs, pattern=pattern)]
-        )
+        required_pys = set([venv.py for venv in self.venv.expand([], pattern=pattern)])
         # Apply Python filters.
         if pythons:
             required_pys = required_pys.intersection(pythons)
@@ -304,7 +310,7 @@ def get_pep_dep(libname: str, version: str):
     return f"{libname}{version}"
 
 
-def get_env_str(envs: t.List[EnvSpec]):
+def get_env_str(envs: t.List[t.Tuple[str, str]]):
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
@@ -384,8 +390,7 @@ def run_cmd_venv(venv, cmd, **kwargs):
 
 
 def expand_specs(specs):
-    """Generator over all configurations of a specification.
-
+    """
     [(X, [X0, X1, ...]), (Y, [Y0, Y1, ...)] ->
       ((X, X0), (Y, Y0)), ((X, X0), (Y, Y1)), ((X, X1), (Y, Y0)), ((X, X1), (Y, Y1))
     """
@@ -396,21 +401,3 @@ def expand_specs(specs):
 
     all_vals = itertools.product(*all_vals)
     return all_vals
-
-
-def venvs_iter(venvs: t.Iterable[Venv], pattern: t.Pattern, py=None):
-    """Iterator over an iterable of venvs.
-
-    :param pattern: An optional pattern to match Venv names against.
-    :param py: An optional python version to match against.
-    """
-    for base_venv in venvs:
-        for venv in base_venv.expand([]):
-            if py and venv.py != py:
-                continue
-
-            if not pattern.match(venv.name):
-                logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
-                continue
-
-            yield venv
