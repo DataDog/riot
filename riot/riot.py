@@ -219,18 +219,24 @@ class Session:
         @staticmethod
         def is_warning(output):
             lower_output = output.lower()
-            return any(lower_output in warning for warning in ("deprecated", 
-                "deprecation", 
-                "warning", 
-                "no longer maintained", 
-                "not maintained",
-                "did you mean",
-                "syntaxwarning",
-                "userwarning",
-                "runtimewarning"
-            ))
+            return any(
+                lower_output in warning
+                for warning in (
+                    "deprecated",
+                    "deprecation",
+                    "warning",
+                    "no longer maintained",
+                    "not maintained",
+                    "did you mean",
+                    "syntaxwarning",
+                    "userwarning",
+                    "runtimewarning",
+                )
+            )
 
-        click.echo(click.style("\n-------------------summary-------------------", bold=True))
+        click.echo(
+            click.style("\n-------------------summary-------------------", bold=True)
+        )
 
         num_failed = 0
         num_passed = 0
@@ -241,16 +247,24 @@ class Session:
             env_str = get_env_str(case.env)
             s = f"{r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
 
-            if(failed):
+            if failed:
                 num_failed += 1
-                click.echo(click.style("x", fg="red", bold=True), click.style(s, fg="red"))
+                click.echo(
+                    click.style("x", fg="red", bold=True), click.style(s, fg="red")
+                )
             else:
                 num_passed += 1
-                if(is_warning(r.output)):
+                if is_warning(r.output):
                     num_warnings += 1
-                    click.echo(click.style("⚠", fg="yellow", bold=True), click.style(s, fg="yellow"))
+                    click.echo(
+                        click.style("⚠", fg="yellow", bold=True),
+                        click.style(s, fg="yellow"),
+                    )
                 else:
-                    click.echo(click.style("✓", fg="green", bold=True), click.style(s, fg="green"))
+                    click.echo(
+                        click.style("✓", fg="green", bold=True),
+                        click.style(s, fg="green"),
+                    )
 
         s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
         click.echo(click.style(s_num, fg="blue", bold=True))
