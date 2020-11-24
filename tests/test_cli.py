@@ -40,28 +40,28 @@ def without_riotfile(
         yield
 
 
-def test_main(cli: click.testing.CliRunner):
+def test_main(cli: click.testing.CliRunner) -> None:
     """Running main with no command returns usage."""
     result = cli.invoke(riot.cli.main)
     assert result.exit_code == 0
     assert result.stdout.startswith("Usage: main")
 
 
-def test_main_help(cli: click.testing.CliRunner):
+def test_main_help(cli: click.testing.CliRunner) -> None:
     """Running main with --help returns usage."""
     result = cli.invoke(riot.cli.main, ["--help"])
     assert result.exit_code == 0
     assert result.stdout.startswith("Usage: main")
 
 
-def test_main_version(cli: click.testing.CliRunner):
+def test_main_version(cli: click.testing.CliRunner) -> None:
     """Running main with --version returns version string."""
     result = cli.invoke(riot.cli.main, ["--version"])
     assert result.exit_code == 0
     assert result.stdout.startswith("main, version ")
 
 
-def test_list_empty(cli: click.testing.CliRunner):
+def test_list_empty(cli: click.testing.CliRunner) -> None:
     """Running list with an empty riotfile prints nothing."""
     with with_riotfile(cli, "empty_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list"])
@@ -69,7 +69,7 @@ def test_list_empty(cli: click.testing.CliRunner):
         assert result.stdout == ""
 
 
-def test_list_no_riotfile(cli: click.testing.CliRunner):
+def test_list_no_riotfile(cli: click.testing.CliRunner) -> None:
     """Running list with no riotfile fails with an error."""
     with without_riotfile(cli):
         result = cli.invoke(riot.cli.main, ["list"])
@@ -80,7 +80,7 @@ def test_list_no_riotfile(cli: click.testing.CliRunner):
         )
 
 
-def test_list_default_pattern(cli: click.testing.CliRunner):
+def test_list_default_pattern(cli: click.testing.CliRunner) -> None:
     """Running list with no pattern passes through the default pattern."""
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -93,7 +93,7 @@ def test_list_default_pattern(cli: click.testing.CliRunner):
             assert list_venvs.call_args.args[0].pattern == ".*"
 
 
-def test_list_with_pattern(cli: click.testing.CliRunner):
+def test_list_with_pattern(cli: click.testing.CliRunner) -> None:
     """Running list with a pattern passes through the pattern."""
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -106,7 +106,7 @@ def test_list_with_pattern(cli: click.testing.CliRunner):
             assert list_venvs.call_args.args[0].pattern == "^pattern.*"
 
 
-def test_run(cli: click.testing.CliRunner):
+def test_run(cli: click.testing.CliRunner) -> None:
     """Running run with default options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -133,7 +133,7 @@ def test_run(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] is False
 
 
-def test_run_with_long_args(cli: click.testing.CliRunner):
+def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
     """Running run with long option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -163,7 +163,7 @@ def test_run_with_long_args(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] is True
 
 
-def test_run_with_short_args(cli: click.testing.CliRunner):
+def test_run_with_short_args(cli: click.testing.CliRunner) -> None:
     """Running run with short option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -190,7 +190,7 @@ def test_run_with_short_args(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] is False
 
 
-def test_run_with_pattern(cli: click.testing.CliRunner):
+def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
     """Running run with pattern passes in that pattern."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -217,7 +217,7 @@ def test_run_with_pattern(cli: click.testing.CliRunner):
             assert kwargs["pass_env"] is False
 
 
-def test_generate_suites_with_long_args(cli: click.testing.CliRunner):
+def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
     """Generatening generate with long option names uses those options."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -239,7 +239,7 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner):
             assert kwargs["skip_deps"] is True
 
 
-def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner):
+def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner) -> None:
     """Generatening generate with short option names uses those options."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -258,7 +258,7 @@ def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner):
             assert kwargs["skip_deps"] is True
 
 
-def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
+def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
     """Generatening generate with pattern passes in that pattern."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
@@ -288,7 +288,7 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner):
 )
 def test_run_suites_cmdargs_not_set(
     cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
-):
+) -> None:
     """Running command with optional infix cmdargs."""
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
@@ -335,7 +335,7 @@ venv = Venv(
             assert cmd.endswith(cmdrun)
 
 
-def test_nested_venv(cli: click.testing.CliRunner):
+def test_nested_venv(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
             f.write(
