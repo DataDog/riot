@@ -266,13 +266,13 @@ class Session:
         for case in suites_iter(self.suites, pattern):
             if case.suite != curr_suite:
                 curr_suite = case.suite
-                print(f"{case.suite.name}:", file=out)
+                click.echo(f"{case.suite.name}:")
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in case.pkgs
             )
             env_str = get_env_str(case.env)
             py_str = f"Python {case.py}"
-            print(f" {env_str} {py_str} {pkgs_str}", file=out)
+            click.echo(f" {env_str} {py_str} {pkgs_str}")
 
     def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
         """Generate all the required base venvs for `suites`."""
