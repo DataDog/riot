@@ -61,9 +61,82 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
     return [x] if not isinstance(x, list) else x
 
 
+class Interpreter:
+    def __init__(self, hint: t.Union[str, float, int]):
+        self._hint = str(hint)
+
+    def __eq__(self, other: object) -> bool:
+        """Interpreters with the same hint should be equal.
+
+        >>> Interpreter(3.9) == Interpreter(3.9)
+        True
+        >>> Interpreter("3.9") == Interpreter("3.9")
+        True
+        >>> Interpreter("3.8") == Interpreter("3.9")
+        False
+        >>> Interpreter("3.8") == Interpreter(3.8)
+        True
+        """
+        if isinstance(other, Interpreter):
+            return other._hint == self._hint
+        else:
+            return False
+
+    def __hash__(self):
+        """Return the hash of the hint.
+
+        >>> hash(Interpreter(3.9)) == hash(Interpreter(3.9))
+        True
+        >>> hash(Interpreter("3.9")) == hash(Interpreter("3.9"))
+        True
+        >>> hash(Interpreter("3.8")) == hash(Interpreter("3.9"))
+        False
+        >>> hash(Interpreter("3.8")) == hash(Interpreter(3.8))
+        True
+        """
+        return hash(self._hint)
+
+    def __repr__(self) -> str:
+        """Return the representation of the Interpreter.
+
+        >>> repr(Interpreter(3.9)) == repr(Interpreter(3.9))
+        True
+        >>> repr(Interpreter("3.9")) == repr(Interpreter(3.9))
+        True
+        """
+        return f"Interpreter({repr(self._hint)})"
+
+    def __str__(self) -> str:
+        """Return the path of the interpreter executable."""
+        return repr(self)
+
+    def version(self) -> str:
+        path = self.path()
+
+        output = subprocess.check_output([path, "--version"])
+        version = output.decode().strip().split(" ")[1]
+        return version
+
+    def path(self) -> str:
+        """Return the Python interpreter path or raise.
+
+        This defers the error until the interpeter is actually required. This is
+        desirable for cases where a user might not require all the mentioned
+        interpreters to be installed for their usage.
+        """
+        py_ex = shutil.which(self._hint)
+        if not py_ex:
+            py_ex = shutil.which(f"python{self._hint}")
+
+        if not py_ex:
+            raise FileNotFoundError(f"Python interpreter {self._hint} not found")
+        else:
+            return py_ex
+
+
 @dataclasses.dataclass
 class Venv:
-    pys: dataclasses.InitVar[t.List[float]] = None
+    pys: dataclasses.InitVar[t.List[Interpreter]] = None
     pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     name: t.Optional[str] = None
@@ -72,7 +145,7 @@ class Venv:
 
     def __post_init__(self, pys, pkgs, env):
         """Normalize the data."""
-        self.pys = to_list(pys) if pys is not None else []
+        self.pys = [Interpreter(py) for py in to_list(pys)] if pys is not None else []
         self.pkgs = rm_singletons(pkgs) if pkgs else {}
         self.env = rm_singletons(env) if env else {}
 
@@ -129,7 +202,7 @@ class Venv:
 @dataclasses.dataclass
 class VenvInstance:
     name: t.Optional[str]
-    py: float
+    py: Interpreter
     command: str
     env: t.Tuple[t.Tuple[str, str]]
     pkgs: t.Tuple[t.Tuple[str, str]]
@@ -175,7 +248,7 @@ class Session:
         out: t.TextIO = sys.stdout,
         pass_env: bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
-        pythons: t.Optional[t.Set[str]] = None,
+        pythons: t.Optional[t.Set[Interpreter]] = None,
     ) -> None:
         results = []
 
@@ -188,10 +261,12 @@ class Session:
 
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
-                logger.debug("Skipping venv instance %s due to Python version", inst)
+                logger.debug(
+                    "Skipping venv instance %s due to interpreter mismatch", inst
+                )
                 continue
 
-            base_venv = get_base_venv_path(inst.py)
+            base_venv = get_base_venv_path(inst.py.version())
 
             # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {
@@ -287,7 +362,7 @@ class Session:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
             env_str = get_env_str(r.instance.env)
-            s = f"{status_char}  {r.instance.name}: {env_str} python{r.instance.py} {r.pkgstr}"
+            s = f"{status_char}  {r.instance.name}: {env_str} {r.instance.py} {r.pkgstr}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
@@ -301,7 +376,7 @@ class Session:
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
             env_str = get_env_str(inst.env)
-            py_str = f"Python {inst.py}"
+            py_str = f"{inst.py}"
             print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(
@@ -309,7 +384,7 @@ class Session:
         pattern: t.Pattern[str],
         recreate: bool,
         skip_deps: bool,
-        pythons: t.Optional[t.Set[str]],
+        pythons: t.Optional[t.Set[Interpreter]],
     ) -> None:
         """Generate all the required base venvs."""
         # Find all the python versions used.
@@ -319,13 +394,13 @@ class Session:
             required_pys = required_pys.intersection(pythons)
 
         logger.info(
-            "Generating virtual environments for Python versions %s",
+            "Generating virtual environments for interpreters %s",
             ",".join(str(s) for s in required_pys),
         )
 
         for py in required_pys:
             try:
-                venv_path = create_base_venv(py, recreate=recreate)
+                venv_path = create_base_venv(py, recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
@@ -364,7 +439,7 @@ def get_env_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
-def get_base_venv_path(pyversion):
+def get_base_venv_path(pyversion: str) -> str:
     """Return the base virtual environment path relative to the current directory."""
     pyversion = str(pyversion).replace(".", "")
     return f".riot/.venv_py{pyversion}"
@@ -400,28 +475,21 @@ def run_cmd(
     return r
 
 
-def create_base_venv(pyversion, path=None, recreate=True):
+def create_base_venv(interpreter: Interpreter, recreate: bool) -> str:
     """Attempt to create a virtual environment for `pyversion`.
 
     :param pyversion: string or int representing the major.minor Python
                       version. eg. 3.7, "3.8".
     """
-    path = path or get_base_venv_path(pyversion)
+    version = interpreter.version()
+    path = get_base_venv_path(version)
 
     if os.path.isdir(path) and not recreate:
         logger.info("Skipping creation of virtualenv '%s' as it already exists.", path)
         return path
 
-    py_ex = f"python{pyversion}"
-    py_ex = shutil.which(py_ex)
-
-    if not py_ex:
-        logger.debug("%s interpreter not found", py_ex)
-        raise FileNotFoundError
-    else:
-        logger.info("Found Python interpreter '%s'.", py_ex)
-
-    logger.info("Creating virtualenv '%s' with Python '%s'.", path, py_ex)
+    py_ex = interpreter.path()
+    logger.info("Creating virtualenv '%s' with interpreter '%s'.", path, py_ex)
     run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
     return path
 

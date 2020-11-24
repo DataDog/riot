@@ -7,7 +7,7 @@ import re
 import click
 import pkg_resources
 
-from .riot import Session
+from .riot import Interpreter, Session
 
 
 try:
@@ -15,6 +15,13 @@ try:
 except pkg_resources.DistributionNotFound:
     # package is not installed
     __version__ = "dev"
+
+
+class InterpreterParamType(click.ParamType):
+    name = "interpreter"
+
+    def convert(self, value, param, ctx):
+        return Interpreter(value)
 
 
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
@@ -25,7 +32,7 @@ SKIP_BASE_INSTALL_ARG = click.option(
     "-s", "--skip-base-install", "skip_base_install", is_flag=True, default=False
 )
 PYTHON_VERSIONS_ARG = click.option(
-    "-p", "--python", "pythons", type=float, default=[], multiple=True
+    "-p", "--python", "pythons", type=InterpreterParamType(), default=[], multiple=True
 )
 
 
