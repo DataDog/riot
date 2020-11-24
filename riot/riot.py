@@ -216,9 +216,10 @@ class Session:
             finally:
                 results.append(result)
 
+        @staticmethod
         def is_warning(output):
             lower_output = output.lower()
-            warnings = ["deprecated", 
+            return any(lower_output in warning for warning in ("deprecated", 
                 "deprecation", 
                 "warning", 
                 "no longer maintained", 
@@ -227,11 +228,7 @@ class Session:
                 "syntaxwarning",
                 "userwarning",
                 "runtimewarning"
-            ]
-            for warning in warnings:
-                if warning in lower_output:
-                    return True
-            return False
+            ))
 
         click.echo(click.style("\n-------------------summary-------------------", bold=True))
 
@@ -460,7 +457,6 @@ def suites_iter(suites: t.Iterable[Suite], pattern: t.Pattern, py=None):
         if not pattern.match(suite.name):
             logger.debug("Skipping suite '%s' due to mismatch.", suite.name)
             continue
-
         for case, env, spy, pkgs in cases_iter(suite.cases):
             if py and spy != py:
                 continue

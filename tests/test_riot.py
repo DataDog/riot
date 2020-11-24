@@ -108,7 +108,7 @@ def test_suites_iter():
     instances = list(suites_iter(suites, pattern=re.compile(".*")))
     assert len(instances) == (2 * 3 * 2) + (2 * 1 * 2) + (2 * 3 * 4)
 
-def test_output():
+def test_output() -> None:
     s = Session()
     s.suites = [
         Suite(
