@@ -49,6 +49,7 @@ class Venv:
     venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
 
     def __post_init__(self, pys, pkgs, env):
+        """Normalize the data."""
         self.pys = to_list(pys) if pys is not None else []
         self.pkgs = rm_singletons(pkgs) if pkgs else {}
         self.env = rm_singletons(env) if env else {}
