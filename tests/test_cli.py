@@ -293,7 +293,8 @@ def test_run_suites_cmdargs_not_set(
     """Running command with optional infix cmdargs"""
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write("""
+            f.write(
+                """
 from riot import Suite, Case
 
 
@@ -317,7 +318,8 @@ suites = [
         ],
     ),
 ]
-            """)
+            """
+            )
         with mock.patch("subprocess.run") as subprocess_run:
             subprocess_run.return_value.returncode = 0
             args = ["run", name]
