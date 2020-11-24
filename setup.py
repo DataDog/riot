@@ -22,6 +22,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache 2",
     packages=find_packages(exclude=["tests*"]),
+    package_data={"riot": ["py.typed"]},
     python_requires=">=3.6",
     install_requires=[
         "attrs>=19.1.0",
@@ -30,4 +31,7 @@ setup(
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
+    # Required for mypy compatibility, see
+    # https://mypy.readthedocs.io/en/stable/installed_packages.html#making-pep-561-compatible-packages
+    zip_safe=False,
 )
