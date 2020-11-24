@@ -59,9 +59,7 @@ class Venv:
             return venv
 
     def instances(
-        self,
-        pattern: t.Pattern[str],
-        parents: t.List["Venv"] = [],
+        self, pattern: t.Pattern[str], parents: t.List["Venv"] = [],
     ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
             if venv.name and not pattern.match(venv.name):
@@ -260,7 +258,7 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, pythons: t.Optional[t.Set[str]] = None, out=sys.stdout):
+    def list_venvs(self, pattern, pythons=None, out=sys.stdout):
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
                 continue

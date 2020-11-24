@@ -116,12 +116,15 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
             assert result.stdout == ""
 
             list_venvs.assert_called_once()
-            assert list_venvs.call_args.kwargs["pythons"] == (3.6, )
+            assert list_venvs.call_args.kwargs["pythons"] == (3.6,)
 
     # multiple pythons
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
-            result = cli.invoke(riot.cli.main, ["list", "--python", "3.6", "-p", "3.8", "--python", "2.7"])
+            result = cli.invoke(
+                riot.cli.main,
+                ["list", "--python", "3.6", "-p", "3.8", "--python", "2.7"],
+            )
             # Success, but no output because we don't have a matching pattern
             assert result.exit_code == 0
             assert result.stdout == ""
@@ -246,8 +249,7 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
-                riot.cli.main,
-                ["generate", "--recreate-venvs", "--skip-base-install"],
+                riot.cli.main, ["generate", "--recreate-venvs", "--skip-base-install"],
             )
             # Success, but no output because we mock generate_base_venvs
             assert result.exit_code == 0
