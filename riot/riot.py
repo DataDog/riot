@@ -75,6 +75,14 @@ class Session:
     suites: t.List[Suite] = attr.ib(factory=list)
     global_deps: t.List[str] = attr.ib(factory=list)
     global_env: t.List[t.Tuple[str, str]] = attr.ib(factory=list)
+    warnings = (
+        "deprecated",
+        "deprecation",
+        "warning",
+        "no longer maintained",
+        "not maintained",
+        "did you mean",
+    )
 
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
@@ -221,14 +229,7 @@ class Session:
             lower_output = output.lower()
             return any(
                 warning in lower_output
-                for warning in (
-                    "deprecated",
-                    "deprecation",
-                    "warning",
-                    "no longer maintained",
-                    "not maintained",
-                    "did you mean",
-                )
+                for warning in self.warnings
             )
 
         click.echo(
