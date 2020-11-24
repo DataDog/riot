@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 SHELL = "/bin/bash"
-ENCODING = "utf-8"
+ENCODING = sys.getdefaultencoding()
 
 
 if t.TYPE_CHECKING or sys.version_info[:2] >= (3, 9):
