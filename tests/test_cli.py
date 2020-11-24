@@ -302,8 +302,8 @@ venv = Venv(
         Venv(
             name="test_nocmdargs",
             command="echo no cmdargs",
-            cases=[
-                Case(
+            venvs=[
+                Venv(
                     pys=[3.8],
                 ),
             ],
@@ -311,8 +311,8 @@ venv = Venv(
         Venv(
             name="test_cmdargs",
             command="echo cmdargs={cmdargs}",
-            cases=[
-                Case(
+            venvs=[
+                Venv(
                     pys=[3.8],
                 ),
             ],
@@ -326,7 +326,7 @@ venv = Venv(
             args = ["run", name]
             if cmdargs:
                 args += ["--cmdargs", cmdargs]
-            result = cli.invoke(riot.cli.main, args)
+            result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
             assert result.exit_code == 0
             assert result.stdout == ""
 

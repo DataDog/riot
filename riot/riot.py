@@ -55,7 +55,7 @@ class Venv:
         parents: t.List["Venv"] = [],
     ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
-            if not pattern.match(venv.name):
+            if venv.name and not pattern.match(venv.name):
                 logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
                 continue
             else:
