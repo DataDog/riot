@@ -228,10 +228,7 @@ class Session:
             if output is None:
                 return False
             lower_output = output.lower()
-            return any(
-                warning in lower_output
-                for warning in self.warnings
-            )
+            return any(warning in lower_output for warning in self.warnings)
 
         click.echo(
             click.style("\n-------------------summary-------------------", bold=True)
