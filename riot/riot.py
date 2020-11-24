@@ -32,10 +32,32 @@ class AttrDict(t.Dict[_K, _V]):
 
 
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
+    """Convert single values in a dictionary to a list with that value.
+
+    >>> rm_singletons({ "k": "v" })
+    {'k': ['v']}
+    >>> rm_singletons({ "k": ["v"] })
+    {'k': ['v']}
+    >>> rm_singletons({ "k": ["v", "x", "y"] })
+    {'k': ['v', 'x', 'y']}
+    >>> rm_singletons({ "k": [1, 2, 3] })
+    {'k': [1, 2, 3]}
+    """
     return {k: to_list(v) for k, v in d.items()}
 
 
 def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
+    """Convert a single value to a list containing that value.
+
+    >>> to_list(["x", "y", "z"])
+    ['x', 'y', 'z']
+    >>> to_list(["x"])
+    ['x']
+    >>> to_list("x")
+    ['x']
+    >>> to_list(1)
+    [1]
+    """
     return [x] if not isinstance(x, list) else x
 
 
@@ -437,6 +459,11 @@ def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K
 
     {X: [X0, X1, ...], Y: [Y0, Y1, ...]} ->
       [(X, X0), (Y, Y0)), ((X, X0), (Y, Y1)), ((X, X1), (Y, Y0)), ((X, X1), (Y, Y1)]
+
+    >>> list(expand_specs({"x": ["x0", "x1"]}))
+    [(('x', 'x0'),), (('x', 'x1'),)]
+    >>> list(expand_specs({"x": ["x0", "x1"], "y": ["y0", "y1"]}))
+    [(('x', 'x0'), ('y', 'y0')), (('x', 'x0'), ('y', 'y1')), (('x', 'x1'), ('y', 'y0')), (('x', 'x1'), ('y', 'y1'))]
     """
     all_vals = [[(name, val) for val in vals] for name, vals in specs.items()]
 
