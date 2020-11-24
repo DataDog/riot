@@ -72,20 +72,22 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
     )
 
 
-@main.command(help="Run")
+@main.command(
+    help="Run",
+    context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
+)
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
-@click.option("--cmdargs", "cmdargs", default="")
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @click.pass_context
-def run(ctx, recreate_venvs, skip_base_install, pass_env, cmdargs, pythons, pattern):
+def run(ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern):
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
         recreate_venvs=recreate_venvs,
         skip_base_install=skip_base_install,
         pass_env=pass_env,
-        cmdargs=cmdargs,
+        cmdargs=ctx.args,
         pythons=pythons,
     )
