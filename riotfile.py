@@ -5,7 +5,7 @@ venv = Venv(
     venvs=[
         Venv(
             name="test",
-            command="pytest --color=yes tests/ {cmdargs}",
+            command="pytest --color=yes {cmdargs} tests/",
             env={
                 "LC_ALL": ["C.UTF-8"],
                 "LANG": ["C.UTF-8"],
