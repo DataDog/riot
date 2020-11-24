@@ -4,6 +4,7 @@ import itertools
 import logging
 import os
 import shutil
+import click
 import subprocess
 import sys
 import typing as t
@@ -201,7 +202,7 @@ class Session:
                     )
             except CmdFailure as e:
                 result.code = e.code
-                print(e.msg, file=out)
+                click.echo(click.style(e.msg, fg="red"))
             except KeyboardInterrupt:
                 result.code = 1
                 break
@@ -213,13 +214,48 @@ class Session:
             finally:
                 results.append(result)
 
-        print("\n-------------------summary-------------------", file=out)
+        def is_warning(output):
+            lower_output = output.lower()
+            warnings = ["deprecated", 
+                "deprecation", 
+                "warning", 
+                "no longer maintained", 
+                "not maintained",
+                "did you mean",
+                "syntaxwarning",
+                "userwarning",
+                "runtimewarning"
+            ]
+            for warning in warnings:
+                if warning in lower_output:
+                    return True
+            return False
+
+        click.echo(click.style("\n-------------------summary-------------------", bold=True))
+
+        num_failed = 0
+        num_passed = 0
+        num_warnings = 0
+
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
             env_str = get_env_str(case.env)
             s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
-            print(s, file=out)
+            if(failed):
+                num_failed += 1
+                click.echo(click.style(s, fg="red"))
+            else:
+                num_passed += 1
+                if(is_warning(r)):
+                    num_warnings += 1
+                    status_char = "⚠"
+                    s = f"{status_char}  {r.case.suite.name}: {env_str} python{r.case.py} {r.pkgstr}"
+                    click.echo(click.style(s, fg="yellow"))
+                else:
+                    click.echo(click.style(s, fg="green"))
+        s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
+        click.echo(click.style(s_num, fg="blue", bold=True))
 
         if any(True for r in results if r.code != 0):
             sys.exit(1)

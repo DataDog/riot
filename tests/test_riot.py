@@ -1,7 +1,8 @@
 import re
+import typing
 
 from riot import Suite, Case
-from riot.riot import expand_specs, suites_iter
+from riot.riot import expand_specs, suites_iter, Session
 
 
 def test_expand():
@@ -106,3 +107,14 @@ def test_suites_iter():
 
     instances = list(suites_iter(suites, pattern=re.compile(".*")))
     assert len(instances) == (2 * 3 * 2) + (2 * 1 * 2) + (2 * 3 * 4)
+
+def test_output():
+    s = Session()
+    s.suites = [
+        Suite(
+            name="test",
+            command="pytest tests/test_output_display.py",
+            cases = []
+        )
+    ]
+    s.run_suites(pattern=re.compile(".*"))
