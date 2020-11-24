@@ -25,6 +25,20 @@ venv = Venv(
             },
         ),
         Venv(
+            name="flake8",
+            command="flake8",
+            pkgs={
+                "flake8": [""],
+                "flake8-blind-except": [""],
+                "flake8-builtins": [""],
+                "flake8-docstrings": [""],
+                "flake8-logging-format": [""],
+                "flake8-rst-docstrings": [""],
+                # needed for some features from flake8-rst-docstrings
+                "pygments": [""],
+            },
+        ),
+        Venv(
             name="typing",
             command="mypy riot/ tests/",
             pkgs={

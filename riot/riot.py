@@ -28,10 +28,10 @@ class AttrDict(dict):
 class Venv:
     name: t.Optional[str] = attr.ib(default=None)
     command: t.Optional[str] = attr.ib(default=None)
-    pys: t.List[float] = attr.ib(default=[])
-    pkgs: t.Dict[str, t.List[str]] = attr.ib(default={})
-    env: t.Dict[str, t.List[str]] = attr.ib(default={})
-    venvs: t.List["Venv"] = attr.ib(default=[])
+    pys: t.List[float] = attr.ib(factory=list)
+    pkgs: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
+    env: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
+    venvs: t.List["Venv"] = attr.ib(factory=list)
 
     def resolve(self, parents: t.List["Venv"]) -> "Venv":
         if not parents:
@@ -232,8 +232,8 @@ class Session:
             except KeyboardInterrupt:
                 result.code = 1
                 break
-            except Exception as e:
-                logger.error("Test runner failed: %s", e, exc_info=True)
+            except Exception:
+                logger.error("Test runner failed", exc_info=True)
                 sys.exit(1)
             else:
                 result.code = 0
@@ -303,7 +303,7 @@ def rmchars(chars: str, s: str):
 
 
 def get_pep_dep(libname: str, version: str):
-    """Returns a valid PEP 508 dependency string.
+    """Return a valid PEP 508 dependency string.
 
     ref: https://www.python.org/dev/peps/pep-0508/
     """
@@ -315,9 +315,7 @@ def get_env_str(envs: t.List[t.Tuple[str, str]]):
 
 
 def get_base_venv_path(pyversion):
-    """Given a python version return the base virtual environment path relative
-    to the current directory.
-    """
+    """Return the base virtual environment path relative to the current directory."""
     pyversion = str(pyversion).replace(".", "")
     return f".riot/.venv_py{pyversion}"
 
@@ -347,7 +345,7 @@ def run_cmd(*args, **kwargs):
 
 
 def create_base_venv(pyversion, path=None, recreate=True):
-    """Attempts to create a virtual environment for `pyversion`.
+    """Attempt to create a virtual environment for `pyversion`.
 
     :param pyversion: string or int representing the major.minor Python
                       version. eg. 3.7, "3.8".
@@ -368,14 +366,12 @@ def create_base_venv(pyversion, path=None, recreate=True):
         logger.info("Found Python interpreter '%s'.", py_ex)
 
     logger.info("Creating virtualenv '%s' with Python '%s'.", path, py_ex)
-    r = run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
+    run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
     return path
 
 
 def get_venv_command(venv_path, cmd):
-    """Return the command string used to execute `cmd` in virtual env located
-    at `venv_path`.
-    """
+    """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
 
 
@@ -390,7 +386,10 @@ def run_cmd_venv(venv, cmd, **kwargs):
 
 
 def expand_specs(specs):
-    """
+    """Return the product of all items from the passed dictionary.
+
+    In summary:
+
     [(X, [X0, X1, ...]), (Y, [Y0, Y1, ...)] ->
       ((X, X0), (Y, Y0)), ((X, X0), (Y, Y1)), ((X, X1), (Y, Y0)), ((X, X1), (Y, Y1))
     """
