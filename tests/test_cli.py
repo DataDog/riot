@@ -106,6 +106,33 @@ def test_list_with_pattern(cli: click.testing.CliRunner) -> None:
             assert list_venvs.call_args.args[0].pattern == "^pattern.*"
 
 
+def test_list_with_python(cli: click.testing.CliRunner) -> None:
+    """Running list with a python passes through the python."""
+    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
+        with with_riotfile(cli, "empty_riotfile.py"):
+            result = cli.invoke(riot.cli.main, ["list", "--python", "3.6"])
+            # Success, but no output because we don't have a matching pattern
+            assert result.exit_code == 0
+            assert result.stdout == ""
+
+            list_venvs.assert_called_once()
+            assert list_venvs.call_args.kwargs["pythons"] == (3.6,)
+
+    # multiple pythons
+    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
+        with with_riotfile(cli, "empty_riotfile.py"):
+            result = cli.invoke(
+                riot.cli.main,
+                ["list", "--python", "3.6", "-p", "3.8", "--python", "2.7"],
+            )
+            # Success, but no output because we don't have a matching pattern
+            assert result.exit_code == 0
+            assert result.stdout == ""
+
+            list_venvs.assert_called_once()
+            assert list_venvs.call_args.kwargs["pythons"] == (3.6, 3.8, 2.7)
+
+
 def test_run(cli: click.testing.CliRunner) -> None:
     """Running run with default options."""
     with mock.patch("riot.cli.Session.run") as run:

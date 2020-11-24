@@ -259,8 +259,10 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, out=sys.stdout):
+    def list_venvs(self, pattern, pythons=None, out=sys.stdout):
         for inst in self.venv.instances(pattern=pattern):
+            if pythons and inst.py not in pythons:
+                continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )

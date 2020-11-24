@@ -49,11 +49,12 @@ def main(ctx, riotfile, log_level):
     ctx.obj["session"] = Session.from_config_file(riotfile)
 
 
-@main.command("list", help="List sessions")
+@main.command("list", help="List venvs")
+@PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @click.pass_context
-def list_venvs(ctx, pattern):
-    ctx.obj["session"].list_venvs(re.compile(pattern))
+def list_venvs(ctx, pythons, pattern):
+    ctx.obj["session"].list_venvs(re.compile(pattern), pythons=pythons)
 
 
 @main.command(help="Generate virtual environments")
