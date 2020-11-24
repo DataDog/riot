@@ -220,7 +220,7 @@ class Session:
         def is_warning(output):
             lower_output = output.lower()
             return any(
-                lower_output in warning
+                warning in lower_output
                 for warning in (
                     "deprecated",
                     "deprecation",
@@ -228,9 +228,6 @@ class Session:
                     "no longer maintained",
                     "not maintained",
                     "did you mean",
-                    "syntaxwarning",
-                    "userwarning",
-                    "runtimewarning",
                 )
             )
 
