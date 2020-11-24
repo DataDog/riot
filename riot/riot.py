@@ -13,7 +13,6 @@ import attr
 
 logger = logging.getLogger(__name__)
 
-
 SHELL = "/bin/bash"
 ENCODING = "utf-8"
 
@@ -24,14 +23,24 @@ class AttrDict(dict):
         self.__dict__ = self
 
 
+def rm_singletons(
+    d: t.Dict[str, t.Union[str, t.List[str]]]
+) -> t.Dict[str, t.List[str]]:
+    return {k: [v] if isinstance(v, str) else v for k, v in d.items()}
+
+
+def float_to_list(x: t.Union[float, t.List[float]]) -> t.List[float]:
+    return [x] if isinstance(x, float) else x
+
+
 @attr.s
 class Venv:
     name: t.Optional[str] = attr.ib(default=None)
     command: t.Optional[str] = attr.ib(default=None)
-    pys: t.List[float] = attr.ib(default=[])
-    pkgs: t.Dict[str, t.List[str]] = attr.ib(default={})
-    env: t.Dict[str, t.List[str]] = attr.ib(default={})
-    venvs: t.List["Venv"] = attr.ib(default=[])
+    pys: t.List[float] = attr.ib(converter=float_to_list, factory=list)
+    pkgs: t.Dict[str, t.List[str]] = attr.ib(converter=rm_singletons, factory=dict)
+    env: t.Dict[str, t.List[str]] = attr.ib(converter=rm_singletons, factory=dict)
+    venvs: t.List["Venv"] = attr.ib(factory=list)
 
     def resolve(self, parents: t.List["Venv"]) -> "Venv":
         if not parents:

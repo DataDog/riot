@@ -385,3 +385,54 @@ def test_failure():
         result = cli.invoke(riot.cli.main, ["run", "-s", "failure"])
         assert result.exit_code == 1
         assert result.stdout == ""
+
+
+def test_types(cli: click.testing.CliRunner):
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+venv = Venv(
+    venvs=[
+        Venv(
+            pys=[3],
+            name="success",
+            pkgs={
+                "pytest": [""],
+            },
+            command="pytest test_success.py",
+        ),
+        Venv(
+            pys=[3],
+            name="success2",
+            pkgs={
+                "pytest": "",
+            },
+            command="pytest test_success.py",
+        ),
+    ],
+)
+            """
+            )
+
+        with open("test_success.py", "w") as f:
+            f.write(
+                """
+def test_success():
+    assert 1 == 1
+            """
+            )
+
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "success2"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert result.stdout == ""
