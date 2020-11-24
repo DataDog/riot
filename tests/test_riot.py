@@ -114,7 +114,13 @@ def test_output():
         Suite(
             name="test",
             command="pytest tests/test_output_display.py",
-            cases = []
-        )
+            cases = [
+                Case(
+                    env=[],
+                    pys=[],
+                    pkgs=[],
+                )
+            ]
+        ),
     ]
     s.run_suites(pattern=re.compile(".*"))
