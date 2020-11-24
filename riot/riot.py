@@ -49,7 +49,7 @@ class Venv:
                 venv.pkgs.update(parent.pkgs)
             return venv
 
-    def expand(
+    def instances(
         self,
         parents: t.List["Venv"],
         pattern: t.Pattern,
@@ -59,9 +59,9 @@ class Venv:
                 logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
                 continue
             else:
-                for venv_inst in venv.expand(parents + [self], pattern):
-                    if venv_inst:
-                        yield venv_inst
+                for inst in venv.instances(parents + [self], pattern):
+                    if inst:
+                        yield inst
         else:
             resolved = self.resolve(parents)
 
@@ -94,7 +94,7 @@ class VenvInstance:
 
 @attr.s
 class VenvInstanceResult:
-    venv: VenvInstance = attr.ib()
+    instance: VenvInstance = attr.ib()
     venv_name: str = attr.ib()
     pkgstr: str = attr.ib()
     code: int = attr.ib(default=1)
@@ -143,16 +143,16 @@ class Session:
             pythons=pythons,
         )
 
-        for venv in self.venv.expand([], pattern=pattern):
-            if pythons and venv.py not in pythons:
-                logger.debug("Skipping venv %s due to Python version", venv)
+        for inst in self.venv.instances([], pattern=pattern):
+            if pythons and inst.py not in pythons:
+                logger.debug("Skipping venv instance %s due to Python version", inst)
                 continue
 
-            base_venv = get_base_venv_path(venv.py)
+            base_venv = get_base_venv_path(inst.py)
 
-            # Resolve the packages required for this venv.
+            # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {
-                name: version for name, version in venv.pkgs if version is not None
+                name: version for name, version in inst.pkgs if version is not None
             }
 
             if pkgs:
@@ -170,7 +170,7 @@ class Session:
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
-                venv=venv_inst, venv_name=venv_name, pkgstr=pkg_str
+                instance=inst, venv_name=venv_name, pkgstr=pkg_str
             )
 
             try:
@@ -207,7 +207,7 @@ class Session:
                 env = os.environ.copy() if pass_env else {}
 
                 # Add in the instance env vars.
-                for k, v in venv.env:
+                for k, v in inst.env:
                     resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
                     if resolved_val is not None:
                         if k in env:
@@ -215,7 +215,7 @@ class Session:
                         env[k] = resolved_val
 
                 # Finally, run the test in the venv.
-                cmd = venv.command
+                cmd = inst.command
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
                 logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
                 try:
@@ -244,26 +244,28 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            env_str = get_env_str(r.venv.env)
-            s = f"{status_char}  {r.venv.name}: {env_str} python{r.venv.py} {r.pkgstr}"
+            env_str = get_env_str(r.instance.env)
+            s = f"{status_char}  {r.instance.name}: {env_str} python{r.instance.py} {r.pkgstr}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
     def list_venvs(self, pattern, out=sys.stdout):
-        for venv in self.venv.expand([], pattern):
+        for inst in self.venv.instances([], pattern):
             pkgs_str = " ".join(
-                f"'{get_pep_dep(name, version)}'" for name, version in venv.pkgs.items()
+                f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
-            env_str = get_env_str(venv.env)
-            py_str = f"Python {venv.py}"
-            print(f"{venv.name} {env_str} {py_str} {pkgs_str}", file=out)
+            env_str = get_env_str(inst.env)
+            py_str = f"Python {inst.py}"
+            print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
 
     def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
         """Generate all the required base venvs."""
         # Find all the python versions used.
-        required_pys = set([venv.py for venv in self.venv.expand([], pattern=pattern)])
+        required_pys = set(
+            [inst.py for inst in self.venv.instances([], pattern=pattern)]
+        )
         # Apply Python filters.
         if pythons:
             required_pys = required_pys.intersection(pythons)
