@@ -96,6 +96,7 @@ class Session:
         recreate_venvs=False,
         out: t.TextIO = sys.stdout,
         pass_env=False,
+        cmdargs=None,
         pythons=[],
     ):
         """Runs the command for each case in `suites` in a virtual environment
@@ -194,7 +195,7 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv, cmd, stdout=out, env=env)
+                    run_cmd_venv(venv, cmd, stdout=out, env=env, cmdargs=cmdargs)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -327,6 +328,12 @@ def run_cmd(*args, **kwargs):
         kwargs["encoding"] = ENCODING
     if "stdout" not in kwargs:
         kwargs["stdout"] = subprocess.PIPE
+
+    # insert command args if passed
+    if "cmdargs" in kwargs:
+        cmd = args[0]
+        args = (cmd.format(cmdargs=kwargs["cmdargs"]),) + args[1:]
+        del kwargs["cmdargs"]
 
     logger.debug("Running command %s", args[0])
     r = subprocess.run(*args, **kwargs)
