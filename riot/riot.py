@@ -193,7 +193,7 @@ class Session:
                     try:
                         shutil.copytree(base_venv, venv_name)
                     except FileNotFoundError:
-                        logger.info("Base virtualenv '%s' does not exists", venv_name)
+                        logger.info("Base virtualenv '%s' does not exist", venv_name)
                         continue
                     except FileExistsError:
                         # Assume the venv already exists and works fine
