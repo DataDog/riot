@@ -59,6 +59,7 @@ venv = Venv(
             command="sphinx-build -W -b html docs docs/_build/",
             pkgs={
                 "sphinx": ["==3.3"],
+                "reno": [""],
             },
         ),
     ],
