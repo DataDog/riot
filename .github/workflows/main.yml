@@ -35,6 +35,16 @@ jobs:
         with:
           name: docs
           path: docs/_build
+  flake8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: Install Riot
+        run: pip install .
+      - run: riot -v run flake8
   test:
     strategy:
       matrix:
@@ -50,3 +60,7 @@ jobs:
         run: pip install .
       - name: Run tests
         run: riot -v run --python=${{ matrix.python-version }} test
+      - name: Coverage
+        run: |
+          pip install coverage
+          bash <(curl -s https://codecov.io/bash)

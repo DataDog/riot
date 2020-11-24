@@ -10,7 +10,6 @@ import typing as t
 
 import attr
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +17,17 @@ SHELL = "/bin/bash"
 ENCODING = "utf-8"
 
 
-class AttrDict(dict):
+if t.TYPE_CHECKING or sys.version_info[:2] >= (3, 9):
+    _T_CompletedProcess = subprocess.CompletedProcess[str]
+else:
+    _T_CompletedProcess = subprocess.CompletedProcess
+
+
+_K = t.TypeVar("_K")
+_V = t.TypeVar("_V")
+
+
+class AttrDict(t.Dict[_K, _V]):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
@@ -28,10 +37,10 @@ class AttrDict(dict):
 class Venv:
     name: t.Optional[str] = attr.ib(default=None)
     command: t.Optional[str] = attr.ib(default=None)
-    pys: t.List[float] = attr.ib(default=[])
-    pkgs: t.Dict[str, t.List[str]] = attr.ib(default={})
-    env: t.Dict[str, t.List[str]] = attr.ib(default={})
-    venvs: t.List["Venv"] = attr.ib(default=[])
+    pys: t.List[float] = attr.ib(factory=list)
+    pkgs: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
+    env: t.Dict[str, t.List[str]] = attr.ib(factory=dict)
+    venvs: t.List["Venv"] = attr.ib(factory=list)
 
     def resolve(self, parents: t.List["Venv"]) -> "Venv":
         if not parents:
@@ -51,7 +60,7 @@ class Venv:
 
     def instances(
         self,
-        pattern: t.Pattern,
+        pattern: t.Pattern[str],
         parents: t.List["Venv"] = [],
     ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
@@ -88,8 +97,8 @@ class VenvInstance:
     name: t.Optional[str] = attr.ib()
     py: float = attr.ib()
     command: str = attr.ib()
-    env: t.List[t.Tuple[str, str]] = attr.ib()
-    pkgs: t.List[t.Tuple[str, str]] = attr.ib()
+    env: t.Tuple[t.Tuple[str, str]] = attr.ib()
+    pkgs: t.Tuple[t.Tuple[str, str]] = attr.ib()
 
 
 @attr.s
@@ -126,14 +135,14 @@ class Session:
 
     def run(
         self,
-        pattern: t.Pattern,
-        skip_base_install=False,
-        recreate_venvs=False,
+        pattern: t.Pattern[str],
+        skip_base_install: bool = False,
+        recreate_venvs: bool = False,
         out: t.TextIO = sys.stdout,
-        pass_env=False,
-        cmdargs=None,
-        pythons=[],
-    ):
+        pass_env: bool = False,
+        cmdargs: t.Optional[str] = None,
+        pythons: t.Optional[t.Set[str]] = None,
+    ) -> None:
         results = []
 
         self.generate_base_venvs(
@@ -232,8 +241,8 @@ class Session:
             except KeyboardInterrupt:
                 result.code = 1
                 break
-            except Exception as e:
-                logger.error("Test runner failed: %s", e, exc_info=True)
+            except Exception:
+                logger.error("Test runner failed", exc_info=True)
                 sys.exit(1)
             else:
                 result.code = 0
@@ -260,7 +269,13 @@ class Session:
             py_str = f"Python {inst.py}"
             print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
 
-    def generate_base_venvs(self, pattern: t.Pattern, recreate, skip_deps, pythons):
+    def generate_base_venvs(
+        self,
+        pattern: t.Pattern[str],
+        recreate: bool,
+        skip_deps: bool,
+        pythons: t.Optional[t.Set[str]],
+    ) -> None:
         """Generate all the required base venvs."""
         # Find all the python versions used.
         required_pys = set([inst.py for inst in self.venv.instances(pattern=pattern)])
@@ -296,49 +311,53 @@ class Session:
                     sys.exit(1)
 
 
-def rmchars(chars: str, s: str):
+def rmchars(chars: str, s: str) -> str:
     for c in chars:
         s = s.replace(c, "")
     return s
 
 
-def get_pep_dep(libname: str, version: str):
-    """Returns a valid PEP 508 dependency string.
+def get_pep_dep(libname: str, version: str) -> str:
+    """Return a valid PEP 508 dependency string.
 
     ref: https://www.python.org/dev/peps/pep-0508/
     """
     return f"{libname}{version}"
 
 
-def get_env_str(envs: t.List[t.Tuple[str, str]]):
+def get_env_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
 def get_base_venv_path(pyversion):
-    """Given a python version return the base virtual environment path relative
-    to the current directory.
-    """
+    """Return the base virtual environment path relative to the current directory."""
     pyversion = str(pyversion).replace(".", "")
     return f".riot/.venv_py{pyversion}"
 
 
-def run_cmd(*args, **kwargs):
-    # Provide our own defaults.
-    if "shell" in kwargs and "executable" not in kwargs:
-        kwargs["executable"] = SHELL
-    if "encoding" not in kwargs:
-        kwargs["encoding"] = ENCODING
-    if "stdout" not in kwargs:
-        kwargs["stdout"] = subprocess.PIPE
+_T_stdio = t.Union[None, int, t.IO[t.Any]]
+
+
+def run_cmd(
+    args: t.Union[str, t.Sequence[str]],
+    shell: bool = False,
+    stdout: _T_stdio = subprocess.PIPE,
+    cmdargs: t.Optional[str] = None,
+    executable: t.Optional[str] = None,
+) -> _T_CompletedProcess:
+    if shell:
+        executable = SHELL
 
     # insert command args if passed
-    if "cmdargs" in kwargs:
-        cmd = args[0]
-        args = (cmd.format(cmdargs=kwargs["cmdargs"]),) + args[1:]
-        del kwargs["cmdargs"]
+    if cmdargs is not None:
+        if not isinstance(args, str):
+            # FIXME(jd): make it work
+            raise RuntimeError("Cannot use cmdargs with non-string command")
+        args = args.format(cmdargs=cmdargs)
 
-    logger.debug("Running command %s", args[0])
-    r = subprocess.run(*args, **kwargs)
+    logger.debug("Running command %s", args)
+    # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
+    r = subprocess.run(args, encoding=ENCODING, stdout=stdout, executable=executable, shell=shell)  # type: ignore[arg-type]
     logger.debug(r.stdout)
 
     if r.returncode != 0:
@@ -347,7 +366,7 @@ def run_cmd(*args, **kwargs):
 
 
 def create_base_venv(pyversion, path=None, recreate=True):
-    """Attempts to create a virtual environment for `pyversion`.
+    """Attempt to create a virtual environment for `pyversion`.
 
     :param pyversion: string or int representing the major.minor Python
                       version. eg. 3.7, "3.8".
@@ -368,36 +387,45 @@ def create_base_venv(pyversion, path=None, recreate=True):
         logger.info("Found Python interpreter '%s'.", py_ex)
 
     logger.info("Creating virtualenv '%s' with Python '%s'.", path, py_ex)
-    r = run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
+    run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
     return path
 
 
-def get_venv_command(venv_path, cmd):
-    """Return the command string used to execute `cmd` in virtual env located
-    at `venv_path`.
-    """
+def get_venv_command(venv_path: str, cmd: str) -> str:
+    """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
 
 
-def run_cmd_venv(venv, cmd, **kwargs):
-    env = kwargs.get("env") or {}
+def run_cmd_venv(
+    venv: str,
+    args: str,
+    stdout: _T_stdio = subprocess.PIPE,
+    cmdargs: t.Optional[str] = None,
+    executable: t.Optional[str] = None,
+    env: t.Dict[str, str] = None,
+) -> _T_CompletedProcess:
+    cmd = get_venv_command(venv, args)
+
+    if env is None:
+        env = {}
+
     env_str = " ".join(f"{k}={v}" for k, v in env.items())
-    cmd = get_venv_command(venv, cmd)
 
     logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    r = run_cmd(cmd, shell=True, **kwargs)
-    return r
+    return run_cmd(
+        cmd, stdout=stdout, cmdargs=cmdargs, executable=executable, shell=True
+    )
 
 
-def expand_specs(specs):
+def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
+    """Return the product of all items from the passed dictionary.
+
+    In summary:
+
+    {X: [X0, X1, ...], Y: [Y0, Y1, ...]} ->
+      [(X, X0), (Y, Y0)), ((X, X0), (Y, Y1)), ((X, X1), (Y, Y0)), ((X, X1), (Y, Y1)]
     """
-    [(X, [X0, X1, ...]), (Y, [Y0, Y1, ...)] ->
-      ((X, X0), (Y, Y0)), ((X, X0), (Y, Y1)), ((X, X1), (Y, Y0)), ((X, X1), (Y, Y1))
-    """
-    all_vals = []
+    all_vals = [[(name, val) for val in vals] for name, vals in specs.items()]
 
-    for name, vals in specs.items():
-        all_vals.append([(name, val) for val in vals])
-
-    all_vals = itertools.product(*all_vals)
-    return all_vals
+    # Need to cast because the * star typeshed of itertools.product returns Any
+    return t.cast(t.Iterator[t.Tuple[t.Tuple[_K, _V]]], itertools.product(*all_vals))
