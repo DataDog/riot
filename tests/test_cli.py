@@ -306,14 +306,14 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
 @pytest.mark.parametrize(
     "name,cmdargs,cmdrun",
     [
-        ("test_cmdargs", None, "echo cmdargs="),
-        ("test_cmdargs", "-k filter", "echo cmdargs=-k filter"),
-        ("test_nocmdargs", None, "echo no cmdargs"),
-        ("test_nocmdargs", "-k filter", "echo no cmdargs"),
+        ("test_cmdargs", [], "echo cmdargs="),
+        ("test_cmdargs", ["--", "-k", "filter"], "echo cmdargs=-k filter"),
+        ("test_nocmdargs", [], "echo no cmdargs"),
+        ("test_nocmdargs", ["--", "-k", "filter"], "echo no cmdargs"),
     ],
 )
-def test_run_suites_cmdargs_not_set(
-    cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
+def test_run_suites_cmdargs(
+    cli: click.testing.CliRunner, name: str, cmdargs: typing.List[str], cmdrun: str
 ) -> None:
     """Running command with optional infix cmdargs."""
     with cli.isolated_filesystem():
@@ -348,9 +348,7 @@ venv = Venv(
             )
         with mock.patch("subprocess.run") as subprocess_run:
             subprocess_run.return_value.returncode = 0
-            args = ["run", name]
-            if cmdargs:
-                args += ["--cmdargs", cmdargs]
+            args = ["run", name] + cmdargs
             result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
             assert result.exit_code == 0
             assert result.stdout == ""
