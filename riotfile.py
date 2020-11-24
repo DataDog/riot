@@ -28,14 +28,14 @@ venv = Venv(
             name="flake8",
             command="flake8",
             pkgs={
-                "flake8": [""],
-                "flake8-blind-except": [""],
-                "flake8-builtins": [""],
-                "flake8-docstrings": [""],
-                "flake8-logging-format": [""],
-                "flake8-rst-docstrings": [""],
+                "flake8": "",
+                "flake8-blind-except": "",
+                "flake8-builtins": "",
+                "flake8-docstrings": "",
+                "flake8-logging-format": "",
+                "flake8-rst-docstrings": "",
                 # needed for some features from flake8-rst-docstrings
-                "pygments": [""],
+                "pygments": "",
             },
         ),
         Venv(
@@ -51,15 +51,15 @@ venv = Venv(
             name="codecov",
             command="bash <(curl -s https://codecov.io/bash)",
             pkgs={
-                "coverage": [""],
+                "coverage": "",
             },
         ),
         Venv(
             name="docs",
             command="sphinx-build -W -b html docs docs/_build/",
             pkgs={
-                "sphinx": ["==3.3"],
-                "reno": [""],
+                "sphinx": "==3.3",
+                "reno": "",
             },
         ),
     ],
