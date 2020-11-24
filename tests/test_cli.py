@@ -387,7 +387,7 @@ def test_failure():
         assert result.stdout == ""
 
 
-def test_types(cli: click.testing.CliRunner):
+def test_types(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
             f.write(

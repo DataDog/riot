@@ -1,5 +1,6 @@
 import importlib.abc
 import importlib.util
+import collections
 import itertools
 import logging
 import os
@@ -23,21 +24,23 @@ class AttrDict(dict):
         self.__dict__ = self
 
 
+_K = t.TypeVar("_K")
+
 def rm_singletons(
-    d: t.Dict[str, t.Union[str, t.List[str]]]
-) -> t.Dict[str, t.List[str]]:
+    d: t.Dict[_K, t.Union[str, t.List[str]]]
+) -> t.Dict[_K, t.List[str]]:
     return {k: [v] if isinstance(v, str) else v for k, v in d.items()}
 
 
-def float_to_list(x: t.Union[float, t.List[float]]) -> t.List[float]:
-    return [x] if isinstance(x, float) else x
+def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
+    return [x] if not isinstance(x, collections.abc.Iterable) else x
 
 
 @attr.s
 class Venv:
     name: t.Optional[str] = attr.ib(default=None)
     command: t.Optional[str] = attr.ib(default=None)
-    pys: t.List[float] = attr.ib(converter=float_to_list, factory=list)
+    pys: t.List[float] = attr.ib(converter=to_list, factory=list)
     pkgs: t.Dict[str, t.List[str]] = attr.ib(converter=rm_singletons, factory=dict)
     env: t.Dict[str, t.List[str]] = attr.ib(converter=rm_singletons, factory=dict)
     venvs: t.List["Venv"] = attr.ib(factory=list)
