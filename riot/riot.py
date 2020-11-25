@@ -61,9 +61,13 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
     return [x] if not isinstance(x, list) else x
 
 
+@dataclasses.dataclass(unsafe_hash=True)
 class Interpreter:
-    def __init__(self, hint: t.Union[str, float, int]):
-        self._hint = str(hint)
+    hint: dataclasses.InitVar[str]
+
+    def __post_init__(self, hint: t.Union[float, int, str]) -> None:
+        """Normalize the data."""
+        self.hint = str(hint)
 
     def __eq__(self, other: object) -> bool:
         """Interpreters with the same hint should be equal.
@@ -78,33 +82,9 @@ class Interpreter:
         True
         """
         if isinstance(other, Interpreter):
-            return other._hint == self._hint
+            return other.hint == self.hint
         else:
             return False
-
-    def __hash__(self):
-        """Return the hash of the hint.
-
-        >>> hash(Interpreter(3.9)) == hash(Interpreter(3.9))
-        True
-        >>> hash(Interpreter("3.9")) == hash(Interpreter("3.9"))
-        True
-        >>> hash(Interpreter("3.8")) == hash(Interpreter("3.9"))
-        False
-        >>> hash(Interpreter("3.8")) == hash(Interpreter(3.8))
-        True
-        """
-        return hash(self._hint)
-
-    def __repr__(self) -> str:
-        """Return the representation of the Interpreter.
-
-        >>> repr(Interpreter(3.9)) == repr(Interpreter(3.9))
-        True
-        >>> repr(Interpreter("3.9")) == repr(Interpreter(3.9))
-        True
-        """
-        return f"Interpreter({repr(self._hint)})"
 
     def __str__(self) -> str:
         """Return the path of the interpreter executable."""
@@ -124,12 +104,12 @@ class Interpreter:
         desirable for cases where a user might not require all the mentioned
         interpreters to be installed for their usage.
         """
-        py_ex = shutil.which(self._hint)
+        py_ex = shutil.which(self.hint)
         if not py_ex:
-            py_ex = shutil.which(f"python{self._hint}")
+            py_ex = shutil.which(f"python{self.hint}")
 
         if not py_ex:
-            raise FileNotFoundError(f"Python interpreter {self._hint} not found")
+            raise FileNotFoundError(f"Python interpreter {self.hint} not found")
         else:
             return py_ex
 
