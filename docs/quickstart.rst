@@ -11,8 +11,6 @@ with ``pytest``::
 
         from riot import latest, Venv
 
-        version = "0.3"
-
         venv = Venv(
             pys=[3.9],
             venvs=[

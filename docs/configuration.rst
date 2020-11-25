@@ -11,7 +11,6 @@ is typically placed in the root directory of the project for ease of access.
 
 A ``riotfile.py`` must define the following:
 
-- ``version`` tells riot what version the configuration is.
 - ``venv`` a :ref:`Venv` that declares how to build the virtual environments.
 
 
