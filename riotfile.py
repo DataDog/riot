@@ -1,20 +1,20 @@
-from riot import Venv
+from riot import latest, Venv
 
 venv = Venv(
     pys=3.8,
     venvs=[
         Venv(
             name="test",
-            command="pytest --color=yes --cov=riot/ --cov=tests/ --cov-append --cov-report= {cmdargs} tests/",
+            command="pytest {cmdargs}",
             env={
                 "LC_ALL": "C.UTF-8",
                 "LANG": "C.UTF-8",
             },
-            pys=[3.7, 3.8, 3.9],
+            pys=[3.6, 3.7, 3.8, 3.9],
             pkgs={
-                "pytest": "",
-                "pytest-cov": "",
-                "mock": "",
+                "pytest": latest,
+                "pytest-cov": latest,
+                "mock": latest,
             },
         ),
         Venv(
@@ -28,22 +28,23 @@ venv = Venv(
             name="flake8",
             command="flake8",
             pkgs={
-                "flake8": "",
-                "flake8-blind-except": "",
-                "flake8-builtins": "",
-                "flake8-docstrings": "",
-                "flake8-logging-format": "",
-                "flake8-rst-docstrings": "",
+                "flake8": latest,
+                "flake8-blind-except": latest,
+                "flake8-builtins": latest,
+                "flake8-docstrings": latest,
+                "flake8-import-order": latest,
+                "flake8-logging-format": latest,
+                "flake8-rst-docstrings": latest,
                 # needed for some features from flake8-rst-docstrings
-                "pygments": "",
+                "pygments": latest,
             },
         ),
         Venv(
             name="typing",
             command="mypy",
             pkgs={
-                "mypy": "",
-                "pytest": "",
+                "mypy": latest,
+                "pytest": latest,
             },
         ),
         Venv(
@@ -51,7 +52,7 @@ venv = Venv(
             name="codecov",
             command="bash <(curl -s https://codecov.io/bash)",
             pkgs={
-                "coverage": "",
+                "coverage": latest,
             },
         ),
         Venv(
@@ -59,7 +60,7 @@ venv = Venv(
             command="sphinx-build -W -b html docs docs/_build/",
             pkgs={
                 "sphinx": "==3.3",
-                "reno": "",
+                "reno": latest,
             },
         ),
     ],

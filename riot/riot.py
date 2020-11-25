@@ -7,7 +7,9 @@ import os
 import shutil
 import subprocess
 import sys
+import traceback
 import typing as t
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +34,32 @@ class AttrDict(t.Dict[_K, _V]):
 
 
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
+    """Convert single values in a dictionary to a list with that value.
+
+    >>> rm_singletons({ "k": "v" })
+    {'k': ['v']}
+    >>> rm_singletons({ "k": ["v"] })
+    {'k': ['v']}
+    >>> rm_singletons({ "k": ["v", "x", "y"] })
+    {'k': ['v', 'x', 'y']}
+    >>> rm_singletons({ "k": [1, 2, 3] })
+    {'k': [1, 2, 3]}
+    """
     return {k: to_list(v) for k, v in d.items()}
 
 
 def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
+    """Convert a single value to a list containing that value.
+
+    >>> to_list(["x", "y", "z"])
+    ['x', 'y', 'z']
+    >>> to_list(["x"])
+    ['x']
+    >>> to_list("x")
+    ['x']
+    >>> to_list(1)
+    [1]
+    """
     return [x] if not isinstance(x, list) else x
 
 
@@ -136,23 +160,33 @@ class Session:
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
         spec = importlib.util.spec_from_file_location("riotfile", path)
+        if not spec:
+            raise Exception(
+                f"Invalid file format for riotfile. Expected file with .py extension got '{path}'."
+            )
         config = importlib.util.module_from_spec(spec)
 
         # DEV: MyPy has `ModuleSpec.loader` as `Optional[_Loader`]` which doesn't have `exec_module`
         # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
-        t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
-
-        venv = getattr(config, "venv", Venv())
-        return cls(venv=venv)
+        try:
+            t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
+        except Exception as e:
+            raise Exception(
+                f"Failed to parse riotfile '{path}'.\n{traceback.format_exc()}"
+            ) from e
+        else:
+            venv = getattr(config, "venv", Venv())
+            return cls(venv=venv)
 
     def run(
         self,
         pattern: t.Pattern[str],
+        venv_pattern: t.Pattern[str],
         skip_base_install: bool = False,
         recreate_venvs: bool = False,
         out: t.TextIO = sys.stdout,
         pass_env: bool = False,
-        cmdargs: t.Optional[str] = None,
+        cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[str]] = None,
     ) -> None:
         results = []
@@ -177,17 +211,19 @@ class Session:
             }
 
             if pkgs:
-                # Strip special characters for the venv directory name.
-                venv_postfix = "_".join(
-                    [f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()]
-                )
-                venv_name = f"{base_venv}_{venv_postfix}"
+                venv_name = get_venv_directory_name(base_venv, pkgs)
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
             else:
                 venv_name = base_venv
                 pkg_str = ""
+
+            if not venv_pattern.search(venv_name):
+                logger.debug(
+                    "Skipping venv instance '%s' due to pattern mismatch", venv_name
+                )
+                continue
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
@@ -271,9 +307,14 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, pythons=None, out=sys.stdout):
+    def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
+                continue
+            base_venv = get_base_venv_path(inst.py)
+            if not venv_pattern.search(
+                get_venv_directory_name(base_venv, dict(inst.pkgs))
+            ):
                 continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
@@ -338,6 +379,12 @@ def get_pep_dep(libname: str, version: str) -> str:
     return f"{libname}{version}"
 
 
+def get_venv_directory_name(base_venv, pkgs):
+    # Strip special characters for the venv directory name.
+    venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
+    return f"{base_venv}_{venv_postfix}"
+
+
 def get_env_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
     return " ".join(f"{k}={v}" for k, v in envs)
 
@@ -355,18 +402,18 @@ def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[str] = None,
+    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
 
-    # insert command args if passed
-    if cmdargs is not None:
-        if not isinstance(args, str):
-            # FIXME(jd): make it work
-            raise RuntimeError("Cannot use cmdargs with non-string command")
-        args = args.format(cmdargs=cmdargs)
+    if cmdargs and not isinstance(args, str):
+        # FIXME(jd): make it work
+        raise RuntimeError("Cannot use cmdargs with non-string command")
+
+    if isinstance(args, str):
+        args = args.format(cmdargs=(" ".join(cmdargs) if cmdargs else ""))
 
     logger.debug("Running command %s", args)
     # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
@@ -413,7 +460,7 @@ def run_cmd_venv(
     venv: str,
     args: str,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[str] = None,
+    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
     env: t.Dict[str, str] = None,
 ) -> _T_CompletedProcess:
@@ -437,6 +484,11 @@ def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K
 
     {X: [X0, X1, ...], Y: [Y0, Y1, ...]} ->
       [(X, X0), (Y, Y0)), ((X, X0), (Y, Y1)), ((X, X1), (Y, Y0)), ((X, X1), (Y, Y1)]
+
+    >>> list(expand_specs({"x": ["x0", "x1"]}))
+    [(('x', 'x0'),), (('x', 'x1'),)]
+    >>> list(expand_specs({"x": ["x0", "x1"], "y": ["y0", "y1"]}))
+    [(('x', 'x0'), ('y', 'y0')), (('x', 'x0'), ('y', 'y1')), (('x', 'x1'), ('y', 'y0')), (('x', 'x1'), ('y', 'y1'))]
     """
     all_vals = [[(name, val) for val in vals] for name, vals in specs.items()]
 

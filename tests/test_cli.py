@@ -7,7 +7,6 @@ import typing
 import click.testing
 import mock
 import pytest
-
 import riot.cli
 import riot.riot
 
@@ -106,6 +105,22 @@ def test_list_with_pattern(cli: click.testing.CliRunner) -> None:
             assert list_venvs.call_args.args[0].pattern == "^pattern.*"
 
 
+def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
+    """Running list with a venv pattern passes."""
+    with with_riotfile(cli, "simple_riotfile.py"):
+        result = cli.invoke(
+            riot.cli.main,
+            [
+                "list",
+                "test",
+                "--venv-pattern",
+                "pytest543$",
+            ],
+        )
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+
 def test_list_with_python(cli: click.testing.CliRunner) -> None:
     """Running list with a python passes through the python."""
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
@@ -147,6 +162,7 @@ def test_run(cli: click.testing.CliRunner) -> None:
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
+                    "venv_pattern",
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
@@ -155,6 +171,7 @@ def test_run(cli: click.testing.CliRunner) -> None:
                 ]
             )
             assert kwargs["pattern"].pattern == ".*"
+            assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is False
             assert kwargs["skip_base_install"] is False
             assert kwargs["pass_env"] is False
@@ -177,6 +194,7 @@ def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
+                    "venv_pattern",
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
@@ -185,6 +203,7 @@ def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
                 ]
             )
             assert kwargs["pattern"].pattern == ".*"
+            assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is True
             assert kwargs["skip_base_install"] is True
             assert kwargs["pass_env"] is True
@@ -204,6 +223,7 @@ def test_run_with_short_args(cli: click.testing.CliRunner) -> None:
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
+                    "venv_pattern",
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
@@ -212,6 +232,7 @@ def test_run_with_short_args(cli: click.testing.CliRunner) -> None:
                 ]
             )
             assert kwargs["pattern"].pattern == ".*"
+            assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is True
             assert kwargs["skip_base_install"] is True
             assert kwargs["pass_env"] is False
@@ -231,6 +252,7 @@ def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
             assert set(kwargs.keys()) == set(
                 [
                     "pattern",
+                    "venv_pattern",
                     "recreate_venvs",
                     "skip_base_install",
                     "pass_env",
@@ -239,9 +261,67 @@ def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
                 ]
             )
             assert kwargs["pattern"].pattern == "^pattern.*"
+            assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is False
             assert kwargs["skip_base_install"] is False
             assert kwargs["pass_env"] is False
+
+
+def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
+    """Running run with pattern passes in that pattern."""
+    with mock.patch("riot.riot.logger.debug") as mock_debug:
+        with with_riotfile(cli, "simple_riotfile.py"):
+            result = cli.invoke(
+                riot.cli.main,
+                [
+                    "run",
+                    "test",
+                    "-d",
+                    "--skip-base-install",
+                ],
+            )
+            assert result.exit_code == 0
+            assert result.stdout == ""
+
+            mock_debug.assert_called()
+            assert not any(
+                [
+                    call_args
+                    for call_args in mock_debug.call_args_list
+                    if call_args.args[0]
+                    == "Skipping venv instance '%s' due to pattern mismatch"
+                ]
+            )
+
+
+def test_run_venv_pattern(cli: click.testing.CliRunner) -> None:
+    """Running run with pattern passes in that pattern."""
+    with mock.patch("riot.riot.logger.debug") as mock_debug:
+        with with_riotfile(cli, "simple_riotfile.py"):
+            result = cli.invoke(
+                riot.cli.main,
+                [
+                    "run",
+                    "test",
+                    "-d",
+                    "--skip-base-install",
+                    "--venv-pattern",
+                    "pytest543$",
+                ],
+            )
+            assert result.exit_code == 0
+            assert result.stdout == ""
+
+            mock_debug.assert_called()
+            assert any(
+                [
+                    call_args
+                    for call_args in mock_debug.call_args_list
+                    if call_args.args[0]
+                    == "Skipping venv instance '%s' due to pattern mismatch"
+                    and call_args.args[1].endswith("pytest")
+                ]
+            )
 
 
 def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
@@ -307,14 +387,14 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
 @pytest.mark.parametrize(
     "name,cmdargs,cmdrun",
     [
-        ("test_cmdargs", None, "echo cmdargs="),
-        ("test_cmdargs", "-k filter", "echo cmdargs=-k filter"),
-        ("test_nocmdargs", None, "echo no cmdargs"),
-        ("test_nocmdargs", "-k filter", "echo no cmdargs"),
+        ("test_cmdargs", [], "echo cmdargs="),
+        ("test_cmdargs", ["--", "-k", "filter"], "echo cmdargs=-k filter"),
+        ("test_nocmdargs", [], "echo no cmdargs"),
+        ("test_nocmdargs", ["--", "-k", "filter"], "echo no cmdargs"),
     ],
 )
-def test_run_suites_cmdargs_not_set(
-    cli: click.testing.CliRunner, name: str, cmdargs: str, cmdrun: str
+def test_run_suites_cmdargs(
+    cli: click.testing.CliRunner, name: str, cmdargs: typing.List[str], cmdrun: str
 ) -> None:
     """Running command with optional infix cmdargs."""
     with cli.isolated_filesystem():
@@ -349,9 +429,7 @@ venv = Venv(
             )
         with mock.patch("subprocess.run") as subprocess_run:
             subprocess_run.return_value.returncode = 0
-            args = ["run", name]
-            if cmdargs:
-                args += ["--cmdargs", cmdargs]
+            args = ["run", name] + cmdargs
             result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
             assert result.exit_code == 0
             assert result.stdout == ""
@@ -425,18 +503,12 @@ venv = Venv(
         Venv(
             pys=[3],
             name="success",
-            pkgs={
-                "pytest": [""],
-            },
-            command="pytest test_success.py",
+            command="exit 0",
         ),
         Venv(
             pys=[3],
             name="success2",
-            pkgs={
-                "pytest": "",
-            },
-            command="pytest test_success.py",
+            command="exit 0",
         ),
     ],
 )
@@ -462,3 +534,47 @@ def test_success():
         )
         assert result.exit_code == 0
         assert result.stdout == ""
+
+
+def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+venv = Venv(
+    venvs=[
+        Venv(
+            pys=[3],
+            name="success",
+            command="echo hello",
+        ),
+    ],
+)
+            """
+            )
+
+        result = cli.invoke(
+            riot.cli.main, ["-f", "riotfile", "list"], catch_exceptions=False
+        )
+        assert result.exit_code == 1
+        assert (
+            result.stdout
+            == "Failed to construct config file:\nInvalid file format for riotfile. Expected file with .py extension got 'riotfile'.\n"
+        )
+
+
+def test_riotfile_execute_error(cli: click.testing.CliRunner) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+this is invalid syntax
+            """
+            )
+
+        result = cli.invoke(riot.cli.main, ["list"], catch_exceptions=False)
+        assert result.exit_code == 1
+        assert "Failed to parse" in result.stdout
+        assert "SyntaxError: invalid syntax" in result.stdout
