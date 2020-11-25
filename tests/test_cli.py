@@ -7,7 +7,6 @@ import typing
 import click.testing
 import mock
 import pytest
-
 import riot.cli
 import riot.riot
 

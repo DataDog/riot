@@ -32,6 +32,7 @@ venv = Venv(
                 "flake8-blind-except": "",
                 "flake8-builtins": "",
                 "flake8-docstrings": "",
+                "flake8-import-order": "",
                 "flake8-logging-format": "",
                 "flake8-rst-docstrings": "",
                 # needed for some features from flake8-rst-docstrings

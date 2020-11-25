@@ -1,10 +1,11 @@
 __all__ = ["main"]
 
-import pkg_resources
 import logging
 import re
 
+
 import click
+import pkg_resources
 
 from .riot import Session
 
