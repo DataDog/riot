@@ -87,8 +87,8 @@ installed.
 Generating the base virtual environments is useful for performance to avoid
 having to reinstall the local package repeatedly.
 
-Once the base virtual environments are built, the --skip option can be used
-for the run command to avoid having to install the local package."""
+Once the base virtual environments are built, the ``--skip-base-install`` option
+can be used for the run command to avoid having to install the local package."""
 )
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
