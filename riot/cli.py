@@ -26,6 +26,7 @@ class InterpreterParamType(click.ParamType):
 
 
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
+VENV_PATTERN_ARG = click.option("--venv-pattern", "venv_pattern", default=r".*")
 RECREATE_VENVS_ARG = click.option(
     "-r", "--recreate-venvs", "recreate_venvs", is_flag=True, default=False
 )
@@ -65,9 +66,12 @@ def main(ctx, riotfile, log_level):
 @main.command("list", help="List venvs")
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@VENV_PATTERN_ARG
 @click.pass_context
-def list_venvs(ctx, pythons, pattern):
-    ctx.obj["session"].list_venvs(re.compile(pattern), pythons=pythons)
+def list_venvs(ctx, pythons, pattern, venv_pattern):
+    ctx.obj["session"].list_venvs(
+        re.compile(pattern), re.compile(venv_pattern), pythons=pythons
+    )
 
 
 @main.command(help="Generate virtual environments")
@@ -94,10 +98,14 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@VENV_PATTERN_ARG
 @click.pass_context
-def run(ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern):
+def run(
+    ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern, venv_pattern
+):
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
+        venv_pattern=re.compile(venv_pattern),
         recreate_venvs=recreate_venvs,
         skip_base_install=skip_base_install,
         pass_env=pass_env,
