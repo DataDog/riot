@@ -7,7 +7,9 @@ import os
 import shutil
 import subprocess
 import sys
+import traceback
 import typing as t
+
 
 logger = logging.getLogger(__name__)
 
@@ -195,14 +197,23 @@ class Session:
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
         spec = importlib.util.spec_from_file_location("riotfile", path)
+        if not spec:
+            raise Exception(
+                f"Invalid file format for riotfile. Expected file with .py extension got '{path}'."
+            )
         config = importlib.util.module_from_spec(spec)
 
         # DEV: MyPy has `ModuleSpec.loader` as `Optional[_Loader`]` which doesn't have `exec_module`
         # https://github.com/python/typeshed/blob/fe58699ca5c9ee4838378adb88aaf9323e9bbcf0/stdlib/3/_importlib_modulespec.pyi#L13-L44
-        t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
-
-        venv = getattr(config, "venv", Venv())
-        return cls(venv=venv)
+        try:
+            t.cast(importlib.abc.Loader, spec.loader).exec_module(config)
+        except Exception as e:
+            raise Exception(
+                f"Failed to parse riotfile '{path}'.\n{traceback.format_exc()}"
+            ) from e
+        else:
+            venv = getattr(config, "venv", Venv())
+            return cls(venv=venv)
 
     def run(
         self,

@@ -2,6 +2,7 @@ __all__ = ["main"]
 
 import logging
 import re
+import sys
 
 
 import click
@@ -51,7 +52,11 @@ def main(ctx, riotfile, log_level):
         logging.basicConfig(level=log_level)
 
     ctx.ensure_object(dict)
-    ctx.obj["session"] = Session.from_config_file(riotfile)
+    try:
+        ctx.obj["session"] = Session.from_config_file(riotfile)
+    except Exception as e:
+        click.echo(f"Failed to construct config file:\n{str(e)}", err=True)
+        sys.exit(1)
 
 
 @main.command("list", help="""List all virtual env instances matching a pattern.""")
