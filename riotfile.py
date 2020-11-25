@@ -10,7 +10,7 @@ venv = Venv(
                 "LC_ALL": "C.UTF-8",
                 "LANG": "C.UTF-8",
             },
-            pys=[3.7, 3.8, 3.9],
+            pys=[3.6, 3.7, 3.8, 3.9],
             pkgs={
                 "pytest": latest,
                 "pytest-cov": latest,
