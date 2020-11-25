@@ -28,7 +28,11 @@ class InterpreterParamType(click.ParamType):
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
 VENV_PATTERN_ARG = click.option("--venv-pattern", "venv_pattern", default=r".*")
 RECREATE_VENVS_ARG = click.option(
-    "-r", "--recreate-venvs", "recreate_venvs", is_flag=True, default=False
+    "-r",
+    "--recreate-venvs",
+    "recreate_venvs",
+    is_flag=True,
+    default=False,
 )
 SKIP_BASE_INSTALL_ARG = click.option(
     "-s", "--skip-base-install", "skip_base_install", is_flag=True, default=False
@@ -63,7 +67,7 @@ def main(ctx, riotfile, log_level):
         sys.exit(1)
 
 
-@main.command("list", help="List venvs")
+@main.command("list", help="""List all virtual env instances matching a pattern.""")
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @VENV_PATTERN_ARG
@@ -74,7 +78,18 @@ def list_venvs(ctx, pythons, pattern, venv_pattern):
     )
 
 
-@main.command(help="Generate virtual environments")
+@main.command(
+    help="""Generate base virtual environments.
+
+A base virtual environment is a virtual environment with the local package
+installed.
+
+Generating the base virtual environments is useful for performance to avoid
+having to reinstall the local package repeatedly.
+
+Once the base virtual environments are built, the --skip option can be used
+for the run command to avoid having to install the local package."""
+)
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @PYTHON_VERSIONS_ARG
@@ -90,7 +105,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 
 
 @main.command(
-    help="Run",
+    help="""Run virtualenv instances with names matching a pattern.""",
     context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
 )
 @RECREATE_VENVS_ARG
