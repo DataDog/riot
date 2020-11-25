@@ -181,6 +181,7 @@ class Session:
     def run(
         self,
         pattern: t.Pattern[str],
+        venv_pattern: t.Pattern[str],
         skip_base_install: bool = False,
         recreate_venvs: bool = False,
         out: t.TextIO = sys.stdout,
@@ -210,17 +211,19 @@ class Session:
             }
 
             if pkgs:
-                # Strip special characters for the venv directory name.
-                venv_postfix = "_".join(
-                    [f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()]
-                )
-                venv_name = f"{base_venv}_{venv_postfix}"
+                venv_name = get_venv_directory_name(base_venv, pkgs)
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
             else:
                 venv_name = base_venv
                 pkg_str = ""
+
+            if not venv_pattern.search(venv_name):
+                logger.debug(
+                    "Skipping venv instance '%s' due to pattern mismatch", venv_name
+                )
+                continue
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
@@ -304,9 +307,14 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, pythons=None, out=sys.stdout):
+    def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
+                continue
+            base_venv = get_base_venv_path(inst.py)
+            if not venv_pattern.search(
+                get_venv_directory_name(base_venv, dict(inst.pkgs))
+            ):
                 continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
@@ -369,6 +377,12 @@ def get_pep_dep(libname: str, version: str) -> str:
     ref: https://www.python.org/dev/peps/pep-0508/
     """
     return f"{libname}{version}"
+
+
+def get_venv_directory_name(base_venv, pkgs):
+    # Strip special characters for the venv directory name.
+    venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
+    return f"{base_venv}_{venv_postfix}"
 
 
 def get_env_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
