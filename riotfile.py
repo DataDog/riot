@@ -47,7 +47,7 @@ venv = Venv(
             },
         ),
         Venv(
-            pys=[3.6, 3.7, 3.8, 3.9],
+            pys=[3.6, 3.7, 3.8, 3.9, "pypy3"],
             name="codecov",
             command="bash <(curl -s https://codecov.io/bash)",
             pkgs={
