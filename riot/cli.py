@@ -8,7 +8,7 @@ import sys
 import click
 import pkg_resources
 
-from .riot import Session
+from .riot import Interpreter, Session
 
 
 try:
@@ -18,7 +18,15 @@ except pkg_resources.DistributionNotFound:
     __version__ = "dev"
 
 
+class InterpreterParamType(click.ParamType):
+    name = "interpreter"
+
+    def convert(self, value, param, ctx):
+        return Interpreter(value)
+
+
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
+VENV_PATTERN_ARG = click.option("--venv-pattern", "venv_pattern", default=r".*")
 RECREATE_VENVS_ARG = click.option(
     "-r",
     "--recreate-venvs",
@@ -30,7 +38,7 @@ SKIP_BASE_INSTALL_ARG = click.option(
     "-s", "--skip-base-install", "skip_base_install", is_flag=True, default=False
 )
 PYTHON_VERSIONS_ARG = click.option(
-    "-p", "--python", "pythons", type=float, default=[], multiple=True
+    "-p", "--python", "pythons", type=InterpreterParamType(), default=[], multiple=True
 )
 
 
@@ -62,9 +70,12 @@ def main(ctx, riotfile, log_level):
 @main.command("list", help="""List all virtual env instances matching a pattern.""")
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@VENV_PATTERN_ARG
 @click.pass_context
-def list_venvs(ctx, pythons, pattern):
-    ctx.obj["session"].list_venvs(re.compile(pattern), pythons=pythons)
+def list_venvs(ctx, pythons, pattern, venv_pattern):
+    ctx.obj["session"].list_venvs(
+        re.compile(pattern), re.compile(venv_pattern), pythons=pythons
+    )
 
 
 @main.command(
@@ -102,10 +113,14 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@VENV_PATTERN_ARG
 @click.pass_context
-def run(ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern):
+def run(
+    ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern, venv_pattern
+):
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
+        venv_pattern=re.compile(venv_pattern),
         recreate_venvs=recreate_venvs,
         skip_base_install=skip_base_install,
         pass_env=pass_env,
