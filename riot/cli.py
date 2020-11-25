@@ -1,10 +1,12 @@
 __all__ = ["main"]
 
-import pkg_resources
 import logging
 import re
+import sys
+
 
 import click
+import pkg_resources
 
 from .riot import Session
 
@@ -17,6 +19,7 @@ except pkg_resources.DistributionNotFound:
 
 
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
+VENV_PATTERN_ARG = click.option("--venv-pattern", "venv_pattern", default=r".*")
 RECREATE_VENVS_ARG = click.option(
     "-r", "--recreate-venvs", "recreate_venvs", is_flag=True, default=False
 )
@@ -46,14 +49,22 @@ def main(ctx, riotfile, log_level):
         logging.basicConfig(level=log_level)
 
     ctx.ensure_object(dict)
-    ctx.obj["session"] = Session.from_config_file(riotfile)
+    try:
+        ctx.obj["session"] = Session.from_config_file(riotfile)
+    except Exception as e:
+        click.echo(f"Failed to construct config file:\n{str(e)}", err=True)
+        sys.exit(1)
 
 
-@main.command("list", help="List sessions")
+@main.command("list", help="List venvs")
+@PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@VENV_PATTERN_ARG
 @click.pass_context
-def list_suites(ctx, pattern):
-    ctx.obj["session"].list_suites(re.compile(pattern))
+def list_venvs(ctx, pythons, pattern, venv_pattern):
+    ctx.obj["session"].list_venvs(
+        re.compile(pattern), re.compile(venv_pattern), pythons=pythons
+    )
 
 
 @main.command(help="Generate virtual environments")
@@ -71,18 +82,26 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
     )
 
 
-@main.command(help="Run suites")
+@main.command(
+    help="Run",
+    context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
+)
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@VENV_PATTERN_ARG
 @click.pass_context
-def run(ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern):
-    ctx.obj["session"].run_suites(
+def run(
+    ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern, venv_pattern
+):
+    ctx.obj["session"].run(
         pattern=re.compile(pattern),
+        venv_pattern=re.compile(venv_pattern),
         recreate_venvs=recreate_venvs,
         skip_base_install=skip_base_install,
         pass_env=pass_env,
+        cmdargs=ctx.args,
         pythons=pythons,
     )
