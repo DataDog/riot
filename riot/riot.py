@@ -61,30 +61,16 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
     return [x] if not isinstance(x, list) else x
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass(unsafe_hash=True, eq=True)
 class Interpreter:
-    hint: dataclasses.InitVar[str]
+    _T_hint = t.Union[float, int, str]
+
+    hint: dataclasses.InitVar[_T_hint]
+    _hint: str = dataclasses.field(init=False)
 
     def __post_init__(self, hint: t.Union[float, int, str]) -> None:
         """Normalize the data."""
-        self.hint = str(hint)
-
-    def __eq__(self, other: object) -> bool:
-        """Interpreters with the same hint should be equal.
-
-        >>> Interpreter(3.9) == Interpreter(3.9)
-        True
-        >>> Interpreter("3.9") == Interpreter("3.9")
-        True
-        >>> Interpreter("3.8") == Interpreter("3.9")
-        False
-        >>> Interpreter("3.8") == Interpreter(3.8)
-        True
-        """
-        if isinstance(other, Interpreter):
-            return other.hint == self.hint
-        else:
-            return False
+        self._hint = str(hint)
 
     def __str__(self) -> str:
         """Return the path of the interpreter executable."""
@@ -104,14 +90,15 @@ class Interpreter:
         desirable for cases where a user might not require all the mentioned
         interpreters to be installed for their usage.
         """
-        py_ex = shutil.which(self.hint)
-        if not py_ex:
-            py_ex = shutil.which(f"python{self.hint}")
+        py_ex = shutil.which(self._hint)
 
         if not py_ex:
-            raise FileNotFoundError(f"Python interpreter {self.hint} not found")
-        else:
+            py_ex = shutil.which(f"python{self._hint}")
+
+        if py_ex:
             return py_ex
+
+        raise FileNotFoundError(f"Python interpreter {self._hint} not found")
 
 
 @dataclasses.dataclass
