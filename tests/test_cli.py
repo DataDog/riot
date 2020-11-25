@@ -422,18 +422,12 @@ venv = Venv(
         Venv(
             pys=[3],
             name="success",
-            pkgs={
-                "pytest": [""],
-            },
-            command="pytest test_success.py",
+            command="exit 0",
         ),
         Venv(
             pys=[3],
             name="success2",
-            pkgs={
-                "pytest": "",
-            },
-            command="pytest test_success.py",
+            command="exit 0",
         ),
     ],
 )
@@ -459,3 +453,47 @@ def test_success():
         )
         assert result.exit_code == 0
         assert result.stdout == ""
+
+
+def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+venv = Venv(
+    venvs=[
+        Venv(
+            pys=[3],
+            name="success",
+            command="echo hello",
+        ),
+    ],
+)
+            """
+            )
+
+        result = cli.invoke(
+            riot.cli.main, ["-f", "riotfile", "list"], catch_exceptions=False
+        )
+        assert result.exit_code == 1
+        assert (
+            result.stdout
+            == "Invalid file format for riotfile. Expected file with .py extension got 'riotfile'.\n"
+        )
+
+
+def test_riotfile_execute_error(cli: click.testing.CliRunner) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+this is invalid syntax
+            """
+            )
+
+        result = cli.invoke(riot.cli.main, ["list"], catch_exceptions=False)
+        assert result.exit_code == 1
+        assert "Failed to parse" in result.stdout
+        assert "SyntaxError: invalid syntax" in result.stdout
