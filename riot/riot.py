@@ -68,7 +68,7 @@ class Interpreter:
     hint: dataclasses.InitVar[_T_hint]
     _hint: str = dataclasses.field(init=False)
 
-    def __post_init__(self, hint: t.Union[float, int, str]) -> None:
+    def __post_init__(self, hint: _T_hint) -> None:
         """Normalize the data."""
         self._hint = str(hint)
 
