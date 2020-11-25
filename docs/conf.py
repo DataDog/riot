@@ -10,11 +10,17 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-
 project = "riot"
 
+copyright = "2020-Present Datadog, Inc"  # noqa
+
 extensions = [
-    "sphinx.ext.doctest",
     "sphinx.ext.autodoc",
+    "sphinx.ext.doctest",
+    "sphinx.ext.napoleon",
+    "sphinx_rtd_theme",
     "reno.sphinxext",
+    "sphinx_click",
 ]
+
+html_theme = "sphinx_rtd_theme"

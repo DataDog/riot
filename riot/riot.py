@@ -63,6 +63,43 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
 
 @dataclasses.dataclass
 class Venv:
+    """Specifies how to build and run a virtual environment.
+
+    Venvs can be nested to benefit from inheriting from a parent Venv. All
+    attributes are passed down to child Venvs. The child Venvs can override
+    parent attributes with the semantics defined below.
+
+    Example::
+
+        Venv(
+          pys=[3.9],
+          venvs=[
+              Venv(
+                  name="mypy",
+                  command="mypy",
+                  pkgs={
+                      "mypy": "==0.790",
+                  },
+              ),
+              Venv(
+                  name="test",
+                  pys=["3.7", "3.8", "3.9"],
+                  command="pytest",
+                  pkgs={
+                      "pytest": "==6.1.2",
+                  },
+              ),
+          ])
+
+    Args:
+        name (str): Name of the instance. Overrides parent value.
+        command (str): Command to run in the virtual environment. Overrides parent value.
+        pys  (List[float]): Python versions. Overrides parent value.
+        pkgs (Dict[str, Union[str, List[str]]]): Packages and version(s) to install into the virtual env. Merges and overrides parent values.
+        env  (Dict[str, Union[str, List[str]]]): Environment variables to define in the virtual env. Merges and overrides parent values.
+        venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
+    """
+
     pys: dataclasses.InitVar[t.List[float]] = None
     pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
