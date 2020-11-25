@@ -480,7 +480,7 @@ venv = Venv(
         assert result.exit_code == 1
         assert (
             result.stdout
-            == "Invalid file format for riotfile. Expected file with .py extension got 'riotfile'.\n"
+            == "Failed to construct config file:\nInvalid file format for riotfile. Expected file with .py extension got 'riotfile'.\n"
         )
 
 
