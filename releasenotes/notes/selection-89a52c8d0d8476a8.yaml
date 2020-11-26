@@ -1,0 +1,6 @@
+---
+prelude: >
+  The pattern argument now also accepts the hashcode of a virtual environment instance.
+features:
+  - |
+    Add hashcode to Venv instances for selecting environments.

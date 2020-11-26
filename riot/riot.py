@@ -1,4 +1,6 @@
 import dataclasses
+import functools
+import hashlib
 import importlib.abc
 import importlib.util
 import itertools
@@ -191,13 +193,8 @@ class Venv:
         parents: t.List["Venv"] = [],
     ) -> t.Generator["VenvInstance", None, None]:
         for venv in self.venvs:
-            if venv.name and not pattern.match(venv.name):
-                logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
-                continue
-            else:
-                for inst in venv.instances(parents=parents + [self], pattern=pattern):
-                    if inst:
-                        yield inst
+            for inst in venv.instances(pattern, parents=parents + [self]):
+                yield inst
         else:
             resolved = self.resolve(parents)
 
@@ -210,7 +207,7 @@ class Venv:
             for env in expand_specs(resolved.env):
                 for py in resolved.pys:
                     for pkgs in expand_specs(resolved.pkgs):
-                        yield VenvInstance(
+                        inst = VenvInstance(
                             name=resolved.name,
                             command=resolved.command,
                             py=py,
@@ -218,8 +215,13 @@ class Venv:
                             pkgs=pkgs,
                         )
 
+                        if pattern.match(inst.humanhash()) or (
+                            inst.name and pattern.search(inst.name)
+                        ):
+                            yield inst
 
-@dataclasses.dataclass
+
+@dataclasses.dataclass(eq=True, frozen=True)
 class VenvInstance:
     command: str
     env: t.Tuple[t.Tuple[str, str]]
@@ -233,12 +235,26 @@ class VenvInstance:
         venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
         return f"{base_path}_{venv_postfix}"
 
+    def __str__(self) -> str:
+        """Return a human readable form of the instance."""
+        env_str = env_to_str(self.env)
+        return f"<{self.name} {self.humanhash()}: {env_str} {self.pkgstr()} {self.py}> {self.command}>"
+
+    @functools.lru_cache()
+    def pkgstr(self) -> str:
+        return " ".join([get_pep_dep(lib, version) for lib, version in self.pkgs])
+
+    @functools.lru_cache()
+    def humanhash(self) -> str:
+        m = hashlib.sha256()
+        for f in dataclasses.astuple(self):
+            m.update(str(f).encode())
+        return m.hexdigest()[0:4]
+
 
 @dataclasses.dataclass
 class VenvInstanceResult:
     instance: VenvInstance
-    venv_name: str
-    pkgstr: str
     code: int = 1
 
 
@@ -295,7 +311,7 @@ class Session:
             pythons=pythons,
         )
 
-        for inst in self.venv.instances(pattern=pattern):
+        for inst in self.venv.instances(pattern):
             if pythons and inst.py not in pythons:
                 logger.debug(
                     "Skipping venv instance %s due to interpreter mismatch", inst
@@ -311,12 +327,8 @@ class Session:
 
             if pkgs:
                 venv_path = inst.venv_path()
-                pkg_str = " ".join(
-                    [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
-                )
             else:
                 venv_path = base_venv_path
-                pkg_str = ""
 
             if not venv_pattern.search(venv_path):
                 logger.debug(
@@ -325,9 +337,7 @@ class Session:
                 continue
 
             # Result which will be updated with the test outcome.
-            result = VenvInstanceResult(
-                instance=inst, venv_name=venv_path, pkgstr=pkg_str
-            )
+            result = VenvInstanceResult(instance=inst)
 
             try:
                 if pkgs:
@@ -346,15 +356,15 @@ class Session:
                         # Assume the venv already exists and works fine
                         logger.info("Virtualenv '%s' already exists", venv_path)
 
-                    logger.info("Installing venv dependencies %s.", pkg_str)
+                    logger.info("Installing venv dependencies %s.", inst.pkgstr())
                     try:
                         run_cmd_venv(
                             venv_path,
-                            f"pip --disable-pip-version-check install {pkg_str}",
+                            f"pip --disable-pip-version-check install {inst.pkgstr()}",
                         )
                     except CmdFailure as e:
                         raise CmdFailure(
-                            f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
+                            f"Failed to install venv dependencies {inst.pkgstr()}\n{e.proc.stdout}",
                             e.proc,
                         )
 
@@ -366,15 +376,15 @@ class Session:
 
                 # Finally, run the test in the venv.
                 if cmdargs is not None:
-                    inst.command = inst.command.format(cmdargs=(" ".join(cmdargs)))
+                    cmd = inst.command.format(cmdargs=(" ".join(cmdargs)))
+                else:
+                    cmd = inst.command
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
-                logger.info(
-                    "Running command '%s' with environment '%s'.", inst.command, env_str
-                )
+                logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
+                    run_cmd_venv(venv_path, cmd, stdout=out, env=env)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -397,26 +407,35 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            env_str = env_to_str(r.instance.env)
-            s = f"{status_char}  <{r.instance.name}: {env_str} {r.pkgstr} {r.instance.py}> {r.instance.command}"
+            s = f"{status_char}  {r.instance}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
-        for inst in self.venv.instances(pattern=pattern):
+    def list_venvs(
+        self,
+        pattern: t.Pattern[str],
+        venv_pattern: t.Pattern[str],
+        pythons: t.Optional[t.Set[Interpreter]] = None,
+        out: t.TextIO = sys.stdout,
+    ) -> None:
+        for inst in self.venv.instances(pattern):
             if pythons and inst.py not in pythons:
                 continue
 
             if not venv_pattern.search(inst.venv_path()):
                 continue
+
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
             env_str = env_to_str(inst.env)
             py_str = f"{inst.py}"
-            print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
+            print(
+                f"{inst.humanhash()} {inst.name} {env_str} {py_str} {pkgs_str}",
+                file=out,
+            )
 
     def generate_base_venvs(
         self,
@@ -428,7 +447,7 @@ class Session:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
         required_pys: t.Set[Interpreter] = set(
-            [inst.py for inst in self.venv.instances(pattern=pattern)]
+            [inst.py for inst in self.venv.instances(pattern)]
         )
         # Apply Python filters.
         if pythons:
@@ -521,7 +540,7 @@ def run_cmd(
     return r
 
 
-def get_venv_command(venv_path: str, cmd: str) -> str:
+def venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
 
@@ -533,7 +552,7 @@ def run_cmd_venv(
     executable: t.Optional[str] = None,
     env: t.Dict[str, str] = None,
 ) -> _T_CompletedProcess:
-    cmd = get_venv_command(venv, args)
+    cmd = venv_command(venv, args)
 
     if env is None:
         env = {}
