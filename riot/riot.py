@@ -350,13 +350,16 @@ class Session:
                         env[k] = resolved_val
 
                 # Finally, run the test in the venv.
-                cmd = inst.command
+                if cmdargs is not None:
+                    inst.command = inst.command.format(cmdargs=(" ".join(cmdargs)))
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
-                logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
+                logger.info(
+                    "Running command '%s' with environment '%s'.", inst.command, env_str
+                )
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_name, cmd, stdout=out, env=env, cmdargs=cmdargs)
+                    run_cmd_venv(venv_name, inst.command, stdout=out, env=env)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -481,18 +484,10 @@ def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
-
-    if cmdargs and not isinstance(args, str):
-        # FIXME(jd): make it work
-        raise RuntimeError("Cannot use cmdargs with non-string command")
-
-    if isinstance(args, str):
-        args = args.format(cmdargs=(" ".join(cmdargs) if cmdargs else ""))
 
     logger.debug("Running command %s", args)
     # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
@@ -532,7 +527,6 @@ def run_cmd_venv(
     venv: str,
     args: str,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
     env: t.Dict[str, str] = None,
 ) -> _T_CompletedProcess:
@@ -544,9 +538,7 @@ def run_cmd_venv(
     env_str = " ".join(f"{k}={v}" for k, v in env.items())
 
     logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    return run_cmd(
-        cmd, stdout=stdout, cmdargs=cmdargs, executable=executable, shell=True
-    )
+    return run_cmd(cmd, stdout=stdout, executable=executable, shell=True)
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
