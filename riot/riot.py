@@ -27,12 +27,6 @@ _K = t.TypeVar("_K")
 _V = t.TypeVar("_V")
 
 
-class AttrDict(t.Dict[_K, _V]):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
-
-
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
     """Convert single values in a dictionary to a list with that value.
 
@@ -342,12 +336,7 @@ class Session:
                 env = os.environ.copy() if pass_env else {}
 
                 # Add in the instance env vars.
-                for k, v in inst.env:
-                    resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
-                    if resolved_val is not None:
-                        if k in env:
-                            logger.debug("Venv overrides environment variable %s", k)
-                        env[k] = resolved_val
+                env.update(dict(inst.env))
 
                 # Finally, run the test in the venv.
                 if cmdargs is not None:
