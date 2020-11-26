@@ -27,12 +27,6 @@ _K = t.TypeVar("_K")
 _V = t.TypeVar("_V")
 
 
-class AttrDict(t.Dict[_K, _V]):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
-
-
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
     """Convert single values in a dictionary to a list with that value.
 
@@ -368,21 +362,19 @@ class Session:
                 env = os.environ.copy() if pass_env else {}
 
                 # Add in the instance env vars.
-                for k, v in inst.env:
-                    resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
-                    if resolved_val is not None:
-                        if k in env:
-                            logger.debug("Venv overrides environment variable %s", k)
-                        env[k] = resolved_val
+                env.update(dict(inst.env))
 
                 # Finally, run the test in the venv.
-                cmd = inst.command
+                if cmdargs is not None:
+                    inst.command = inst.command.format(cmdargs=(" ".join(cmdargs)))
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
-                logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
+                logger.info(
+                    "Running command '%s' with environment '%s'.", inst.command, env_str
+                )
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_path, cmd, stdout=out, env=env, cmdargs=cmdargs)
+                    run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -514,18 +506,10 @@ def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
-
-    if cmdargs and not isinstance(args, str):
-        # FIXME(jd): make it work
-        raise RuntimeError("Cannot use cmdargs with non-string command")
-
-    if isinstance(args, str):
-        args = args.format(cmdargs=(" ".join(cmdargs) if cmdargs else ""))
 
     logger.debug("Running command %s", args)
     # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
@@ -546,7 +530,6 @@ def run_cmd_venv(
     venv: str,
     args: str,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
     env: t.Dict[str, str] = None,
 ) -> _T_CompletedProcess:
@@ -558,9 +541,7 @@ def run_cmd_venv(
     env_str = " ".join(f"{k}={v}" for k, v in env.items())
 
     logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    return run_cmd(
-        cmd, stdout=stdout, cmdargs=cmdargs, executable=executable, shell=True
-    )
+    return run_cmd(cmd, stdout=stdout, executable=executable, shell=True)
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
