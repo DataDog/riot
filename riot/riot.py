@@ -70,7 +70,7 @@ class Interpreter:
 
     def __str__(self) -> str:
         """Return the path of the interpreter executable."""
-        return repr(self)
+        return repr(self.path())
 
     def version(self) -> str:
         path = self.path()
@@ -398,7 +398,7 @@ class Session:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
             env_str = env_to_str(r.instance.env)
-            s = f"{status_char}  {r.instance.name}: {env_str} {r.instance.py} {r.pkgstr}"
+            s = f"{status_char}  <{r.instance.name}: {env_str} {r.pkgstr} {r.instance.py}> {r.instance.command}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
