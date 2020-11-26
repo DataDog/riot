@@ -96,6 +96,26 @@ class Interpreter:
 
         raise FileNotFoundError(f"Python interpreter {self._hint} not found")
 
+    def venv_path(self) -> str:
+        """Return the path to the virtual environment for this interpreter."""
+        version = self.version().replace(".", "")
+        return f".riot/.venv_py{version}"
+
+    def create_venv(self, recreate: bool) -> str:
+        """Attempt to create a virtual environment for this intepreter."""
+        path: str = self.venv_path()
+
+        if os.path.isdir(path) and not recreate:
+            logger.info(
+                "Skipping creation of virtualenv '%s' as it already exists.", path
+            )
+            return path
+
+        py_ex = self.path()
+        logger.info("Creating virtualenv '%s' with interpreter '%s'.", path, py_ex)
+        run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
+        return path
+
 
 @dataclasses.dataclass
 class Venv:
@@ -201,11 +221,17 @@ class Venv:
 
 @dataclasses.dataclass
 class VenvInstance:
-    name: t.Optional[str]
-    py: Interpreter
     command: str
     env: t.Tuple[t.Tuple[str, str]]
+    name: t.Optional[str]
     pkgs: t.Tuple[t.Tuple[str, str]]
+    py: Interpreter
+
+    def venv_path(self) -> str:
+        """Return path to directory of the instance."""
+        base_path = self.py.venv_path()
+        venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
+        return f"{base_path}_{venv_postfix}"
 
 
 @dataclasses.dataclass
@@ -276,7 +302,7 @@ class Session:
                 )
                 continue
 
-            base_venv = get_base_venv_path(inst.py.version())
+            base_venv_path: str = inst.py.venv_path()
 
             # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {
@@ -284,23 +310,23 @@ class Session:
             }
 
             if pkgs:
-                venv_name = get_venv_directory_name(base_venv, pkgs)
+                venv_path = inst.venv_path()
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
             else:
-                venv_name = base_venv
+                venv_path = base_venv_path
                 pkg_str = ""
 
-            if not venv_pattern.search(venv_name):
+            if not venv_pattern.search(venv_path):
                 logger.debug(
-                    "Skipping venv instance '%s' due to pattern mismatch", venv_name
+                    "Skipping venv instance '%s' due to pattern mismatch", venv_path
                 )
                 continue
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
-                instance=inst, venv_name=venv_name, pkgstr=pkg_str
+                instance=inst, venv_name=venv_path, pkgstr=pkg_str
             )
 
             try:
@@ -308,22 +334,22 @@ class Session:
                     # Copy the base venv to use for this venv.
                     logger.info(
                         "Copying base virtualenv '%s' into virtualenv '%s'.",
-                        base_venv,
-                        venv_name,
+                        base_venv_path,
+                        venv_path,
                     )
                     try:
-                        shutil.copytree(base_venv, venv_name)
+                        shutil.copytree(base_venv_path, venv_path)
                     except FileNotFoundError:
-                        logger.info("Base virtualenv '%s' does not exist", venv_name)
+                        logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
                     except FileExistsError:
                         # Assume the venv already exists and works fine
-                        logger.info("Virtualenv '%s' already exists", venv_name)
+                        logger.info("Virtualenv '%s' already exists", venv_path)
 
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
                         run_cmd_venv(
-                            venv_name,
+                            venv_path,
                             f"pip --disable-pip-version-check install {pkg_str}",
                         )
                     except CmdFailure as e:
@@ -348,7 +374,7 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_name, inst.command, stdout=out, env=env)
+                    run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -371,7 +397,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            env_str = get_env_str(r.instance.env)
+            env_str = env_to_str(r.instance.env)
             s = f"{status_char}  {r.instance.name}: {env_str} {r.instance.py} {r.pkgstr}"
             print(s, file=out)
 
@@ -382,15 +408,13 @@ class Session:
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
                 continue
-            base_venv = get_base_venv_path(inst.py)
-            if not venv_pattern.search(
-                get_venv_directory_name(base_venv, dict(inst.pkgs))
-            ):
+
+            if not venv_pattern.search(inst.venv_path()):
                 continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
-            env_str = get_env_str(inst.env)
+            env_str = env_to_str(inst.env)
             py_str = f"{inst.py}"
             print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
 
@@ -402,8 +426,10 @@ class Session:
         pythons: t.Optional[t.Set[Interpreter]],
     ) -> None:
         """Generate all the required base venvs."""
-        # Find all the python versions used.
-        required_pys = set([inst.py for inst in self.venv.instances(pattern=pattern)])
+        # Find all the python interpreters used.
+        required_pys: t.Set[Interpreter] = set(
+            [inst.py for inst in self.venv.instances(pattern=pattern)]
+        )
         # Apply Python filters.
         if pythons:
             required_pys = required_pys.intersection(pythons)
@@ -415,7 +441,7 @@ class Session:
 
         for py in required_pys:
             try:
-                venv_path = create_base_venv(py, recreate)
+                venv_path = py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
@@ -437,6 +463,15 @@ class Session:
 
 
 def rmchars(chars: str, s: str) -> str:
+    """Remove chars from s.
+
+    >>> rmchars("123", "123456")
+    '456'
+    >>> rmchars(">=<.", ">=2.0")
+    '20'
+    >>> rmchars(">=<.", "")
+    ''
+    """
     for c in chars:
         s = s.replace(c, "")
     return s
@@ -446,24 +481,22 @@ def get_pep_dep(libname: str, version: str) -> str:
     """Return a valid PEP 508 dependency string.
 
     ref: https://www.python.org/dev/peps/pep-0508/
+
+    >>> get_pep_dep("riot", "==0.2.0")
+    'riot==0.2.0'
     """
     return f"{libname}{version}"
 
 
-def get_venv_directory_name(base_venv, pkgs):
-    # Strip special characters for the venv directory name.
-    venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
-    return f"{base_venv}_{venv_postfix}"
+def env_to_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
+    """Return a human-friendly representation of environment variables.
 
-
-def get_env_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
+    >>> env_to_str([("FOO", "BAR")])
+    'FOO=BAR'
+    >>> env_to_str([("K", "V"), ("K2", "V2")])
+    'K=V K2=V2'
+    """
     return " ".join(f"{k}={v}" for k, v in envs)
-
-
-def get_base_venv_path(pyversion: str) -> str:
-    """Return the base virtual environment path relative to the current directory."""
-    pyversion = str(pyversion).replace(".", "")
-    return f".riot/.venv_py{pyversion}"
 
 
 _T_stdio = t.Union[None, int, t.IO[t.Any]]
@@ -486,25 +519,6 @@ def run_cmd(
     if r.returncode != 0:
         raise CmdFailure("Command %s failed with code %s." % (args[0], r.returncode), r)
     return r
-
-
-def create_base_venv(interpreter: Interpreter, recreate: bool) -> str:
-    """Attempt to create a virtual environment for `pyversion`.
-
-    :param pyversion: string or int representing the major.minor Python
-                      version. eg. 3.7, "3.8".
-    """
-    version = interpreter.version()
-    path = get_base_venv_path(version)
-
-    if os.path.isdir(path) and not recreate:
-        logger.info("Skipping creation of virtualenv '%s' as it already exists.", path)
-        return path
-
-    py_ex = interpreter.path()
-    logger.info("Creating virtualenv '%s' with interpreter '%s'.", path, py_ex)
-    run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
-    return path
 
 
 def get_venv_command(venv_path: str, cmd: str) -> str:
