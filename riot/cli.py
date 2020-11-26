@@ -105,7 +105,20 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 
 
 @main.command(
-    help="""Run virtualenv instances with names matching a pattern.""",
+    help="""Run virtual environment instances.
+
+Instances can be filtered by providing a pattern to match the name or hashcode.
+
+Arguments can be passed to the command of the instance as well.
+
+Examples:
+
+    riot run tests
+
+    riot run tests -k "test_something_specific"
+
+    riot run 9a32b
+""",
     context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
 )
 @RECREATE_VENVS_ARG

@@ -238,7 +238,7 @@ class VenvInstance:
     def __str__(self) -> str:
         """Return a human readable form of the instance."""
         env_str = env_to_str(self.env)
-        return f"<{self.name} {self.humanhash()}: {env_str} {self.pkgstr()} {self.py}> {self.command}>"
+        return f"<{self.name} {self.humanhash()}: {env_str} {self.pkgstr()} {self.py}>"
 
     @functools.lru_cache()
     def pkgstr(self) -> str:
@@ -255,6 +255,7 @@ class VenvInstance:
 @dataclasses.dataclass
 class VenvInstanceResult:
     instance: VenvInstance
+    cmd: str
     code: int = 1
 
 
@@ -337,7 +338,7 @@ class Session:
                 continue
 
             # Result which will be updated with the test outcome.
-            result = VenvInstanceResult(instance=inst)
+            result = VenvInstanceResult(instance=inst, cmd=inst.command)
 
             try:
                 if pkgs:
@@ -376,15 +377,18 @@ class Session:
 
                 # Finally, run the test in the venv.
                 if cmdargs is not None:
-                    cmd = inst.command.format(cmdargs=(" ".join(cmdargs)))
+                    result.cmd = inst.command.format(cmdargs=(" ".join(cmdargs)))
                 else:
-                    cmd = inst.command
+                    result.cmd = inst.command
+
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
-                logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
+                logger.info(
+                    "Running command '%s' with environment '%s'.", result.cmd, env_str
+                )
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_path, cmd, stdout=out, env=env)
+                    run_cmd_venv(venv_path, result.cmd, stdout=out, env=env)
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
@@ -407,7 +411,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             status_char = "✖️" if failed else "✔️"
-            s = f"{status_char}  {r.instance}"
+            s = f"{status_char}  {r.instance} {r.cmd}"
             print(s, file=out)
 
         if any(True for r in results if r.code != 0):
@@ -573,6 +577,8 @@ def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K
 
     >>> list(expand_specs({"x": ["x0", "x1"]}))
     [(('x', 'x0'),), (('x', 'x1'),)]
+    >>> list(expand_specs({"x": ["x0"], "y": ["y0"]}))
+    [(('x', 'x0'), ('y', 'y0'))]
     >>> list(expand_specs({"x": ["x0", "x1"], "y": ["y0", "y1"]}))
     [(('x', 'x0'), ('y', 'y0')), (('x', 'x0'), ('y', 'y1')), (('x', 'x1'), ('y', 'y0')), (('x', 'x1'), ('y', 'y1'))]
     """

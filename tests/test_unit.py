@@ -19,7 +19,9 @@ from riot.riot import Interpreter, VenvInstance
         ("3", 3, True),
     ],
 )
-def test_interpreter(v1: t.Union[float, int, str], v2: t.Union[float, int, str], equal: bool) -> None:
+def test_interpreter(
+    v1: t.Union[float, int, str], v2: t.Union[float, int, str], equal: bool
+) -> None:
     if equal:
         assert Interpreter(v1) == Interpreter(v2)
         assert hash(Interpreter(v1)) == hash(Interpreter(v2))
