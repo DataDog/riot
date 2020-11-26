@@ -1,3 +1,5 @@
+import typing as t
+
 import pytest
 from riot.riot import Interpreter, VenvInstance
 
@@ -17,7 +19,7 @@ from riot.riot import Interpreter, VenvInstance
         ("3", 3, True),
     ],
 )
-def test_interpreter(v1, v2, equal):
+def test_interpreter(v1: t.Union[float, int, str], v2: t.Union[float, int, str], equal: bool) -> None:
     if equal:
         assert Interpreter(v1) == Interpreter(v2)
         assert hash(Interpreter(v1)) == hash(Interpreter(v2))
@@ -32,16 +34,16 @@ def test_interpreter(v1, v2, equal):
     "v1,v2",
     [
         (
-            VenvInstance("name", Interpreter(3.6), "pytest", tuple(), tuple()),
-            VenvInstance("name1", Interpreter(3.6), "pytest", tuple(), tuple()),
+            VenvInstance("pytest", tuple(), "test", tuple(), Interpreter(3.6)),
+            VenvInstance("pytest", tuple(), "test", tuple(), Interpreter(3.9)),
         ),
         (
-            VenvInstance("name", Interpreter(3.6), "pytest", tuple(), tuple()),
-            VenvInstance("name", Interpreter(3.7), "pytest", tuple(), tuple()),
+            VenvInstance("pytest", tuple(), "test", tuple(), Interpreter(3.6)),
+            VenvInstance("pytest", tuple(), "test2", tuple(), Interpreter(3.6)),
         ),
     ],
 )
-def test_instance_hash_neq(v1, v2):
+def test_instance_hash_neq(v1: VenvInstance, v2: VenvInstance) -> None:
     assert v1.humanhash() != v2.humanhash()
 
 
@@ -49,10 +51,10 @@ def test_instance_hash_neq(v1, v2):
     "v1,v2",
     [
         (
-            VenvInstance("name", Interpreter(3.6), "pytest", tuple(), tuple()),
-            VenvInstance("name", Interpreter(3.6), "pytest", tuple(), tuple()),
+            VenvInstance("pytest", tuple(), "test", tuple(), Interpreter(3.6)),
+            VenvInstance("pytest", tuple(), "test", tuple(), Interpreter(3.6)),
         ),
     ],
 )
-def test_instance_hash_eq(v1, v2):
+def test_instance_hash_eq(v1: VenvInstance, v2: VenvInstance) -> None:
     assert v1.humanhash() == v2.humanhash()

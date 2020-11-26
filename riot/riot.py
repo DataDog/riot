@@ -224,9 +224,9 @@ class Venv:
 @dataclasses.dataclass(eq=True, frozen=True)
 class VenvInstance:
     command: str
-    env: t.Tuple[t.Tuple[str, str]]
+    env: t.Sequence[t.Tuple[str, str]]
     name: t.Optional[str]
-    pkgs: t.Tuple[t.Tuple[str, str]]
+    pkgs: t.Sequence[t.Tuple[str, str]]
     py: Interpreter
 
     def venv_path(self) -> str:
