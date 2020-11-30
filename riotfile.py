@@ -48,7 +48,7 @@ venv = Venv(
             },
         ),
         Venv(
-            pys=[3.6, 3.7, 3.8, 3.9],
+            pys=[3.6, 3.7, 3.8, 3.9, "pypy3"],
             name="codecov",
             command="bash <(curl -s https://codecov.io/bash)",
             pkgs={
@@ -57,9 +57,11 @@ venv = Venv(
         ),
         Venv(
             name="docs",
-            command="sphinx-build -W -b html docs docs/_build/",
+            command="sphinx-build {cmdargs} -W -b html docs docs/_build/",
             pkgs={
                 "sphinx": "==3.3",
+                "sphinx-rtd-theme": "==0.5.0",
+                "sphinx-click": "==2.5.0",
                 "reno": latest,
             },
         ),

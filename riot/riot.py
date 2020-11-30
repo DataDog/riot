@@ -28,12 +28,6 @@ _K = t.TypeVar("_K")
 _V = t.TypeVar("_V")
 
 
-class AttrDict(t.Dict[_K, _V]):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
-
-
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
     """Convert single values in a dictionary to a list with that value.
 
@@ -64,9 +58,106 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
     return [x] if not isinstance(x, list) else x
 
 
+@dataclasses.dataclass(unsafe_hash=True, eq=True)
+class Interpreter:
+    _T_hint = t.Union[float, int, str]
+
+    hint: dataclasses.InitVar[_T_hint]
+    _hint: str = dataclasses.field(init=False)
+
+    def __post_init__(self, hint: _T_hint) -> None:
+        """Normalize the data."""
+        self._hint = str(hint)
+
+    def __str__(self) -> str:
+        """Return the path of the interpreter executable."""
+        return repr(self)
+
+    def version(self) -> str:
+        path = self.path()
+
+        output = subprocess.check_output([path, "--version"])
+        version = output.decode().strip().split(" ")[1]
+        return version
+
+    def path(self) -> str:
+        """Return the Python interpreter path or raise.
+
+        This defers the error until the interpeter is actually required. This is
+        desirable for cases where a user might not require all the mentioned
+        interpreters to be installed for their usage.
+        """
+        py_ex = shutil.which(self._hint)
+
+        if not py_ex:
+            py_ex = shutil.which(f"python{self._hint}")
+
+        if py_ex:
+            return py_ex
+
+        raise FileNotFoundError(f"Python interpreter {self._hint} not found")
+
+    def venv_path(self) -> str:
+        """Return the path to the virtual environment for this interpreter."""
+        version = self.version().replace(".", "")
+        return f".riot/.venv_py{version}"
+
+    def create_venv(self, recreate: bool) -> str:
+        """Attempt to create a virtual environment for this intepreter."""
+        path: str = self.venv_path()
+
+        if os.path.isdir(path) and not recreate:
+            logger.info(
+                "Skipping creation of virtualenv '%s' as it already exists.", path
+            )
+            return path
+
+        py_ex = self.path()
+        logger.info("Creating virtualenv '%s' with interpreter '%s'.", path, py_ex)
+        run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
+        return path
+
+
 @dataclasses.dataclass
 class Venv:
-    pys: dataclasses.InitVar[t.List[float]] = None
+    """Specifies how to build and run a virtual environment.
+
+    Venvs can be nested to benefit from inheriting from a parent Venv. All
+    attributes are passed down to child Venvs. The child Venvs can override
+    parent attributes with the semantics defined below.
+
+    Example::
+
+        Venv(
+          pys=[3.9],
+          venvs=[
+              Venv(
+                  name="mypy",
+                  command="mypy",
+                  pkgs={
+                      "mypy": "==0.790",
+                  },
+              ),
+              Venv(
+                  name="test",
+                  pys=["3.7", "3.8", "3.9"],
+                  command="pytest",
+                  pkgs={
+                      "pytest": "==6.1.2",
+                  },
+              ),
+          ])
+
+    Args:
+        name (str): Name of the instance. Overrides parent value.
+        command (str): Command to run in the virtual environment. Overrides parent value.
+        pys  (List[float]): Python versions. Overrides parent value.
+        pkgs (Dict[str, Union[str, List[str]]]): Packages and version(s) to install into the virtual env. Merges and overrides parent values.
+        env  (Dict[str, Union[str, List[str]]]): Environment variables to define in the virtual env. Merges and overrides parent values.
+        venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
+    """
+
+    pys: dataclasses.InitVar[t.List[Interpreter]] = None
     pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     name: t.Optional[str] = None
@@ -75,7 +166,7 @@ class Venv:
 
     def __post_init__(self, pys, pkgs, env):
         """Normalize the data."""
-        self.pys = to_list(pys) if pys is not None else []
+        self.pys = [Interpreter(py) for py in to_list(pys)] if pys is not None else []
         self.pkgs = rm_singletons(pkgs) if pkgs else {}
         self.env = rm_singletons(env) if env else {}
 
@@ -131,11 +222,17 @@ class Venv:
 
 @dataclasses.dataclass
 class VenvInstance:
-    name: t.Optional[str]
-    py: float
     command: str
     env: t.Tuple[t.Tuple[str, str]]
+    name: t.Optional[str]
     pkgs: t.Tuple[t.Tuple[str, str]]
+    py: Interpreter
+
+    def venv_path(self) -> str:
+        """Return path to directory of the instance."""
+        base_path = self.py.venv_path()
+        venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
+        return f"{base_path}_{venv_postfix}"
 
 
 @dataclasses.dataclass
@@ -197,7 +294,7 @@ class Session:
         out: t.TextIO = sys.stdout,
         pass_env: bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
-        pythons: t.Optional[t.Set[str]] = None,
+        pythons: t.Optional[t.Set[Interpreter]] = None,
     ) -> None:
         results = []
 
@@ -210,10 +307,12 @@ class Session:
 
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
-                logger.debug("Skipping venv instance %s due to Python version", inst)
+                logger.debug(
+                    "Skipping venv instance %s due to interpreter mismatch", inst
+                )
                 continue
 
-            base_venv = get_base_venv_path(inst.py)
+            base_venv_path: str = inst.py.venv_path()
 
             # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {
@@ -221,23 +320,23 @@ class Session:
             }
 
             if pkgs:
-                venv_name = get_venv_directory_name(base_venv, pkgs)
+                venv_path = inst.venv_path()
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
             else:
-                venv_name = base_venv
+                venv_path = base_venv_path
                 pkg_str = ""
 
-            if not venv_pattern.search(venv_name):
+            if not venv_pattern.search(venv_path):
                 logger.debug(
-                    "Skipping venv instance '%s' due to pattern mismatch", venv_name
+                    "Skipping venv instance '%s' due to pattern mismatch", venv_path
                 )
                 continue
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
-                instance=inst, venv_name=venv_name, pkgstr=pkg_str
+                instance=inst, venv_name=venv_path, pkgstr=pkg_str
             )
 
             try:
@@ -245,22 +344,22 @@ class Session:
                     # Copy the base venv to use for this venv.
                     logger.info(
                         "Copying base virtualenv '%s' into virtualenv '%s'.",
-                        base_venv,
-                        venv_name,
+                        base_venv_path,
+                        venv_path,
                     )
                     try:
-                        shutil.copytree(base_venv, venv_name)
+                        shutil.copytree(base_venv_path, venv_path)
                     except FileNotFoundError:
-                        logger.info("Base virtualenv '%s' does not exist", venv_name)
+                        logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
                     except FileExistsError:
                         # Assume the venv already exists and works fine
-                        logger.info("Virtualenv '%s' already exists", venv_name)
+                        logger.info("Virtualenv '%s' already exists", venv_path)
 
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
                         run_cmd_venv(
-                            venv_name,
+                            venv_path,
                             f"pip --disable-pip-version-check install {pkg_str}",
                         )
                     except CmdFailure as e:
@@ -273,22 +372,20 @@ class Session:
                 env = os.environ.copy() if pass_env else {}
 
                 # Add in the instance env vars.
-                for k, v in inst.env:
-                    resolved_val = v(AttrDict(pkgs=pkgs)) if callable(v) else v
-                    if resolved_val is not None:
-                        if k in env:
-                            logger.debug("Venv overrides environment variable %s", k)
-                        env[k] = resolved_val
+                env.update(dict(inst.env))
 
                 # Finally, run the test in the venv.
-                cmd = inst.command
+                if cmdargs is not None:
+                    inst.command = inst.command.format(cmdargs=(" ".join(cmdargs)))
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
-                logger.info("Running command '%s' with environment '%s'.", cmd, env_str)
+                logger.info(
+                    "Running command '%s' with environment '%s'.", inst.command, env_str
+                )
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
                     output = run_cmd_venv(
-                        venv_name, cmd, stdout=out, env=env, cmdargs=cmdargs
+                        venv_path, inst.command, stdout=out, env=env
                     )
                     result.output = output.stdout
                 except CmdFailure as e:
@@ -352,10 +449,8 @@ class Session:
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.py not in pythons:
                 continue
-            base_venv = get_base_venv_path(inst.py)
-            if not venv_pattern.search(
-                get_venv_directory_name(base_venv, dict(inst.pkgs))
-            ):
+
+            if not venv_pattern.search(inst.venv_path()):
                 continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
@@ -369,23 +464,25 @@ class Session:
         pattern: t.Pattern[str],
         recreate: bool,
         skip_deps: bool,
-        pythons: t.Optional[t.Set[str]],
+        pythons: t.Optional[t.Set[Interpreter]],
     ) -> None:
         """Generate all the required base venvs."""
-        # Find all the python versions used.
-        required_pys = set([inst.py for inst in self.venv.instances(pattern=pattern)])
+        # Find all the python interpreters used.
+        required_pys: t.Set[Interpreter] = set(
+            [inst.py for inst in self.venv.instances(pattern=pattern)]
+        )
         # Apply Python filters.
         if pythons:
             required_pys = required_pys.intersection(pythons)
 
         logger.info(
-            "Generating virtual environments for Python versions %s",
+            "Generating virtual environments for interpreters %s",
             ",".join(str(s) for s in required_pys),
         )
 
         for py in required_pys:
             try:
-                venv_path = create_base_venv(py, recreate=recreate)
+                venv_path = py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
@@ -407,6 +504,15 @@ class Session:
 
 
 def rmchars(chars: str, s: str) -> str:
+    """Remove chars from s.
+
+    >>> rmchars("123", "123456")
+    '456'
+    >>> rmchars(">=<.", ">=2.0")
+    '20'
+    >>> rmchars(">=<.", "")
+    ''
+    """
     for c in chars:
         s = s.replace(c, "")
     return s
@@ -416,24 +522,22 @@ def get_pep_dep(libname: str, version: str) -> str:
     """Return a valid PEP 508 dependency string.
 
     ref: https://www.python.org/dev/peps/pep-0508/
+
+    >>> get_pep_dep("riot", "==0.2.0")
+    'riot==0.2.0'
     """
     return f"{libname}{version}"
 
 
-def get_venv_directory_name(base_venv, pkgs):
-    # Strip special characters for the venv directory name.
-    venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in pkgs.items()])
-    return f"{base_venv}_{venv_postfix}"
+def env_to_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
+    """Return a human-friendly representation of environment variables.
 
-
-def get_env_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
+    >>> env_to_str([("FOO", "BAR")])
+    'FOO=BAR'
+    >>> env_to_str([("K", "V"), ("K2", "V2")])
+    'K=V K2=V2'
+    """
     return " ".join(f"{k}={v}" for k, v in envs)
-
-
-def get_base_venv_path(pyversion):
-    """Return the base virtual environment path relative to the current directory."""
-    pyversion = str(pyversion).replace(".", "")
-    return f".riot/.venv_py{pyversion}"
 
 
 _T_stdio = t.Union[None, int, t.IO[t.Any]]
@@ -443,18 +547,10 @@ def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
-
-    if cmdargs and not isinstance(args, str):
-        # FIXME(jd): make it work
-        raise RuntimeError("Cannot use cmdargs with non-string command")
-
-    if isinstance(args, str):
-        args = args.format(cmdargs=(" ".join(cmdargs) if cmdargs else ""))
 
     logger.debug("Running command %s", args)
     # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
@@ -466,32 +562,6 @@ def run_cmd(
     return r
 
 
-def create_base_venv(pyversion, path=None, recreate=True):
-    """Attempt to create a virtual environment for `pyversion`.
-
-    :param pyversion: string or int representing the major.minor Python
-                      version. eg. 3.7, "3.8".
-    """
-    path = path or get_base_venv_path(pyversion)
-
-    if os.path.isdir(path) and not recreate:
-        logger.info("Skipping creation of virtualenv '%s' as it already exists.", path)
-        return path
-
-    py_ex = f"python{pyversion}"
-    py_ex = shutil.which(py_ex)
-
-    if not py_ex:
-        logger.debug("%s interpreter not found", py_ex)
-        raise FileNotFoundError
-    else:
-        logger.info("Found Python interpreter '%s'.", py_ex)
-
-    logger.info("Creating virtualenv '%s' with Python '%s'.", path, py_ex)
-    run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
-    return path
-
-
 def get_venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
@@ -501,7 +571,6 @@ def run_cmd_venv(
     venv: str,
     args: str,
     stdout: _T_stdio = subprocess.PIPE,
-    cmdargs: t.Optional[t.Sequence[str]] = None,
     executable: t.Optional[str] = None,
     env: t.Dict[str, str] = None,
 ) -> _T_CompletedProcess:
@@ -513,9 +582,7 @@ def run_cmd_venv(
     env_str = " ".join(f"{k}={v}" for k, v in env.items())
 
     logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    return run_cmd(
-        cmd, stdout=stdout, cmdargs=cmdargs, executable=executable, shell=True
-    )
+    return run_cmd(cmd, stdout=stdout, executable=executable, shell=True)
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:

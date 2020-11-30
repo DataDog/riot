@@ -9,6 +9,7 @@ import mock
 import pytest
 import riot.cli
 import riot.riot
+from riot.riot import Interpreter
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -131,7 +132,7 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
             assert result.stdout == ""
 
             list_venvs.assert_called_once()
-            assert list_venvs.call_args.kwargs["pythons"] == (3.6,)
+            assert list_venvs.call_args.kwargs["pythons"] == (Interpreter("3.6"),)
 
     # multiple pythons
     with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
@@ -145,7 +146,11 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
             assert result.stdout == ""
 
             list_venvs.assert_called_once()
-            assert list_venvs.call_args.kwargs["pythons"] == (3.6, 3.8, 2.7)
+            assert list_venvs.call_args.kwargs["pythons"] == (
+                Interpreter("3.6"),
+                Interpreter("3.8"),
+                Interpreter("2.7"),
+            )
 
 
 def test_run(cli: click.testing.CliRunner) -> None:
@@ -349,7 +354,9 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
     """Generatening generate with pattern passes in that pattern."""
     with mock.patch("riot.cli.Session.generate_base_venvs") as generate_base_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
-            result = cli.invoke(riot.cli.main, ["generate", "^pattern.*"])
+            result = cli.invoke(
+                riot.cli.main, ["generate", "^pattern.*"], catch_exceptions=False
+            )
             # Success, but no output because we mock generate_base_venvs
             assert result.exit_code == 0
             assert result.stdout == ""
@@ -390,7 +397,7 @@ venv = Venv(
             command="echo no cmdargs",
             venvs=[
                 Venv(
-                    pys=[3.8],
+                    pys=[3],
                 ),
             ],
         ),
@@ -399,7 +406,7 @@ venv = Venv(
             command="echo cmdargs={cmdargs}",
             venvs=[
                 Venv(
-                    pys=[3.8],
+                    pys=[3],
                 ),
             ],
         ),
@@ -461,12 +468,16 @@ def test_failure():
             """
             )
 
-        result = cli.invoke(riot.cli.main, ["run", "-s", "success"])
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
+        )
         assert result.exit_code == 0
         assert "✓ success:  python3 'pytest'" in result.stdout
         assert "1 passed with 0 warnings, 0 failed" in result.stdout
 
-        result = cli.invoke(riot.cli.main, ["run", "-s", "failure"])
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "failure"], catch_exceptions=False
+        )
         assert result.exit_code == 1
         assert "x failure:  python3 'pytest'" in result.stdout
         assert "0 passed with 0 warnings, 1 failed" in result.stdout
