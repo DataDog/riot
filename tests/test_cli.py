@@ -472,7 +472,7 @@ def test_failure():
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ success:  python3 'pytest'" in result.stdout
+        assert "✓ success" in result.stdout
         assert "1 passed with 0 warnings, 0 failed" in result.stdout
 
         result = cli.invoke(
@@ -519,13 +519,13 @@ def test_success():
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ success:  python3" in result.stdout
+        assert "✓ success" in result.stdout
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success2"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ success2:  python3" in result.stdout
+        assert "✓ success2" in result.stdout
 
 
 def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
