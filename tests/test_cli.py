@@ -479,7 +479,7 @@ def test_failure():
             riot.cli.main, ["run", "-s", "failure"], catch_exceptions=False
         )
         assert result.exit_code == 1
-        assert "x failure:  python3 'pytest'" in result.stdout
+        assert "x failure" in result.stdout
         assert "0 passed with 0 warnings, 1 failed" in result.stdout
 
 
