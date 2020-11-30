@@ -285,8 +285,8 @@ def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
             ],
         )
         assert result.exit_code == 0
-        assert "✓ test:  python3 'pytest==5.4.3'" in result.stdout
-        assert "✓ test:  python3 'pytest'" in result.stdout
+        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'" in result.stdout
+        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest'" in result.stdout
         assert "2 passed with 0 warnings, 0 failed" in result.stdout
 
 
@@ -305,7 +305,7 @@ def test_run_venv_pattern(cli: click.testing.CliRunner) -> None:
             ],
         )
         assert result.exit_code == 0
-        assert "✓ test:  python3 'pytest==5.4.3'"
+        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'"
         assert "1 passed with 0 warnings, 0 failed" in result.stdout
 
 
