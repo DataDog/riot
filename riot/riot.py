@@ -265,6 +265,12 @@ class Session:
         "did you mean",
     )
 
+    def is_warning(output):
+        if output is None:
+            return False
+        lower_output = output.lower()
+        return any(warning in lower_output for warning in self.warnings)
+
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
         spec = importlib.util.spec_from_file_location("riotfile", path)
@@ -385,9 +391,7 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    output = run_cmd_venv(
-                        venv_path, inst.command, stdout=out, env=env
-                    )
+                    output = run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
                     result.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
@@ -407,12 +411,6 @@ class Session:
             finally:
                 results.append(result)
 
-        def is_warning(output):
-            if output is None:
-                return False
-            lower_output = output.lower()
-            return any(warning in lower_output for warning in self.warnings)
-
         click.echo(
             click.style("\n-------------------summary-------------------", bold=True)
         )
@@ -423,7 +421,7 @@ class Session:
 
         for r in results:
             failed = r.code != 0
-            env_str = get_env_str(r.instance.env)
+            env_str = env_to_str(r.instance.env)
             s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.pkgstr}"
 
             if failed:
