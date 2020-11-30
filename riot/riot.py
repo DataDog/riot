@@ -75,7 +75,8 @@ class Interpreter:
     def version(self) -> str:
         path = self.path()
 
-        output = subprocess.check_output([path, "--version"])
+        # Redirect stderr to stdout because Python 2 prints version on stderr
+        output = subprocess.check_output([path, "--version"], stderr=subprocess.STDOUT)
         version = output.decode().strip().split(" ")[1]
         return version
 
