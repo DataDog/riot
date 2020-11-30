@@ -119,7 +119,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
             ],
         )
         assert result.exit_code == 0
-        assert result.stdout == "test  Python 3 'pytest==5.4.3'\n"
+        assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
 
 
 def test_list_with_python(cli: click.testing.CliRunner) -> None:
