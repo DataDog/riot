@@ -385,9 +385,7 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    output = run_cmd_venv(
-                        venv_path, inst.command, stdout=out, env=env
-                    )
+                    output = run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
                     result.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
@@ -456,7 +454,7 @@ class Session:
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
-            env_str = env_to_str(r.instance.env)
+            env_str = env_to_str(inst.env)
             py_str = f"Python {inst.py}"
             click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
 
