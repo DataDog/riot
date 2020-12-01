@@ -286,6 +286,12 @@ class Session:
             venv = getattr(config, "venv", Venv())
             return cls(venv=venv)
 
+    def is_warning(self, output):
+        if output is None:
+            return False
+        lower_output = output.lower()
+        return any(warning in lower_output for warning in self.warnings)
+
     def run(
         self,
         pattern: t.Pattern[str],
@@ -405,12 +411,6 @@ class Session:
             finally:
                 results.append(result)
 
-        def is_warning(output):
-            if output is None:
-                return False
-            lower_output = output.lower()
-            return any(warning in lower_output for warning in self.warnings)
-
         click.echo(
             click.style("\n-------------------summary-------------------", bold=True)
         )
@@ -430,7 +430,7 @@ class Session:
                 click.echo(s)
             else:
                 num_passed += 1
-                if is_warning(r.output):
+                if self.is_warning(r.output):
                     num_warnings += 1
                     s = f"{click.style('⚠', fg='yellow', bold=True)} {click.style(s, fg='yellow')}"
                     click.echo(s)
