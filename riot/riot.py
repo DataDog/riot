@@ -10,6 +10,7 @@ import sys
 import traceback
 import typing as t
 
+import click
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +242,7 @@ class VenvInstanceResult:
     venv_name: str
     pkgstr: str
     code: int = 1
+    output: str = ""
 
 
 class CmdFailure(Exception):
@@ -254,6 +256,14 @@ class CmdFailure(Exception):
 @dataclasses.dataclass
 class Session:
     venv: Venv
+    warnings = (
+        "deprecated",
+        "deprecation",
+        "warning",
+        "no longer maintained",
+        "not maintained",
+        "did you mean",
+    )
 
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
@@ -275,6 +285,12 @@ class Session:
         else:
             venv = getattr(config, "venv", Venv())
             return cls(venv=venv)
+
+    def is_warning(self, output):
+        if output is None:
+            return False
+        lower_output = output.lower()
+        return any(warning in lower_output for warning in self.warnings)
 
     def run(
         self,
@@ -375,14 +391,15 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
+                    output = run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
+                    result.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
                     )
             except CmdFailure as e:
                 result.code = e.code
-                print(e.msg, file=out)
+                click.echo(click.style(e.msg, fg="red"))
             except KeyboardInterrupt:
                 result.code = 1
                 break
@@ -394,13 +411,35 @@ class Session:
             finally:
                 results.append(result)
 
-        print("\n-------------------summary-------------------", file=out)
+        click.echo(
+            click.style("\n-------------------summary-------------------", bold=True)
+        )
+
+        num_failed = 0
+        num_passed = 0
+        num_warnings = 0
+
         for r in results:
             failed = r.code != 0
-            status_char = "✖️" if failed else "✔️"
             env_str = env_to_str(r.instance.env)
-            s = f"{status_char}  {r.instance.name}: {env_str} {r.instance.py} {r.pkgstr}"
-            print(s, file=out)
+            s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.pkgstr}"
+
+            if failed:
+                num_failed += 1
+                s = f"{click.style('x', fg='red', bold=True)} {click.style(s, fg='red')}"
+                click.echo(s)
+            else:
+                num_passed += 1
+                if self.is_warning(r.output):
+                    num_warnings += 1
+                    s = f"{click.style('⚠', fg='yellow', bold=True)} {click.style(s, fg='yellow')}"
+                    click.echo(s)
+                else:
+                    s = f"{click.style('✓', fg='green', bold=True)} {click.style(s, fg='green')}"
+                    click.echo(s)
+
+        s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
+        click.echo(click.style(s_num, fg="blue", bold=True))
 
         if any(True for r in results if r.code != 0):
             sys.exit(1)
@@ -416,8 +455,8 @@ class Session:
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
             env_str = env_to_str(inst.env)
-            py_str = f"{inst.py}"
-            print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
+            py_str = f"Python {inst.py}"
+            click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
 
     def generate_base_venvs(
         self,
