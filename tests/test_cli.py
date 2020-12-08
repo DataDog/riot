@@ -8,6 +8,7 @@ import _pytest.monkeypatch
 import click.testing
 import mock
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
@@ -605,3 +606,72 @@ this is invalid syntax
         assert result.exit_code == 1
         assert "Failed to parse" in result.stdout
         assert "SyntaxError: invalid syntax" in result.stdout
+
+
+def test_run_pass_env(cli: click.testing.CliRunner, monkeypatch: MonkeyPatch) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+
+venv = Venv(
+    pys=[3],
+    pkgs={
+        "pytest": [""],
+    },
+    venvs=[
+        Venv(
+            name="no_env",
+            command="pytest test_no_env.py",
+        ),
+        Venv(
+            name="env",
+            command="pytest test_env.py",
+        ),
+    ],
+)
+                """
+            )
+
+        with open("test_no_env.py", "w") as f:
+            f.write(
+                """
+import os
+
+
+def test_no_env():
+    assert os.environ.get("TEST_ENV_VAR") is None
+            """
+            )
+
+        with open("test_env.py", "w") as f:
+            f.write(
+                """
+import os
+
+
+def test_env():
+    assert os.environ.get("TEST_ENV_VAR") == "1"
+            """
+            )
+
+        # set environment variables to check in test execution
+        monkeypatch.setenv("TEST_ENV_VAR", "1")
+
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "no_env"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert "1 passed with 0 warnings, 0 failed" in result.stdout
+
+        result = cli.invoke(riot.cli.main, ["run", "-s", "env"], catch_exceptions=False)
+        assert result.exit_code == 1
+        assert "0 passed with 0 warnings, 1 failed" in result.stdout
+
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "--pass-env", "env"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert "1 passed with 0 warnings, 0 failed" in result.stdout
