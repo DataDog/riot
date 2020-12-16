@@ -1,4 +1,5 @@
 import dataclasses
+import functools
 import importlib.abc
 import importlib.util
 import itertools
@@ -73,6 +74,7 @@ class Interpreter:
         """Return the path of the interpreter executable."""
         return repr(self)
 
+    @functools.lru_cache()
     def version(self) -> str:
         path = self.path()
 
@@ -81,6 +83,7 @@ class Interpreter:
         version = output.decode().strip().split(" ")[1]
         return version
 
+    @functools.lru_cache()
     def path(self) -> str:
         """Return the Python interpreter path or raise.
 
