@@ -119,7 +119,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
             ],
         )
         assert result.exit_code == 0
-        assert result.stdout == ""
+        assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
 
 
 def test_list_with_python(cli: click.testing.CliRunner) -> None:
@@ -274,59 +274,39 @@ def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
 
 def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
     """Running run with pattern passes in that pattern."""
-    with mock.patch("riot.riot.logger.debug") as mock_debug:
-        with with_riotfile(cli, "simple_riotfile.py"):
-            result = cli.invoke(
-                riot.cli.main,
-                [
-                    "run",
-                    "test",
-                    "-d",
-                    "--skip-base-install",
-                ],
-            )
-            assert result.exit_code == 0
-            assert result.stdout == ""
-
-            mock_debug.assert_called()
-            assert not any(
-                [
-                    call_args
-                    for call_args in mock_debug.call_args_list
-                    if call_args.args[0]
-                    == "Skipping venv instance '%s' due to pattern mismatch"
-                ]
-            )
+    with with_riotfile(cli, "simple_riotfile.py"):
+        result = cli.invoke(
+            riot.cli.main,
+            [
+                "run",
+                "test",
+                "-d",
+                "--skip-base-install",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'" in result.stdout
+        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest'" in result.stdout
+        assert "2 passed with 0 warnings, 0 failed" in result.stdout
 
 
 def test_run_venv_pattern(cli: click.testing.CliRunner) -> None:
     """Running run with pattern passes in that pattern."""
-    with mock.patch("riot.riot.logger.debug") as mock_debug:
-        with with_riotfile(cli, "simple_riotfile.py"):
-            result = cli.invoke(
-                riot.cli.main,
-                [
-                    "run",
-                    "test",
-                    "-d",
-                    "--skip-base-install",
-                    "--venv-pattern",
-                    "pytest543$",
-                ],
-            )
-            assert result.exit_code == 0
-            assert result.stdout == ""
-
-            mock_debug.assert_called()
-            assert any(
-                [
-                    call_args
-                    for call_args in mock_debug.call_args_list
-                    if call_args.args[0]
-                    == "Skipping venv instance '%s' due to pattern mismatch"
-                    and call_args.args[1].endswith("pytest")
-                ]
-            )
+    with with_riotfile(cli, "simple_riotfile.py"):
+        result = cli.invoke(
+            riot.cli.main,
+            [
+                "run",
+                "test",
+                "-d",
+                "--skip-base-install",
+                "--venv-pattern",
+                "pytest543$",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'"
+        assert "1 passed with 0 warnings, 0 failed" in result.stdout
 
 
 def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
@@ -439,7 +419,6 @@ venv = Venv(
             args = ["run", name] + cmdargs
             result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
             assert result.exit_code == 0
-            assert result.stdout == ""
 
             subprocess_run.assert_called()
 
@@ -493,13 +472,15 @@ def test_failure():
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert result.stdout == ""
+        assert "✓ success" in result.stdout
+        assert "1 passed with 0 warnings, 0 failed" in result.stdout
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "failure"], catch_exceptions=False
         )
         assert result.exit_code == 1
-        assert result.stdout == ""
+        assert "x failure" in result.stdout
+        assert "0 passed with 0 warnings, 1 failed" in result.stdout
 
 
 def test_types(cli: click.testing.CliRunner) -> None:
@@ -538,13 +519,13 @@ def test_success():
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert result.stdout == ""
+        assert "✓ success" in result.stdout
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success2"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert result.stdout == ""
+        assert "✓ success2" in result.stdout
 
 
 def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
