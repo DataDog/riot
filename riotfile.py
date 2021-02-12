@@ -1,7 +1,7 @@
 from riot import latest, Venv
 
 venv = Venv(
-    pys=3.8,
+    pys=3,
     venvs=[
         Venv(
             name="test",
