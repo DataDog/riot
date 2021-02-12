@@ -161,7 +161,7 @@ class Venv:
         venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
     """
 
-    pys: dataclasses.InitVar[t.List[Interpreter]] = None
+    pys: dataclasses.InitVar[t.List[Interpreter._T_hint]] = None
     pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     name: t.Optional[str] = None
@@ -555,8 +555,9 @@ def run_cmd(
         executable = SHELL
 
     logger.debug("Running command %s", args)
-    # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
-    r = subprocess.run(args, encoding=ENCODING, stdout=stdout, executable=executable, shell=shell)  # type: ignore[arg-type]
+    r = subprocess.run(
+        args, encoding=ENCODING, stdout=stdout, executable=executable, shell=shell
+    )
     logger.debug(r.stdout)
 
     if r.returncode != 0:
