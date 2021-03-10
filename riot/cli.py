@@ -112,11 +112,19 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @SKIP_BASE_INSTALL_ARG
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
 @PYTHON_VERSIONS_ARG
+@click.option("--skip-missing", "skip_missing", is_flag=True, default=False)
 @PATTERN_ARG
 @VENV_PATTERN_ARG
 @click.pass_context
 def run(
-    ctx, recreate_venvs, skip_base_install, pass_env, pythons, pattern, venv_pattern
+    ctx,
+    recreate_venvs,
+    skip_base_install,
+    pass_env,
+    pythons,
+    skip_missing,
+    pattern,
+    venv_pattern,
 ):
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
@@ -126,4 +134,5 @@ def run(
         pass_env=pass_env,
         cmdargs=ctx.args,
         pythons=pythons,
+        skip_missing=skip_missing,
     )

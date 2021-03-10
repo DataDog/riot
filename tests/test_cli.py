@@ -40,6 +40,21 @@ def without_riotfile(
         yield
 
 
+def assert_args(args):
+    assert set(args.keys()) == set(
+        [
+            "pattern",
+            "venv_pattern",
+            "recreate_venvs",
+            "skip_base_install",
+            "pass_env",
+            "cmdargs",
+            "pythons",
+            "skip_missing",
+        ]
+    )
+
+
 def test_main(cli: click.testing.CliRunner) -> None:
     """Running main with no command returns usage."""
     result = cli.invoke(riot.cli.main)
@@ -164,17 +179,7 @@ def test_run(cli: click.testing.CliRunner) -> None:
 
             run.assert_called_once()
             kwargs = run.call_args.kwargs
-            assert set(kwargs.keys()) == set(
-                [
-                    "pattern",
-                    "venv_pattern",
-                    "recreate_venvs",
-                    "skip_base_install",
-                    "pass_env",
-                    "cmdargs",
-                    "pythons",
-                ]
-            )
+            assert_args(kwargs)
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is False
@@ -196,17 +201,7 @@ def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
 
             run.assert_called_once()
             kwargs = run.call_args.kwargs
-            assert set(kwargs.keys()) == set(
-                [
-                    "pattern",
-                    "venv_pattern",
-                    "recreate_venvs",
-                    "skip_base_install",
-                    "pass_env",
-                    "cmdargs",
-                    "pythons",
-                ]
-            )
+            assert_args(kwargs)
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is True
@@ -225,17 +220,7 @@ def test_run_with_short_args(cli: click.testing.CliRunner) -> None:
 
             run.assert_called_once()
             kwargs = run.call_args.kwargs
-            assert set(kwargs.keys()) == set(
-                [
-                    "pattern",
-                    "venv_pattern",
-                    "recreate_venvs",
-                    "skip_base_install",
-                    "pass_env",
-                    "cmdargs",
-                    "pythons",
-                ]
-            )
+            assert_args(kwargs)
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is True
@@ -254,17 +239,7 @@ def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
 
             run.assert_called_once()
             kwargs = run.call_args.kwargs
-            assert set(kwargs.keys()) == set(
-                [
-                    "pattern",
-                    "venv_pattern",
-                    "recreate_venvs",
-                    "skip_base_install",
-                    "pass_env",
-                    "cmdargs",
-                    "pythons",
-                ]
-            )
+            assert_args(kwargs)
             assert kwargs["pattern"].pattern == "^pattern.*"
             assert kwargs["venv_pattern"].pattern == ".*"
             assert kwargs["recreate_venvs"] is False
