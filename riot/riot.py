@@ -305,7 +305,7 @@ class Session:
         pass_env: bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[Interpreter]] = None,
-        skip_missing: bool = True,
+        skip_missing: bool = False,
     ) -> None:
         results = []
 
