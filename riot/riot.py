@@ -305,6 +305,7 @@ class Session:
         pass_env: bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[Interpreter]] = None,
+        skip_missing: bool = False,
     ) -> None:
         results = []
 
@@ -322,7 +323,16 @@ class Session:
                 )
                 continue
 
-            base_venv_path: str = inst.py.venv_path()
+            try:
+                base_venv_path: str = inst.py.venv_path()
+            except FileNotFoundError:
+                if skip_missing:
+                    logger.warning("Skipping missing interpreter %s", inst.py)
+                    continue
+                else:
+                    raise
+
+            logger.info("Running with %s", inst.py)
 
             # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {

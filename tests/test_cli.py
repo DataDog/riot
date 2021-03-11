@@ -50,6 +50,7 @@ def assert_args(args):
             "pass_env",
             "cmdargs",
             "pythons",
+            "skip_missing",
         ]
     )
 
