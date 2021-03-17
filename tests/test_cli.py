@@ -482,14 +482,6 @@ venv = Venv(
             """
             )
 
-        with open("test_success.py", "w") as f:
-            f.write(
-                """
-def test_success():
-    assert 1 == 1
-            """
-            )
-
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
