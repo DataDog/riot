@@ -59,6 +59,9 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
     return [x] if not isinstance(x, list) else x
 
 
+_T_stdio = t.Union[None, int, t.IO[t.Any]]
+
+
 @dataclasses.dataclass(unsafe_hash=True, eq=True)
 class Interpreter:
     _T_hint = t.Union[float, int, str]
@@ -389,7 +392,7 @@ class Session:
 
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
-                        run_cmd_venv(
+                        self.run_cmd_venv(
                             venv_path,
                             f"pip --disable-pip-version-check install {pkg_str}",
                         )
@@ -403,11 +406,7 @@ class Session:
                 if pass_env:
                     env = os.environ.copy()
                 else:
-                    env = {
-                        k: os.environ[k]
-                        for k in self.ALWAYS_PASS_ENV
-                        if k in os.environ
-                    }
+                    env = {}
 
                 # Add in the instance env vars.
                 env.update(dict(inst.env))
@@ -422,7 +421,9 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    output = run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
+                    output = self.run_cmd_venv(
+                        venv_path, inst.command, stdout=out, env=env
+                    )
                     result.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
@@ -525,12 +526,34 @@ class Session:
                 # Install the dev package into the base venv.
                 logger.info("Installing dev package.")
                 try:
-                    run_cmd_venv(
+                    self.run_cmd_venv(
                         venv_path, "pip --disable-pip-version-check install -e ."
                     )
                 except CmdFailure as e:
                     logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
                     sys.exit(1)
+
+    def run_cmd_venv(
+        self,
+        venv: str,
+        args: str,
+        stdout: _T_stdio = subprocess.PIPE,
+        executable: t.Optional[str] = None,
+        env: t.Optional[t.Dict[str, str]] = None,
+    ) -> _T_CompletedProcess:
+        cmd = get_venv_command(venv, args)
+
+        if env is None:
+            env = {}
+
+        for k in self.ALWAYS_PASS_ENV:
+            if k in os.environ and k not in env:
+                env[k] = os.environ[k]
+
+        env_str = " ".join(f"{k}={v}" for k, v in env.items())
+
+        logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
+        return run_cmd(cmd, stdout=stdout, executable=executable, env=env, shell=True)
 
 
 def rmchars(chars: str, s: str) -> str:
@@ -570,9 +593,6 @@ def env_to_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
-_T_stdio = t.Union[None, int, t.IO[t.Any]]
-
-
 def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
@@ -602,24 +622,6 @@ def run_cmd(
 def get_venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
-
-
-def run_cmd_venv(
-    venv: str,
-    args: str,
-    stdout: _T_stdio = subprocess.PIPE,
-    executable: t.Optional[str] = None,
-    env: t.Optional[t.Dict[str, str]] = None,
-) -> _T_CompletedProcess:
-    cmd = get_venv_command(venv, args)
-
-    if env is None:
-        env = {}
-
-    env_str = " ".join(f"{k}={v}" for k, v in env.items())
-
-    logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    return run_cmd(cmd, stdout=stdout, executable=executable, env=env, shell=True)
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
