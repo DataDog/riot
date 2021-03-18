@@ -578,13 +578,19 @@ def run_cmd(
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
     executable: t.Optional[str] = None,
+    env: t.Optional[t.Dict[str, str]] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
 
     logger.debug("Running command %s", args)
     r = subprocess.run(
-        args, encoding=ENCODING, stdout=stdout, executable=executable, shell=shell
+        args,
+        encoding=ENCODING,
+        stdout=stdout,
+        executable=executable,
+        shell=shell,
+        env=env,
     )
     logger.debug(r.stdout)
 
@@ -613,7 +619,7 @@ def run_cmd_venv(
     env_str = " ".join(f"{k}={v}" for k, v in env.items())
 
     logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    return run_cmd(cmd, stdout=stdout, executable=executable, shell=True)
+    return run_cmd(cmd, stdout=stdout, executable=executable, env=env, shell=True)
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:

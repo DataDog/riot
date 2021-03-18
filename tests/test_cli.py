@@ -496,6 +496,46 @@ venv = Venv(
         assert "✓ success2" in result.stdout
 
 
+def test_env(cli: click.testing.CliRunner) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv, latest
+
+venv = Venv(
+    pkgs={
+        "pytest": latest,
+    },
+    venvs=[
+        Venv(
+            env={"foobar": "baz"},
+            pys=[3],
+            name="envtest",
+            command="pytest",
+        ),
+    ],
+)
+            """
+            )
+
+        with open("test_success.py", "w") as f:
+            f.write(
+                """
+import os
+
+def test_success():
+    assert os.environ["foobar"] == "baz"
+            """
+            )
+
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert "✓ envtest" in result.stdout
+
+
 def test_pass_env_always(
     cli: click.testing.CliRunner, monkeypatch: _pytest.monkeypatch.MonkeyPatch
 ) -> None:
