@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    The environment variables ``LANG``, ``LANGUAGE``, ``SSL_CERT_FILE``,
+    ``HTTP_PROXY``, ``HTTPS_PROXY``, ``NO_PROXY``, ``PIP_INDEX_URL`` and
+    ``PATH`` are always passed to the test environment variables.

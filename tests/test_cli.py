@@ -4,6 +4,7 @@ import shutil
 import typing
 
 
+import _pytest.monkeypatch
 import click.testing
 import mock
 import pytest
@@ -493,6 +494,48 @@ venv = Venv(
         )
         assert result.exit_code == 0
         assert "✓ success2" in result.stdout
+
+
+def test_pass_env_always(
+    cli: click.testing.CliRunner, monkeypatch: _pytest.monkeypatch.MonkeyPatch
+) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv
+
+venv = Venv(
+    pkgs={
+        "pytest": [""],
+    },
+    venvs=[
+        Venv(
+            pys=[3],
+            name="envtest",
+            command="pytest",
+        ),
+    ],
+)
+            """
+            )
+
+        with open("test_success.py", "w") as f:
+            f.write(
+                """
+import os
+
+def test_success():
+    assert os.environ["NO_PROXY"] == "baz"
+            """
+            )
+
+        monkeypatch.setenv("NO_PROXY", "baz")
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert "✓ envtest" in result.stdout
 
 
 def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:

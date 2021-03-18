@@ -268,6 +268,17 @@ class Session:
         "did you mean",
     )
 
+    ALWAYS_PASS_ENV = {
+        "LANG",
+        "LANGUAGE",
+        "SSL_CERT_FILE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "PIP_INDEX_URL",
+        "PATH",
+    }
+
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
         spec = importlib.util.spec_from_file_location("riotfile", path)
@@ -389,7 +400,14 @@ class Session:
                         )
 
                 # Generate the environment for the instance.
-                env = os.environ.copy() if pass_env else {}
+                if pass_env:
+                    env = os.environ.copy()
+                else:
+                    env = {
+                        k: os.environ[k]
+                        for k in self.ALWAYS_PASS_ENV
+                        if k in os.environ
+                    }
 
                 # Add in the instance env vars.
                 env.update(dict(inst.env))
