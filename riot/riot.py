@@ -603,7 +603,7 @@ def run_cmd_venv(
     args: str,
     stdout: _T_stdio = subprocess.PIPE,
     executable: t.Optional[str] = None,
-    env: t.Dict[str, str] = None,
+    env: t.Optional[t.Dict[str, str]] = None,
 ) -> _T_CompletedProcess:
     cmd = get_venv_command(venv, args)
 
