@@ -4,11 +4,11 @@ import logging
 import re
 import sys
 
-
 import click
 import pkg_resources
 
-from .riot import Interpreter, Session
+from .riot import Interpreter
+from .riot import Session
 
 
 try:

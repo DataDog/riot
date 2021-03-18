@@ -1,4 +1,6 @@
-from riot import latest, Venv
+from riot import Venv
+from riot import latest
+
 
 venv = Venv(
     pys=3,
@@ -33,6 +35,7 @@ venv = Venv(
             command="flake8 {cmdargs}",
             pkgs={
                 "flake8": latest,
+                "flake8-isort": latest,
                 "flake8-blind-except": latest,
                 "flake8-builtins": latest,
                 "flake8-docstrings": latest,

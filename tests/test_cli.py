@@ -3,11 +3,11 @@ import os
 import shutil
 import typing
 
-
 import _pytest.monkeypatch
 import click.testing
 import mock
 import pytest
+
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
