@@ -382,7 +382,7 @@ class Session:
                         venv_path,
                     )
                     try:
-                        shutil.copytree(base_venv_path, venv_path)
+                        shutil.copytree(base_venv_path, venv_path, symlinks=True)
                     except FileNotFoundError:
                         logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
