@@ -541,8 +541,6 @@ class Session:
         executable: t.Optional[str] = None,
         env: t.Optional[t.Dict[str, str]] = None,
     ) -> _T_CompletedProcess:
-        cmd = get_venv_command(venv, args)
-
         if env is None:
             env = {}
 
@@ -550,10 +548,14 @@ class Session:
             if k in os.environ and k not in env:
                 env[k] = os.environ[k]
 
+        abs_venv = os.path.abspath(venv)
+        env["VIRTUAL_ENV"] = abs_venv
+        env["PATH"] = f"{abs_venv}/bin:" + env.get("PATH", "")
+
         env_str = " ".join(f"{k}={v}" for k, v in env.items())
 
-        logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-        return run_cmd(cmd, stdout=stdout, executable=executable, env=env, shell=True)
+        logger.debug("Executing command '%s' with environment '%s'", args, env_str)
+        return run_cmd(args, stdout=stdout, executable=executable, env=env, shell=True)
 
 
 def rmchars(chars: str, s: str) -> str:
@@ -617,11 +619,6 @@ def run_cmd(
     if r.returncode != 0:
         raise CmdFailure("Command %s failed with code %s." % (args[0], r.returncode), r)
     return r
-
-
-def get_venv_command(venv_path: str, cmd: str) -> str:
-    """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
-    return f"source {venv_path}/bin/activate && {cmd}"
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
