@@ -109,6 +109,16 @@ class Interpreter:
         version = self.version().replace(".", "")
         return f".riot/venv_py{version}"
 
+    def site_packages_path(self) -> str:
+        return os.path.abspath(
+            os.path.join(
+                self.venv_path(),
+                "lib",
+                f"python{sys.version_info[0]}.{sys.version_info[1]}",
+                "site-packages",
+            )
+        )
+
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
         path: str = self.venv_path()
@@ -353,11 +363,13 @@ class Session:
                 name: version for name, version in inst.pkgs if version is not None
             }
 
+            python_path = None
             if pkgs:
                 venv_path = inst.venv_path()
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
+                python_path = inst.py.site_packages_path()
             else:
                 venv_path = base_venv_path
                 pkg_str = ""
@@ -373,16 +385,35 @@ class Session:
                 instance=inst, venv_name=venv_path, pkgstr=pkg_str
             )
 
+            # Generate the environment for the instance.
+            if pass_env:
+                env = os.environ.copy()
+            else:
+                env = {}
+
+            # Add in the instance env vars.
+            env.update(dict(inst.env))
+
+            if python_path:
+                if "PYTHONPATH" in os.environ:
+                    env["PYTHONPATH"] = ":".join(
+                        [python_path, os.environ["PYTHONPATH"]]
+                    )
+                else:
+                    env["PYTHONPATH"] = python_path
+
             try:
                 if pkgs:
-                    # Copy the base venv to use for this venv.
+                    py_ex = inst.py.path()
                     logger.info(
-                        "Copying base virtualenv '%s' into virtualenv '%s'.",
-                        base_venv_path,
-                        venv_path,
+                        "Creating virtualenv '%s' with interpreter '%s'.", py_ex, py_ex
                     )
+
                     try:
-                        shutil.copytree(base_venv_path, venv_path, symlinks=True)
+                        run_cmd(
+                            ["virtualenv", f"--python={py_ex}", venv_path],
+                            stdout=subprocess.PIPE,
+                        )
                     except FileNotFoundError:
                         logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
@@ -395,21 +426,13 @@ class Session:
                         self.run_cmd_venv(
                             venv_path,
                             f"pip --disable-pip-version-check install {pkg_str}",
+                            env=env,
                         )
                     except CmdFailure as e:
                         raise CmdFailure(
                             f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
                             e.proc,
                         )
-
-                # Generate the environment for the instance.
-                if pass_env:
-                    env = os.environ.copy()
-                else:
-                    env = {}
-
-                # Add in the instance env vars.
-                env.update(dict(inst.env))
 
                 # Finally, run the test in the venv.
                 if cmdargs is not None:
