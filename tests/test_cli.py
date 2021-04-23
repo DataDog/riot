@@ -52,6 +52,7 @@ def assert_args(args):
             "cmdargs",
             "pythons",
             "skip_missing",
+            "exit_first",
         ]
     )
 
