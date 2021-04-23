@@ -186,6 +186,7 @@ def test_run(cli: click.testing.CliRunner) -> None:
             assert kwargs["recreate_venvs"] is False
             assert kwargs["skip_base_install"] is False
             assert kwargs["pass_env"] is False
+            assert kwargs["exit_first"] is False
 
 
 def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
@@ -194,7 +195,13 @@ def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
                 riot.cli.main,
-                ["run", "--recreate-venvs", "--skip-base-install", "--pass-env"],
+                [
+                    "run",
+                    "--recreate-venvs",
+                    "--skip-base-install",
+                    "--pass-env",
+                    "--exitfirst",
+                ],
             )
             # Success, but no output because we mock run
             assert result.exit_code == 0
@@ -208,13 +215,14 @@ def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
             assert kwargs["recreate_venvs"] is True
             assert kwargs["skip_base_install"] is True
             assert kwargs["pass_env"] is True
+            assert kwargs["exit_first"] is True
 
 
 def test_run_with_short_args(cli: click.testing.CliRunner) -> None:
     """Running run with short option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
         with with_riotfile(cli, "empty_riotfile.py"):
-            result = cli.invoke(riot.cli.main, ["run", "-r", "-s"])
+            result = cli.invoke(riot.cli.main, ["run", "-r", "-s", "-x"])
             # Success, but no output because we mock run
             assert result.exit_code == 0
             assert result.stdout == ""
@@ -227,6 +235,7 @@ def test_run_with_short_args(cli: click.testing.CliRunner) -> None:
             assert kwargs["recreate_venvs"] is True
             assert kwargs["skip_base_install"] is True
             assert kwargs["pass_env"] is False
+            assert kwargs["exit_first"] is True
 
 
 def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
@@ -246,6 +255,7 @@ def test_run_with_pattern(cli: click.testing.CliRunner) -> None:
             assert kwargs["recreate_venvs"] is False
             assert kwargs["skip_base_install"] is False
             assert kwargs["pass_env"] is False
+            assert kwargs["exit_first"] is False
 
 
 def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
