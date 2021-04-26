@@ -320,6 +320,7 @@ class Session:
         cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[Interpreter]] = None,
         skip_missing: bool = False,
+        exit_first: bool = False,
     ) -> None:
         results = []
 
@@ -432,6 +433,8 @@ class Session:
             except CmdFailure as e:
                 result.code = e.code
                 click.echo(click.style(e.msg, fg="red"))
+                if exit_first:
+                    break
             except KeyboardInterrupt:
                 result.code = 1
                 break

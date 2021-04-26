@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add new ``riot run -x/--exitfirst`` option to stop executing
+    further test suites after the first one fails.
