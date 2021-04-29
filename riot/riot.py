@@ -16,7 +16,7 @@ import click
 
 logger = logging.getLogger(__name__)
 
-SHELL = "/bin/bash"
+SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
 
 
