@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Support CI parallelism  by automatically subdividing selected virtual envs based on
+    ``CI_NODE_TOTAL``/``CI_NODE_INDEX``, or ``CIRCLE_NODE_TOTAL``/``CIRCLE_NODE_INDEX``
+    environment variables if they are available.
+
+    This will impact the results from ``riot run`` and ``riot list``.

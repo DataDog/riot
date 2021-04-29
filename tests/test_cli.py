@@ -3,7 +3,6 @@ import os
 import shutil
 import typing
 
-
 import _pytest.monkeypatch
 import click.testing
 import mock
@@ -11,7 +10,6 @@ import pytest
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
-
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(HERE, "data")
@@ -137,6 +135,67 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
         )
         assert result.exit_code == 0
         assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
+
+
+def test_list_with_circle_parallelism(cli: click.testing.CliRunner) -> None:
+    """Running list with a CIRCLE_NODE_{TOTAL,INDEX} env variables."""
+    with with_riotfile(cli, "many_jobs_riotfile.py"):
+        node_total = 4
+        for node_index in range(node_total):
+            result = cli.invoke(
+                riot.cli.main,
+                [
+                    "list",
+                ],
+                env={
+                    "CIRCLECI": "true",
+                    "CIRCLE_NODE_TOTAL": str(node_total),
+                    "CIRCLE_NODE_INDEX": str(node_index),
+                },
+            )
+            assert result.exit_code == 0
+
+            jobs = [line.split(" ")[0] for line in result.stdout.splitlines()]
+            if node_index == 0:
+                assert jobs == ["job_0", "job_1", "job_2", "job_3"]
+            elif node_index == 1:
+                assert jobs == ["job_4", "job_5", "job_6", "job_7"]
+            elif node_index == 2:
+                assert jobs == ["job_8", "job_9", "job_10", "job_11"]
+            elif node_index == 3:
+                assert jobs == ["job_12", "job_13", "job_14"]
+            else:
+                assert 0 <= node_index < node_total
+
+
+def test_list_with_ci_parallelism(cli: click.testing.CliRunner) -> None:
+    """Running list with a CI_NODE_{TOTAL,INDEX} env variables."""
+    with with_riotfile(cli, "many_jobs_riotfile.py"):
+        node_total = 4
+        for node_index in range(node_total):
+            result = cli.invoke(
+                riot.cli.main,
+                [
+                    "list",
+                ],
+                env={
+                    "CI_NODE_TOTAL": str(node_total),
+                    "CI_NODE_INDEX": str(node_index),
+                },
+            )
+            assert result.exit_code == 0
+
+            jobs = [line.split(" ")[0] for line in result.stdout.splitlines()]
+            if node_index == 0:
+                assert jobs == ["job_0", "job_1", "job_2", "job_3"]
+            elif node_index == 1:
+                assert jobs == ["job_4", "job_5", "job_6", "job_7"]
+            elif node_index == 2:
+                assert jobs == ["job_8", "job_9", "job_10", "job_11"]
+            elif node_index == 3:
+                assert jobs == ["job_12", "job_13", "job_14"]
+            else:
+                assert 0 <= node_index < node_total
 
 
 def test_list_with_python(cli: click.testing.CliRunner) -> None:
@@ -275,6 +334,105 @@ def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
         assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'" in result.stdout
         assert "✓ test:  pythonInterpreter(_hint='3') 'pytest'" in result.stdout
         assert "2 passed with 0 warnings, 0 failed" in result.stdout
+
+
+def test_run_with_ci_parallelism(cli: click.testing.CliRunner) -> None:
+    """Running run with CI_NODE_{TOTAL,INDEX} env variables."""
+    with with_riotfile(cli, "many_jobs_riotfile.py"):
+        node_total = 4
+        for node_index in range(node_total):
+            result = cli.invoke(
+                riot.cli.main,
+                [
+                    "run",
+                    "--skip-base-install",
+                ],
+                env={
+                    "CI_NODE_TOTAL": str(node_total),
+                    "CI_NODE_INDEX": str(node_index),
+                },
+            )
+            assert result.exit_code == 0
+            if node_index == 0:
+                for i in range(4):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "4 passed with 0 warnings, 0 failed" in result.stdout
+            elif node_index == 1:
+                for i in range(4, 8):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "4 passed with 0 warnings, 0 failed" in result.stdout
+            elif node_index == 2:
+                for i in range(8, 12):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "4 passed with 0 warnings, 0 failed" in result.stdout
+            elif node_index == 3:
+                for i in range(12, 15):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "3 passed with 0 warnings, 0 failed" in result.stdout
+            else:
+                assert 0 <= node_index < node_total
+
+
+def test_run_with_circle_parallelism(cli: click.testing.CliRunner) -> None:
+    """Running run with CIRCLE_NODE_{TOTAL,INDEX} env variables."""
+    with with_riotfile(cli, "many_jobs_riotfile.py"):
+        node_total = 4
+        for node_index in range(node_total):
+            result = cli.invoke(
+                riot.cli.main,
+                [
+                    "run",
+                    "--skip-base-install",
+                ],
+                env={
+                    "CIRCLECI": "true",
+                    "CIRCLE_NODE_TOTAL": str(node_total),
+                    "CIRCLE_NODE_INDEX": str(node_index),
+                },
+            )
+            assert result.exit_code == 0
+            if node_index == 0:
+                for i in range(4):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "4 passed with 0 warnings, 0 failed" in result.stdout
+            elif node_index == 1:
+                for i in range(4, 8):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "4 passed with 0 warnings, 0 failed" in result.stdout
+            elif node_index == 2:
+                for i in range(8, 12):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "4 passed with 0 warnings, 0 failed" in result.stdout
+            elif node_index == 3:
+                for i in range(12, 15):
+                    assert (
+                        "✓ job_{}:  pythonInterpreter(_hint='3')".format(i)
+                        in result.stdout
+                    )
+                assert "3 passed with 0 warnings, 0 failed" in result.stdout
+            else:
+                assert 0 <= node_index < node_total
 
 
 def test_run_venv_pattern(cli: click.testing.CliRunner) -> None:

@@ -4,6 +4,7 @@ import importlib.abc
 import importlib.util
 import itertools
 import logging
+import math
 import os
 import shutil
 import subprocess
@@ -238,8 +239,10 @@ class VenvInstance:
     def venv_path(self) -> str:
         """Return path to directory of the instance."""
         base_path = self.py.venv_path()
-        venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
-        return f"{base_path}_{venv_postfix}"
+        if self.pkgs:
+            venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
+            return f"{base_path}_{venv_postfix}"
+        return base_path
 
 
 @dataclasses.dataclass
@@ -309,6 +312,55 @@ class Session:
         lower_output = output.lower()
         return any(warning in lower_output for warning in self.warnings)
 
+    def iter_selected_venvs(
+        self,
+        pattern: t.Pattern[str],
+        venv_pattern: t.Pattern[str],
+        pythons: t.Optional[t.Set[Interpreter]] = None,
+        skip_missing: bool = False,
+    ) -> t.Generator["VenvInstance", None, None]:
+        def _iter_venvs() -> t.Generator["VenvInstance", None, None]:
+            for inst in self.venv.instances(pattern=pattern):
+                if pythons and inst.py not in pythons:
+                    logger.debug(
+                        "Skipping venv instance %s due to interpreter mismatch", inst
+                    )
+                    continue
+
+                try:
+                    venv_path = inst.venv_path()
+                except FileNotFoundError:
+                    if skip_missing:
+                        logger.warning("Skipping missing interpreter %s", inst.py)
+                        continue
+                    else:
+                        raise
+
+                if not venv_pattern.search(venv_path):
+                    logger.debug(
+                        "Skipping venv instance '%s' due to pattern mismatch", venv_path
+                    )
+                    continue
+
+                yield inst
+
+        ci_node_total = os.environ.get("CI_NODE_TOTAL")
+        ci_node_index = os.environ.get("CI_NODE_INDEX")
+        if os.environ.get("CIRCLECI") == "true":
+            if "CIRCLE_NODE_TOTAL" in os.environ and "CIRCLE_NODE_INDEX" in os.environ:
+                ci_node_total = os.environ["CIRCLE_NODE_TOTAL"]
+                ci_node_index = os.environ["CIRCLE_NODE_INDEX"]
+
+        if ci_node_total and ci_node_index:
+            venvs = list(_iter_venvs())
+            per_bucket = math.ceil(len(venvs) / int(ci_node_total))
+            start = int(ci_node_index) * per_bucket
+            end = start + per_bucket
+            for venv in venvs[start:end]:
+                yield venv
+        else:
+            yield from _iter_venvs()
+
     def run(
         self,
         pattern: t.Pattern[str],
@@ -331,22 +383,12 @@ class Session:
             pythons=pythons,
         )
 
-        for inst in self.venv.instances(pattern=pattern):
-            if pythons and inst.py not in pythons:
-                logger.debug(
-                    "Skipping venv instance %s due to interpreter mismatch", inst
-                )
-                continue
-
-            try:
-                base_venv_path: str = inst.py.venv_path()
-            except FileNotFoundError:
-                if skip_missing:
-                    logger.warning("Skipping missing interpreter %s", inst.py)
-                    continue
-                else:
-                    raise
-
+        for inst in self.iter_selected_venvs(
+            pattern=pattern,
+            venv_pattern=venv_pattern,
+            pythons=pythons,
+            skip_missing=skip_missing,
+        ):
             logger.info("Running with %s", inst.py)
 
             # Resolve the packages required for this instance.
@@ -354,20 +396,14 @@ class Session:
                 name: version for name, version in inst.pkgs if version is not None
             }
 
+            # base_venv_path and venv_path will be the same if this VenvInstance has no packages
+            base_venv_path = inst.py.venv_path()
+            venv_path = inst.venv_path()
+            pkg_str = ""
             if pkgs:
-                venv_path = inst.venv_path()
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
-            else:
-                venv_path = base_venv_path
-                pkg_str = ""
-
-            if not venv_pattern.search(venv_path):
-                logger.debug(
-                    "Skipping venv instance '%s' due to pattern mismatch", venv_path
-                )
-                continue
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
@@ -375,7 +411,7 @@ class Session:
             )
 
             try:
-                if pkgs:
+                if venv_path != base_venv_path:
                     # Copy the base venv to use for this venv.
                     logger.info(
                         "Copying base virtualenv '%s' into virtualenv '%s'.",
@@ -391,6 +427,7 @@ class Session:
                         # Assume the venv already exists and works fine
                         logger.info("Virtualenv '%s' already exists", venv_path)
 
+                if pkg_str:
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
                         self.run_cmd_venv(
@@ -480,12 +517,9 @@ class Session:
             sys.exit(1)
 
     def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
-        for inst in self.venv.instances(pattern=pattern):
-            if pythons and inst.py not in pythons:
-                continue
-
-            if not venv_pattern.search(inst.venv_path()):
-                continue
+        for inst in self.iter_selected_venvs(
+            pattern=pattern, venv_pattern=venv_pattern, pythons=pythons
+        ):
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )

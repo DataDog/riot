@@ -4,12 +4,10 @@ import logging
 import re
 import sys
 
-
 import click
 import pkg_resources
 
 from .riot import Interpreter, Session
-
 
 try:
     __version__ = pkg_resources.get_distribution("riot").version
@@ -67,7 +65,20 @@ def main(ctx, riotfile, log_level):
         sys.exit(1)
 
 
-@main.command("list", help="""List all virtual env instances matching a pattern.""")
+@main.command(
+    "list",
+    help="""List all virtual env instances matching a pattern.
+
+    **CI parallelism:**
+
+    When using `CircleCI parallelism <https://circleci.com/docs/2.0/parallelism-faster-jobs/>`_
+    ``riot list`` will automatically subdivide venvs based on ``CIRCLE_NODE_TOTAL`` and ``CIRCLE_NODE_INDEX``
+    environment variables.
+
+    For other environments ``riot list`` will automatically subdivide venvs based on ``CI_NODE_TOTAL`` and ``CI_NODE_INDEX``
+    environment variables if they are available.
+""",
+)
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @VENV_PATTERN_ARG
@@ -105,7 +116,17 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 
 
 @main.command(
-    help="""Run virtualenv instances with names matching a pattern.""",
+    help="""Run virtualenv instances with names matching a pattern.
+
+    **CI parallelism:**
+
+    When using `CircleCI parallelism <https://circleci.com/docs/2.0/parallelism-faster-jobs/>`_
+    ``riot run`` will automatically subdivide venvs based on ``CIRCLE_NODE_TOTAL`` and ``CIRCLE_NODE_INDEX``
+    environment variables.
+
+    For other environments ``riot run`` will automatically subdivide venvs based on ``CI_NODE_TOTAL`` and ``CI_NODE_INDEX``
+    environment variables if they are available.
+    """,
     context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
 )
 @RECREATE_VENVS_ARG
