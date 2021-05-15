@@ -5,6 +5,7 @@ import importlib.util
 import itertools
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,9 @@ import traceback
 import typing as t
 
 import click
+from packaging.version import InvalidVersion
+from packaging.version import Version
+from packaging.version import VERSION_PATTERN
 
 logger = logging.getLogger(__name__)
 
@@ -62,60 +66,158 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
 _T_stdio = t.Union[None, int, t.IO[t.Any]]
 
 
-@dataclasses.dataclass(unsafe_hash=True, eq=True)
+@dataclasses.dataclass(eq=True)
 class Interpreter:
-    _T_hint = t.Union[float, int, str]
+    _path: str = dataclasses.field()
+    _version: Version = dataclasses.field(init=False)
 
-    hint: dataclasses.InitVar[_T_hint]
-    _hint: str = dataclasses.field(init=False)
+    def __post_init__(self):
+        """Get the version of the interpreter."""
+        output = subprocess.check_output(
+            [self._path, "--version"], stderr=subprocess.STDOUT
+        )
+        version = Version(output.decode().strip().split(" ")[1])
+        self._version = version
 
-    def __post_init__(self, hint: _T_hint) -> None:
-        """Normalize the data."""
-        self._hint = str(hint)
+    def __hash__(self) -> int:
+        """Return the hash of this interpreter."""
+        return hash(self._path)
+
+    def __repr__(self) -> str:
+        """Return the repr containing the path and version of this interpreter."""
+        return f"{self.__class__.__name__}('{self.version}', '{self._path}')"
 
     def __str__(self) -> str:
-        """Return the path of the interpreter executable."""
+        """Return the repr of this interpreter."""
         return repr(self)
 
-    @functools.lru_cache()
-    def version(self) -> str:
-        path = self.path()
+    @staticmethod
+    def _matches(v1: Version, v2: Version) -> bool:
+        """Return if v2 matches v1.
 
-        # Redirect stderr to stdout because Python 2 prints version on stderr
-        output = subprocess.check_output([path, "--version"], stderr=subprocess.STDOUT)
-        version = output.decode().strip().split(" ")[1]
-        return version
+        >>> Interpreter._matches(Version("3.8.2"), Version("3"))
+        True
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.8"))
+        True
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.8.2"))
+        True
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.8.3"))
+        False
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.6"))
+        False
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.7"))
+        False
+        >>> Interpreter._matches(Version("3.8.2"), Version("2"))
+        False
+        >>> Interpreter._matches(Version("3.8.2-dev"), Version("3.8.2"))
+        True
+        >>> Interpreter._matches(Version("3.8.2-alpha"), Version("3.8.2"))
+        True
 
-    @functools.lru_cache()
-    def path(self) -> str:
-        """Return the Python interpreter path or raise.
-
-        This defers the error until the interpeter is actually required. This is
-        desirable for cases where a user might not require all the mentioned
-        interpreters to be installed for their usage.
+        FIXME: unfortunately Version will set undefined segments to 0 so
+        we cannot distinguish between "3.0.0" and "3".
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.0.0"))
+        True
+        >>> Interpreter._matches(Version("3.8.2"), Version("3.8.0"))
+        True
         """
-        py_ex = shutil.which(self._hint)
+        if v2 == v1:
+            return True
+        elif v2.micro != v1.micro and v2.micro != 0:
+            return False
+        elif v2.minor != v1.minor and v2.minor != 0:
+            return False
+        elif v2.major != v1.major and v2.major != 0:
+            return False
+        return True
 
-        if not py_ex:
-            py_ex = shutil.which(f"python{self._hint}")
+    @classmethod
+    @functools.lru_cache()
+    def find(cls) -> t.List["Interpreter"]:
+        """Find all Python interpreters discoverable on the PATH."""
+        ex_dirs = os.environ.get("PATH", "").split(":")
+        # Use a list because order matters (need the first match).
+        interp_paths: t.List[str] = []
+        # packaging says that the regular expression needs to be compiled
+        # with the following flags
+        expr = re.compile(f"python{VERSION_PATTERN}$", re.IGNORECASE | re.VERBOSE)
+        for d in ex_dirs:
+            if not os.path.isdir(d):
+                continue
+            for f in os.listdir(d):
+                if expr.match(f):
+                    interp_paths.append(os.path.join(d, f))
 
-        if py_ex:
-            return py_ex
+        interps: t.List[Interpreter] = []
+        for i in interp_paths:
+            try:
+                interp = cls(i)
+            except InvalidVersion:
+                logger.warning(
+                    "Failed to parse version for interpreter %r.", i, exc_info=True
+                )
+            else:
+                interps.append(interp)
 
-        raise FileNotFoundError(f"Python interpreter {self._hint} not found")
+        return interps
+
+    @classmethod
+    def find_match(cls, v: Version) -> "Interpreter":
+        """Return a matching interpreter for the given version.
+
+        If one is not found then raises a FileNotFoundError.
+        """
+        interps = [i for i in cls.find() if i.matches(v)]
+        if len(interps):
+            return interps[0]
+        raise FileNotFoundError("No interpreter matching %r", v)
+
+    @classmethod
+    def resolve(cls, s: str) -> "Interpreter":
+        """Resolve a string into an interpreter.
+
+        Supports file paths, executables on the PATH and specific versions
+        (to be looked up from the PATH). Raises FileNotFoundError if no
+        resolution is found.
+        """
+        if os.path.exists(s):
+            return cls(s)
+
+        ex = shutil.which(s)
+        if ex:
+            return cls(ex)
+
+        try:
+            version = Version(s)
+        except InvalidVersion as e:
+            raise FileNotFoundError("No interpreter found for %r" % s) from e
+        else:
+            return cls.find_match(version)
+
+    @property
+    def version(self) -> Version:
+        return self._version
+
+    def matches(self, version: Version) -> bool:
+        """Return whether the given version matches the version of the interpreter."""
+        return self._matches(self.version, version)
+
+    def path(self) -> str:
+        """Return the path to this interpreter."""
+        return self._path
 
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
-        version = self.version().replace(".", "")
+        version = str(self.version).replace(".", "")
         return f".riot/venv_py{version}"
 
     def create_venv(self, recreate: bool) -> str:
-        """Attempt to create a virtual environment for this intepreter."""
+        """Attempt to create a virtual environment for this interpreter."""
         path: str = self.venv_path()
 
         if os.path.isdir(path) and not recreate:
             logger.info(
-                "Skipping creation of virtualenv '%s' as it already exists.", path
+                "Skipping creation of virtualenv %r as it already exists.", path
             )
             return path
 
@@ -136,7 +238,7 @@ class Venv:
     Example::
 
         Venv(
-          pys=[3.9],
+          pys=["3.9"],
           venvs=[
               Venv(
                   name="mypy",
@@ -158,13 +260,14 @@ class Venv:
     Args:
         name (str): Name of the instance. Overrides parent value.
         command (str): Command to run in the virtual environment. Overrides parent value.
-        pys  (List[float]): Python versions. Overrides parent value.
+        pys  (List[str]): Python version(s) to use. Can be a file path to an interpreter, an executable name (locatable
+            on the PATH or a version number of an interpreter that can be found on the PATH. Overrides parent value.
         pkgs (Dict[str, Union[str, List[str]]]): Packages and version(s) to install into the virtual env. Merges and overrides parent values.
         env  (Dict[str, Union[str, List[str]]]): Environment variables to define in the virtual env. Merges and overrides parent values.
         venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
     """
 
-    pys: dataclasses.InitVar[t.List[Interpreter._T_hint]] = None
+    pys: dataclasses.InitVar[t.Optional[t.List[str]]] = None
     pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     name: t.Optional[str] = None
@@ -173,7 +276,7 @@ class Venv:
 
     def __post_init__(self, pys, pkgs, env):
         """Normalize the data."""
-        self.pys = [Interpreter(py) for py in to_list(pys)] if pys is not None else []
+        self.pys = to_list(pys) if pys is not None else []
         self.pkgs = rm_singletons(pkgs) if pkgs else {}
         self.env = rm_singletons(env) if env else {}
 
@@ -217,11 +320,24 @@ class Venv:
             # Expand out the instances for the venv.
             for env in expand_specs(resolved.env):
                 for py in resolved.pys:
+                    interpreter = None
+                    try:
+                        interpreter = Interpreter.resolve(str(py))
+                    except FileNotFoundError:
+                        logger.debug("Failed to find interpreter for %r", py)
+                    else:
+                        logger.debug(
+                            "Using %r for requirement %r",
+                            interpreter,
+                            py,
+                        )
+
                     for pkgs in expand_specs(resolved.pkgs):
                         yield VenvInstance(
                             name=resolved.name,
                             command=resolved.command,
-                            py=py,
+                            interpreter_version=py,
+                            interpreter=interpreter,
                             env=env,
                             pkgs=pkgs,
                         )
@@ -233,11 +349,17 @@ class VenvInstance:
     env: t.Tuple[t.Tuple[str, str]]
     name: t.Optional[str]
     pkgs: t.Tuple[t.Tuple[str, str]]
-    py: Interpreter
+    interpreter_version: str
+    """A null interpreter means that it was not found."""
+    interpreter: t.Optional[Interpreter]
 
     def venv_path(self) -> str:
         """Return path to directory of the instance."""
-        base_path = self.py.venv_path()
+        if not self.interpreter:
+            raise FileNotFoundError(
+                "No interpreter found for %r" % self.interpreter_version
+            )
+        base_path = self.interpreter.venv_path()
         venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
         return f"{base_path}_{venv_postfix}"
 
@@ -262,6 +384,7 @@ class CmdFailure(Exception):
 @dataclasses.dataclass
 class Session:
     venv: Venv
+    interpreters: t.List[Interpreter]
     warnings = (
         "deprecated",
         "deprecation",
@@ -301,7 +424,9 @@ class Session:
             ) from e
         else:
             venv = getattr(config, "venv", Venv())
-            return cls(venv=venv)
+            interpreters = Interpreter.find()
+            logger.debug("Found interpreters %s.", ", ".join(map(str, interpreters)))
+            return cls(venv=venv, interpreters=interpreters)
 
     def is_warning(self, output):
         if output is None:
@@ -332,22 +457,23 @@ class Session:
         )
 
         for inst in self.venv.instances(pattern=pattern):
-            if pythons and inst.py not in pythons:
-                logger.debug(
-                    "Skipping venv instance %s due to interpreter mismatch", inst
-                )
+            if not inst.interpreter:
+                logger.warning("Skipping %s due to missing interpreter", inst)
+                continue
+            if pythons and inst.interpreter not in pythons:
+                logger.debug("Skipping %s due to interpreter mismatch", inst)
                 continue
 
             try:
-                base_venv_path: str = inst.py.venv_path()
+                base_venv_path: str = inst.interpreter.venv_path()
             except FileNotFoundError:
                 if skip_missing:
-                    logger.warning("Skipping missing interpreter %s", inst.py)
+                    logger.warning("Skipping missing interpreter %s", inst.interpreter)
                     continue
                 else:
                     raise
 
-            logger.info("Running with %s", inst.py)
+            logger.info("Running with %s", inst.interpreter)
 
             # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {
@@ -457,7 +583,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             env_str = env_to_str(r.instance.env)
-            s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.pkgstr}"
+            s = f"{r.instance.name}: {env_str} {r.instance.interpreter} {r.pkgstr}"
 
             if failed:
                 num_failed += 1
@@ -479,19 +605,18 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
+    def list_venvs(self, pattern, venv_pattern, pythons=None):
         for inst in self.venv.instances(pattern=pattern):
-            if pythons and inst.py not in pythons:
+            if pythons and inst.interpreter not in pythons:
+                continue
+            if not inst.interpreter or not venv_pattern.search(inst.venv_path()):
                 continue
 
-            if not venv_pattern.search(inst.venv_path()):
-                continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
             env_str = env_to_str(inst.env)
-            py_str = f"Python {inst.py}"
-            click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
+            click.echo(f"{inst.name} {env_str} {inst.interpreter} {pkgs_str}")
 
     def generate_base_venvs(
         self,
@@ -502,25 +627,27 @@ class Session:
     ) -> None:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
-        required_pys: t.Set[Interpreter] = set(
-            [inst.py for inst in self.venv.instances(pattern=pattern)]
-        )
-        # Apply Python filters.
-        if pythons:
-            required_pys = required_pys.intersection(pythons)
+        required_pys = []
+
+        for inst in self.venv.instances(pattern=pattern):
+            if inst.interpreter is None:
+                logger.warning(
+                    "Interpreter for %r not found.", inst.interpreter_version
+                )
+                continue
+            if not pythons or inst.interpreter in pythons:
+                required_pys.append(inst.interpreter)
 
         logger.info(
-            "Generating virtual environments for interpreters %s",
+            "Generating base virtual environments for interpreters: %s.",
             ",".join(str(s) for s in required_pys),
         )
 
-        for py in required_pys:
+        for interpreter in required_pys:
             try:
-                venv_path = py.create_venv(recreate)
+                venv_path = interpreter.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
-            except FileNotFoundError:
-                logger.error("Python version '%s' not found.", py)
             else:
                 if skip_deps:
                     logger.info("Skipping global deps install.")
