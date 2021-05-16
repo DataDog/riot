@@ -22,7 +22,8 @@ class InterpreterParamType(click.ParamType):
     name = "interpreter"
 
     def convert(self, value, param, ctx):
-        return Interpreter(value)
+        interp = Interpreter.parse(value)
+        return interp
 
 
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")

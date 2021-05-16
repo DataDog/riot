@@ -28,6 +28,7 @@ setup(
     install_requires=[
         "dataclasses; python_version<'3.7'",
         "click>=7,<8",
+        "packaging",
         "virtualenv",
     ],
     setup_requires=["setuptools_scm"],
