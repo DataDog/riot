@@ -36,12 +36,12 @@ def test_interpreter(v1, v2, equal):
         assert repr(Interpreter(v1)) != repr(Interpreter(v2))
 
 
-def test_venv_path(current_interpreter: Interpreter):
+def test_venv_path(current_interpreter: Interpreter) -> None:
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
     assert current_interpreter.venv_path() == ".riot/venv_py{}".format(py_version)
 
 
-def test_sitepackages_path(current_interpreter: Interpreter):
+def test_sitepackages_path(current_interpreter: Interpreter) -> None:
     py_full_version = "".join((str(_) for _ in sys.version_info[:3]))
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
