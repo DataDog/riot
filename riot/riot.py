@@ -88,7 +88,12 @@ class Interpreter:
 
     @functools.lru_cache()
     def version_info(self) -> t.Tuple[int, int, int]:
-        return tuple([int(_) for _ in self.version().split(".")][:3])
+        version_head = "".join(
+            list(itertools.takewhile(lambda _: _.isdigit() or _ == ".", self.version()))
+        )
+        # Return (major, minor, patch)
+        version_info = tuple(int(_) for _ in version_head.split(".")) + (0, 0, 0)
+        return (version_info[0], version_info[1], version_info[2])
 
     @functools.lru_cache()
     def path(self) -> str:

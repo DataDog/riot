@@ -1,3 +1,4 @@
+import os
 import sys
 
 import pytest
@@ -54,7 +55,7 @@ def test_sitepackages_path(current_interpreter: Interpreter) -> None:
 def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     venv = VenvInstance(
         command="echo test",
-        env=(),
+        env=(("env", "test"),),
         name="test",
         pkgs=(("flask", ""),),
         py=current_interpreter,
@@ -67,7 +68,7 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
 def test_venv_instance_site_packages_path(current_interpreter: Interpreter) -> None:
     venv = VenvInstance(
         command="echo test",
-        env=(),
+        env=(("env", "test"),),
         name="test",
         pkgs=(("flask", ""),),
         py=current_interpreter,
