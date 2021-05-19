@@ -87,6 +87,10 @@ class Interpreter:
         return version
 
     @functools.lru_cache()
+    def version_info(self) -> t.Tuple[int, int, int]:
+        return tuple([int(_) for _ in self.version().split(".")][:3])
+
+    @functools.lru_cache()
     def path(self) -> str:
         """Return the Python interpreter path or raise.
 
@@ -110,11 +114,12 @@ class Interpreter:
         return f".riot/venv_py{version}"
 
     def site_packages_path(self) -> str:
+        version_info = self.version_info()
         return os.path.abspath(
             os.path.join(
                 self.venv_path(),
                 "lib",
-                f"python{sys.version_info[0]}.{sys.version_info[1]}",
+                f"python{version_info[0]}.{version_info[1]}",
                 "site-packages",
             )
         )
@@ -251,6 +256,17 @@ class VenvInstance:
         venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
         return f"{base_path}_{venv_postfix}"
 
+    def site_packages_path(self) -> str:
+        py_version = self.py.version_info()
+        return os.path.abspath(
+            os.path.join(
+                self.venv_path(),
+                "lib",
+                f"python{py_version[0]}.{py_version[1]}",
+                "site-packages",
+            )
+        )
+
 
 @dataclasses.dataclass
 class VenvInstanceResult:
@@ -370,7 +386,9 @@ class Session:
                 pkg_str = " ".join(
                     [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
                 )
-                python_path = inst.py.site_packages_path()
+                python_path = ":".join(
+                    [inst.py.site_packages_path(), inst.site_packages_path()]
+                )
             else:
                 venv_path = base_venv_path
                 pkg_str = ""
