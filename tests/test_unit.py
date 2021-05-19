@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from riot.riot import Interpreter
+from riot.riot import Interpreter, VenvInstance
 
 
 @pytest.fixture
@@ -42,10 +42,41 @@ def test_venv_path(current_interpreter: Interpreter) -> None:
 
 
 def test_sitepackages_path(current_interpreter: Interpreter) -> None:
-    py_full_version = "".join((str(_) for _ in sys.version_info[:3]))
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
-    expected = ".riot/venv_py{}/lib/python{}/site-packages".format(
-        py_full_version, py_dot_version
+    expected = os.path.join(
+        current_interpreter.venv_path(),
+        "lib/python{}/site-packages".format(py_dot_version),
     )
     assert current_interpreter.site_packages_path().endswith(expected)
+
+
+def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
+    venv = VenvInstance(
+        command="echo test",
+        env=(),
+        name="test",
+        pkgs=(("flask", ""),),
+        py=current_interpreter,
+    )
+
+    py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    assert venv.venv_path() == ".riot/venv_py{}_flask".format(py_version)
+
+
+def test_venv_instance_site_packages_path(current_interpreter: Interpreter) -> None:
+    venv = VenvInstance(
+        command="echo test",
+        env=(),
+        name="test",
+        pkgs=(("flask", ""),),
+        py=current_interpreter,
+    )
+
+    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
+
+    expected = os.path.join(
+        venv.venv_path(),
+        "lib/python{}/site-packages".format(py_dot_version),
+    )
+    assert venv.site_packages_path().endswith(expected)
