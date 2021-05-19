@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from riot.riot import Interpreter
+from riot.riot import Interpreter, VenvInstance
 
 
 @pytest.fixture
@@ -47,11 +47,3 @@ def test_interpreter_version(current_interpreter: Interpreter) -> None:
 
 def test_interpreter_version_info(current_interpreter: Interpreter) -> None:
     assert current_interpreter.version_info() == sys.version_info[:3]
-        sys.version_info[0],
-        sys.version_info[1],
-        sys.version_info[2],
-    )
-
-def test_venv_path(current_interpreter: Interpreter) -> None:
-    py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert current_interpreter.venv_path() == ".riot/venv_py{}".format(py_version)
