@@ -39,17 +39,23 @@ def test_interpreter(v1, v2, equal):
 
 def test_venv_path(current_interpreter: Interpreter) -> None:
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert current_interpreter.venv_path() == ".riot/venv_py{}".format(py_version)
+    assert current_interpreter.venv_path() == os.path.join(
+        ".riot", "venv_py{}".format(py_version)
+    )
 
 
 def test_sitepackages_path(current_interpreter: Interpreter) -> None:
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
-    expected = os.path.join(
-        current_interpreter.venv_path(),
-        "lib/python{}/site-packages".format(py_dot_version),
+    expected = os.path.abspath(
+        os.path.join(
+            current_interpreter.venv_path(),
+            "lib",
+            "python{}".format(py_dot_version),
+            "site-packages",
+        )
     )
-    assert current_interpreter.site_packages_path().endswith(expected)
+    assert current_interpreter.site_packages_path() == expected
 
 
 def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
@@ -62,7 +68,9 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     )
 
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert venv.venv_path() == ".riot/venv_py{}_flask".format(py_version)
+    assert venv.venv_path() == os.path.join(
+        ".riot", "venv_py{}_flask".format(py_version)
+    )
 
 
 def test_venv_instance_site_packages_path(current_interpreter: Interpreter) -> None:
@@ -76,8 +84,12 @@ def test_venv_instance_site_packages_path(current_interpreter: Interpreter) -> N
 
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
-    expected = os.path.join(
-        venv.venv_path(),
-        "lib/python{}/site-packages".format(py_dot_version),
+    expected = os.path.abspath(
+        os.path.join(
+            venv.venv_path(),
+            "lib",
+            "python{}".format(py_dot_version),
+            "site-packages",
+        )
     )
-    assert venv.site_packages_path().endswith(expected)
+    assert venv.site_packages_path() == expected
