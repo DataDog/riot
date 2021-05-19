@@ -384,16 +384,29 @@ class Session:
                 instance=inst, venv_name=venv_path, pkgstr=pkg_str
             )
 
+            # Generate the environment for the instance.
+            if pass_env:
+                env = os.environ.copy()
+            else:
+                env = {}
+
+            # Add in the instance env vars.
+            env.update(dict(inst.env))
+
+            env["PYTHONPATH"] = inst.pythonpath
+
             try:
                 if pkgs:
-                    # Copy the base venv to use for this venv.
+                    py_ex = inst.py.path()
                     logger.info(
-                        "Copying base virtualenv '%s' into virtualenv '%s'.",
-                        base_venv_path,
-                        venv_path,
+                        "Creating virtualenv '%s' with interpreter '%s'.", py_ex, py_ex
                     )
+
                     try:
-                        shutil.copytree(base_venv_path, venv_path, symlinks=True)
+                        run_cmd(
+                            ["virtualenv", f"--python={py_ex}", venv_path],
+                            stdout=subprocess.PIPE,
+                        )
                     except FileNotFoundError:
                         logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
@@ -406,21 +419,13 @@ class Session:
                         self.run_cmd_venv(
                             venv_path,
                             f"pip --disable-pip-version-check install {pkg_str}",
+                            env=env,
                         )
                     except CmdFailure as e:
                         raise CmdFailure(
                             f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
                             e.proc,
                         )
-
-                # Generate the environment for the instance.
-                if pass_env:
-                    env = os.environ.copy()
-                else:
-                    env = {}
-
-                # Add in the instance env vars.
-                env.update(dict(inst.env))
 
                 # Finally, run the test in the venv.
                 if cmdargs is not None:
