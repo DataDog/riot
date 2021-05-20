@@ -81,19 +81,21 @@ class Interpreter:
     def version(self) -> str:
         path = self.path()
 
-        # Redirect stderr to stdout because Python 2 prints version on stderr
-        output = subprocess.check_output([path, "--version"], stderr=subprocess.STDOUT)
-        version = output.decode().strip().split(" ")[1]
-        return version
+        output = subprocess.check_output(
+            [
+                path,
+                "-c",
+                'import sys; print("%s.%s.%s" % (sys.version_info.major, sys.version_info.minor, sys.version_info.micro))',
+            ],
+        )
+        return output.decode().strip()
 
     @functools.lru_cache()
     def version_info(self) -> t.Tuple[int, int, int]:
-        version_head = "".join(
-            list(itertools.takewhile(lambda _: _.isdigit() or _ == ".", self.version()))
-        )
-        # Return (major, minor, patch)
-        version_info = (tuple(int(_) for _ in version_head.split(".")) + (0, 0, 0))[:3]
-        return t.cast(t.Tuple[int, int, int], version_info)
+        path = self.path()
+
+        version_info = tuple(int(_) for _ in self.version().split(".")) + (0, 0, 0)
+        return t.cast(t.Tuple[int, int, int], version_info[:3])
 
     @functools.lru_cache()
     def path(self) -> str:
