@@ -97,14 +97,10 @@ class Interpreter:
             t.Tuple[int, int, int], tuple(map(int, self.version().split(".")))
         )
 
-    def sitepackages_paths(self) -> t.List[str]:
-        """Return the list of site-packages used by this interpreter."""
-        path = self.path()
-        return get_python_sitepackages(path)
-
     @property
     def pythonpath(self) -> str:
-        return ":".join(self.sitepackages_paths())
+        path = self.path()
+        return ":".join(get_python_sitepackages(path)
 
     @functools.lru_cache()
     def path(self) -> str:

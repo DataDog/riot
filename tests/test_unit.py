@@ -72,10 +72,6 @@ def test_get_venv_sitepackages(current_venv: Venv) -> None:
     assert get_venv_sitepackages(instances[0].venv_path()) == site.getsitepackages()
 
 
-def test_interpreter_sitepackages(current_interpreter: Interpreter) -> None:
-    assert current_interpreter.sitepackages_paths() == site.getsitepackages()
-
-
 def test_interpreter_pythonpath(current_interpreter: Interpreter) -> None:
     assert current_interpreter.pythonpath == ":".join(site.getsitepackages())
 

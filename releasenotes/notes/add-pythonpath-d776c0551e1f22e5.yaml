@@ -1,8 +1,6 @@
 ---
 features:
   - |
-    Add ``Interpreter.sitepackages_paths()`` method to get the expected ``site-package`` directories.
-  - |
     Add ``Interpreter.pythonpath`` property to get expected ``PYTHONPATH`` env value for that ``Interpreter``.
   - |
     Add ``VenvInstance.pythonpath`` property to get expected ``PYTHONPATH`` env value for that ``VenvInstance``.
