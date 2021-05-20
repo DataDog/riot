@@ -100,7 +100,7 @@ class Interpreter:
     @property
     def pythonpath(self) -> str:
         path = self.path()
-        return ":".join(get_python_sitepackages(path)
+        return ":".join(get_python_sitepackages(path))
 
     @functools.lru_cache()
     def path(self) -> str:
