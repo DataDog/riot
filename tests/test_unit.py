@@ -37,7 +37,11 @@ def test_interpreter(v1, v2, equal):
 
 
 def test_interpreter_version(current_interpreter: Interpreter) -> None:
-    version = "%s.%s.%s" % (sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+    version = "%s.%s.%s" % (
+        sys.version_info.major,
+        sys.version_info.minor,
+        sys.version_info.micro,
+    )
     assert current_interpreter.version() == version
 
 
