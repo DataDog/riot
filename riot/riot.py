@@ -92,8 +92,6 @@ class Interpreter:
 
     @functools.lru_cache()
     def version_info(self) -> t.Tuple[int, int, int]:
-        path = self.path()
-
         version_info = tuple(int(_) for _ in self.version().split(".")) + (0, 0, 0)
         return t.cast(t.Tuple[int, int, int], version_info[:3])
 
