@@ -70,6 +70,7 @@ _T_stdio = t.Union[None, int, t.IO[t.Any]]
 class Interpreter:
     _path: str = dataclasses.field()
     _version: Version = dataclasses.field(init=False)
+    _version_expr = re.compile(f"python{VERSION_PATTERN}$", re.IGNORECASE | re.VERBOSE)
 
     def __post_init__(self):
         """Get the version of the interpreter."""
@@ -140,13 +141,13 @@ class Interpreter:
         interp_paths: t.List[str] = []
         # packaging says that the regular expression needs to be compiled
         # with the following flags
-        expr = re.compile(f"python{VERSION_PATTERN}$", re.IGNORECASE | re.VERBOSE)
         for d in ex_dirs:
-            if not os.path.isdir(d):
+            try:
+                for f in os.listdir(d):
+                    if cls._version_expr.match(f):
+                        interp_paths.append(os.path.join(d, f))
+            except (FileNotFoundError, NotADirectoryError):
                 continue
-            for f in os.listdir(d):
-                if expr.match(f):
-                    interp_paths.append(os.path.join(d, f))
 
         interps: t.List[Interpreter] = []
         for i in interp_paths:
