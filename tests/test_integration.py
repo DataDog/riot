@@ -17,7 +17,9 @@ from riot.riot import _T_CompletedProcess
 _T_Path = Union[str, "os.PathLike[Any]"]
 
 
-def run(args: Union[str, Sequence[str]], cwd: _T_Path, env: Optional[Dict[str, str]] = None) -> _T_CompletedProcess:
+def run(
+    args: Union[str, Sequence[str]], cwd: _T_Path, env: Optional[Dict[str, str]] = None
+) -> _T_CompletedProcess:
     if isinstance(args, str):
         args = args.split(" ")
 
@@ -177,6 +179,7 @@ from riot import Venv
     assert result.stdout == ""
     assert result.returncode == 0
 
+
 def test_list_configurations(tmp_path: pathlib.Path) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
@@ -191,7 +194,7 @@ venv = Venv(
     )
     result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
-    assert result.stdout == "test  Interpreter(_hint='3') \n"
+    assert result.stdout == "test  Python Interpreter(_hint='3')\n"
     assert result.returncode == 0
 
     rf_path.write_text(
@@ -411,6 +414,7 @@ def test_failure():
 """,
     )
     result = run("riot run -s pass", cwd=tmp_path)
+    print(result.stdout)
     assert re.search(
         r"""
 ============================= test session starts ==============================
@@ -423,16 +427,18 @@ test_success.py .*
 ============================== 1 passed in .*s ===============================
 
 -------------------summary-------------------
-✔️  pass: .* 'pytest'\n""".lstrip(),
+✓ pass: .*
+1 passed with 0 warnings, 0 failed\n""".lstrip(),
         result.stdout,
     )
     assert result.stderr == ""
     assert result.returncode == 0
 
     result = run("riot run -s fail", cwd=tmp_path)
-    assert "✖️  fail:  Interpreter(_hint='3') 'pytest'\n" in result.stdout
+    assert "x fail:  pythonInterpreter(_hint='3') 'pytest'\n" in result.stdout
     assert result.stderr == ""
     assert result.returncode == 1
+
 
 def test_run_cmdargs(tmp_path: pathlib.Path) -> None:
     rf_path = tmp_path / "riotfile.py"

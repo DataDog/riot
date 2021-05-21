@@ -1,4 +1,5 @@
 import dataclasses
+import functools
 import importlib.abc
 import importlib.util
 import itertools
@@ -10,10 +11,11 @@ import sys
 import traceback
 import typing as t
 
+import click
 
 logger = logging.getLogger(__name__)
 
-SHELL = "/bin/bash"
+SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
 
 
@@ -57,6 +59,9 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
     return [x] if not isinstance(x, list) else x
 
 
+_T_stdio = t.Union[None, int, t.IO[t.Any]]
+
+
 @dataclasses.dataclass(unsafe_hash=True, eq=True)
 class Interpreter:
     _T_hint = t.Union[float, int, str]
@@ -72,13 +77,26 @@ class Interpreter:
         """Return the path of the interpreter executable."""
         return repr(self)
 
+    @functools.lru_cache()
     def version(self) -> str:
         path = self.path()
 
-        output = subprocess.check_output([path, "--version"])
-        version = output.decode().strip().split(" ")[1]
-        return version
+        output = subprocess.check_output(
+            [
+                path,
+                "-c",
+                'import sys; print("%s.%s.%s" % (sys.version_info.major, sys.version_info.minor, sys.version_info.micro))',
+            ],
+        )
+        return output.decode().strip()
 
+    @functools.lru_cache()
+    def version_info(self) -> t.Tuple[int, int, int]:
+        return t.cast(
+            t.Tuple[int, int, int], tuple(map(int, self.version().split(".")))
+        )
+
+    @functools.lru_cache()
     def path(self) -> str:
         """Return the Python interpreter path or raise.
 
@@ -99,7 +117,7 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        return f".riot/.venv_py{version}"
+        return f".riot/venv_py{version}"
 
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
@@ -156,7 +174,7 @@ class Venv:
         venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
     """
 
-    pys: dataclasses.InitVar[t.List[Interpreter]] = None
+    pys: dataclasses.InitVar[t.List[Interpreter._T_hint]] = None
     pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
     name: t.Optional[str] = None
@@ -240,6 +258,7 @@ class VenvInstanceResult:
     venv_name: str
     pkgstr: str
     code: int = 1
+    output: str = ""
 
 
 class CmdFailure(Exception):
@@ -253,6 +272,25 @@ class CmdFailure(Exception):
 @dataclasses.dataclass
 class Session:
     venv: Venv
+    warnings = (
+        "deprecated",
+        "deprecation",
+        "warning",
+        "no longer maintained",
+        "not maintained",
+        "did you mean",
+    )
+
+    ALWAYS_PASS_ENV = {
+        "LANG",
+        "LANGUAGE",
+        "SSL_CERT_FILE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "PIP_INDEX_URL",
+        "PATH",
+    }
 
     @classmethod
     def from_config_file(cls, path: str) -> "Session":
@@ -275,6 +313,12 @@ class Session:
             venv = getattr(config, "venv", Venv())
             return cls(venv=venv)
 
+    def is_warning(self, output):
+        if output is None:
+            return False
+        lower_output = output.lower()
+        return any(warning in lower_output for warning in self.warnings)
+
     def run(
         self,
         pattern: t.Pattern[str],
@@ -285,6 +329,8 @@ class Session:
         pass_env: bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[Interpreter]] = None,
+        skip_missing: bool = False,
+        exit_first: bool = False,
     ) -> None:
         results = []
 
@@ -302,7 +348,16 @@ class Session:
                 )
                 continue
 
-            base_venv_path: str = inst.py.venv_path()
+            try:
+                base_venv_path: str = inst.py.venv_path()
+            except FileNotFoundError:
+                if skip_missing:
+                    logger.warning("Skipping missing interpreter %s", inst.py)
+                    continue
+                else:
+                    raise
+
+            logger.info("Running with %s", inst.py)
 
             # Resolve the packages required for this instance.
             pkgs: t.Dict[str, str] = {
@@ -338,7 +393,7 @@ class Session:
                         venv_path,
                     )
                     try:
-                        shutil.copytree(base_venv_path, venv_path)
+                        shutil.copytree(base_venv_path, venv_path, symlinks=True)
                     except FileNotFoundError:
                         logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
@@ -348,7 +403,7 @@ class Session:
 
                     logger.info("Installing venv dependencies %s.", pkg_str)
                     try:
-                        run_cmd_venv(
+                        self.run_cmd_venv(
                             venv_path,
                             f"pip --disable-pip-version-check install {pkg_str}",
                         )
@@ -359,7 +414,10 @@ class Session:
                         )
 
                 # Generate the environment for the instance.
-                env = os.environ.copy() if pass_env else {}
+                if pass_env:
+                    env = os.environ.copy()
+                else:
+                    env = {}
 
                 # Add in the instance env vars.
                 env.update(dict(inst.env))
@@ -374,14 +432,19 @@ class Session:
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    run_cmd_venv(venv_path, inst.command, stdout=out, env=env)
+                    output = self.run_cmd_venv(
+                        venv_path, inst.command, stdout=out, env=env
+                    )
+                    result.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
                         f"Test failed with exit code {e.proc.returncode}", e.proc
                     )
             except CmdFailure as e:
                 result.code = e.code
-                print(e.msg, file=out)
+                click.echo(click.style(e.msg, fg="red"))
+                if exit_first:
+                    break
             except KeyboardInterrupt:
                 result.code = 1
                 break
@@ -393,13 +456,35 @@ class Session:
             finally:
                 results.append(result)
 
-        print("\n-------------------summary-------------------", file=out)
+        click.echo(
+            click.style("\n-------------------summary-------------------", bold=True)
+        )
+
+        num_failed = 0
+        num_passed = 0
+        num_warnings = 0
+
         for r in results:
             failed = r.code != 0
-            status_char = "✖️" if failed else "✔️"
             env_str = env_to_str(r.instance.env)
-            s = f"{status_char}  {r.instance.name}: {env_str} {r.instance.py} {r.pkgstr}"
-            print(s, file=out)
+            s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.pkgstr}"
+
+            if failed:
+                num_failed += 1
+                s = f"{click.style('x', fg='red', bold=True)} {click.style(s, fg='red')}"
+                click.echo(s)
+            else:
+                num_passed += 1
+                if self.is_warning(r.output):
+                    num_warnings += 1
+                    s = f"{click.style('⚠', fg='yellow', bold=True)} {click.style(s, fg='yellow')}"
+                    click.echo(s)
+                else:
+                    s = f"{click.style('✓', fg='green', bold=True)} {click.style(s, fg='green')}"
+                    click.echo(s)
+
+        s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
+        click.echo(click.style(s_num, fg="blue", bold=True))
 
         if any(True for r in results if r.code != 0):
             sys.exit(1)
@@ -415,8 +500,8 @@ class Session:
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
             )
             env_str = env_to_str(inst.env)
-            py_str = f"{inst.py}"
-            print(f"{inst.name} {env_str} {py_str} {pkgs_str}", file=out)
+            py_str = f"Python {inst.py}"
+            click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
 
     def generate_base_venvs(
         self,
@@ -454,12 +539,34 @@ class Session:
                 # Install the dev package into the base venv.
                 logger.info("Installing dev package.")
                 try:
-                    run_cmd_venv(
+                    self.run_cmd_venv(
                         venv_path, "pip --disable-pip-version-check install -e ."
                     )
                 except CmdFailure as e:
                     logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
                     sys.exit(1)
+
+    def run_cmd_venv(
+        self,
+        venv: str,
+        args: str,
+        stdout: _T_stdio = subprocess.PIPE,
+        executable: t.Optional[str] = None,
+        env: t.Optional[t.Dict[str, str]] = None,
+    ) -> _T_CompletedProcess:
+        cmd = get_venv_command(venv, args)
+
+        if env is None:
+            env = {}
+
+        for k in self.ALWAYS_PASS_ENV:
+            if k in os.environ and k not in env:
+                env[k] = os.environ[k]
+
+        env_str = " ".join(f"{k}={v}" for k, v in env.items())
+
+        logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
+        return run_cmd(cmd, stdout=stdout, executable=executable, env=env, shell=True)
 
 
 def rmchars(chars: str, s: str) -> str:
@@ -499,21 +606,25 @@ def env_to_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
     return " ".join(f"{k}={v}" for k, v in envs)
 
 
-_T_stdio = t.Union[None, int, t.IO[t.Any]]
-
-
 def run_cmd(
     args: t.Union[str, t.Sequence[str]],
     shell: bool = False,
     stdout: _T_stdio = subprocess.PIPE,
     executable: t.Optional[str] = None,
+    env: t.Optional[t.Dict[str, str]] = None,
 ) -> _T_CompletedProcess:
     if shell:
         executable = SHELL
 
     logger.debug("Running command %s", args)
-    # FIXME Remove type: ignore when https://github.com/python/typeshed/pull/4789 is released
-    r = subprocess.run(args, encoding=ENCODING, stdout=stdout, executable=executable, shell=shell)  # type: ignore[arg-type]
+    r = subprocess.run(
+        args,
+        encoding=ENCODING,
+        stdout=stdout,
+        executable=executable,
+        shell=shell,
+        env=env,
+    )
     logger.debug(r.stdout)
 
     if r.returncode != 0:
@@ -524,24 +635,6 @@ def run_cmd(
 def get_venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
-
-
-def run_cmd_venv(
-    venv: str,
-    args: str,
-    stdout: _T_stdio = subprocess.PIPE,
-    executable: t.Optional[str] = None,
-    env: t.Dict[str, str] = None,
-) -> _T_CompletedProcess:
-    cmd = get_venv_command(venv, args)
-
-    if env is None:
-        env = {}
-
-    env_str = " ".join(f"{k}={v}" for k, v in env.items())
-
-    logger.debug("Executing command '%s' with environment '%s'", cmd, env_str)
-    return run_cmd(cmd, stdout=stdout, executable=executable, shell=True)
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:

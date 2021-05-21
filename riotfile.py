@@ -1,15 +1,11 @@
 from riot import latest, Venv
 
 venv = Venv(
-    pys=3.8,
+    pys=3,
     venvs=[
         Venv(
             name="test",
             command="pytest {cmdargs}",
-            env={
-                "LC_ALL": "C.UTF-8",
-                "LANG": "C.UTF-8",
-            },
             pys=[3.6, 3.7, 3.8, 3.9],
             pkgs={
                 "pytest": latest,
@@ -18,15 +14,23 @@ venv = Venv(
             },
         ),
         Venv(
-            name="check_format",
-            command="black --check .",
             pkgs={
                 "black": "==20.8b1",
             },
+            venvs=[
+                Venv(
+                    name="black",
+                    command="black {cmdargs}",
+                ),
+                Venv(
+                    name="fmt",
+                    command="black .",
+                ),
+            ],
         ),
         Venv(
             name="flake8",
-            command="flake8",
+            command="flake8 {cmdargs}",
             pkgs={
                 "flake8": latest,
                 "flake8-blind-except": latest,
@@ -40,15 +44,15 @@ venv = Venv(
             },
         ),
         Venv(
-            name="typing",
-            command="mypy",
+            name="mypy",
+            command="mypy {cmdargs}",
             pkgs={
                 "mypy": latest,
                 "pytest": latest,
             },
         ),
         Venv(
-            pys=[3.6, 3.7, 3.8, 3.9, "pypy3"],
+            pys=[3],
             name="codecov",
             command="bash <(curl -s https://codecov.io/bash)",
             pkgs={
@@ -64,6 +68,25 @@ venv = Venv(
                 "sphinx-click": "==2.5.0",
                 "reno": latest,
             },
+        ),
+        Venv(
+            name="servedocs",
+            command="python -m http.server --directory docs/_build {cmdargs}",
+        ),
+        Venv(
+            pkgs={
+                "reno": latest,
+            },
+            venvs=[
+                Venv(
+                    name="releasenote",
+                    command="reno new --edit {cmdargs}",
+                ),
+                Venv(
+                    name="reno",
+                    command="reno {cmdargs}",
+                ),
+            ],
         ),
     ],
 )

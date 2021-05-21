@@ -1,5 +1,9 @@
 name: CI
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - master
 jobs:
   black:
     runs-on: ubuntu-latest
@@ -10,7 +14,7 @@ jobs:
           python-version: '3.8'
       - name: Install Riot
         run: pip install .
-      - run: riot -v run check_format
+      - run: riot -v run -s black -- --check .
   mypy:
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +24,7 @@ jobs:
           python-version: '3.8'
       - name: Install Riot
         run: pip install .
-      - run: riot -v run typing
+      - run: riot -v run -s mypy
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -46,7 +50,7 @@ jobs:
           python-version: '3.8'
       - name: Install Riot
         run: pip install .
-      - run: riot -v run flake8
+      - run: riot -v run -s flake8
   test:
     strategy:
       matrix:
@@ -64,4 +68,4 @@ jobs:
       - name: Run tests
         run: riot -v run --python=${{ matrix.python-version }} test
       - name: Coverage
-        run: riot -v run --python=${{ matrix.python-version }} codecov
+        run: riot -v run -s --python=${{ matrix.python-version }} codecov
