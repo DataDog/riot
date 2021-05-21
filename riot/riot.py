@@ -188,12 +188,8 @@ class Interpreter:
         if ex:
             return cls(ex)
 
-        try:
-            version = Version(s)
-        except InvalidVersion as e:
-            raise FileNotFoundError("No interpreter found for %r" % s) from e
-        else:
-            return cls.find_match(version)
+        version = InterpreterVersion(s)
+        return cls.find_match(version)
 
     @property
     def version(self) -> Version:
