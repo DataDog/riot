@@ -9,8 +9,6 @@ from typing import Optional
 from typing import Sequence
 from typing import Union
 
-import pytest
-
 from riot.riot import _T_CompletedProcess
 
 
@@ -194,7 +192,7 @@ venv = Venv(
     )
     result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
-    assert result.stdout == "test  Python Interpreter(_hint='3')\n"
+    assert result.stdout == "test  Python Interpreter(_hint='3') \n"
     assert result.returncode == 0
 
     rf_path.write_text(
@@ -486,12 +484,7 @@ venv = Venv(
 """,
     )
     result = run("riot run test", cwd=tmp_path)
-    assert (
-        """
-ERROR: File "setup.py" not found. Directory cannot be installed in editable mode:
-""".strip()
-        in result.stderr
-    )
+    assert 'ERROR: File "setup.py"' in result.stderr
     assert "Dev install failed, aborting!" in result.stderr
     assert result.stdout == ""
     assert result.returncode == 1
