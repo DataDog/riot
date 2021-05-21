@@ -12,7 +12,7 @@ venv = Venv(
             },
             pys=[3.6, 3.7, 3.8, 3.9],
             pkgs={
-                "pytest": "==6.1.2",
+                "pytest": latest,
                 "pytest-cov": latest,
                 "mock": latest,
             },

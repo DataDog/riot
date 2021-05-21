@@ -1,17 +1,38 @@
+import os
+import pathlib
 import re
+import subprocess
+import sys
+from typing import Any
+from typing import Dict
+from typing import Optional
+from typing import Sequence
+from typing import Union
 
 import pytest
 
-from .proctest import TestDir
+from riot.riot import _T_CompletedProcess
 
 
-@pytest.fixture
-def tdir():
-    yield TestDir()
+_T_Path = Union[str, "os.PathLike[Any]"]
 
 
-def test_no_riotfile(tdir: TestDir) -> None:
-    result = tdir.run("riot")
+def run(args: Union[str, Sequence[str]], cwd: _T_Path, env: Optional[Dict[str, str]] = None) -> _T_CompletedProcess:
+    if isinstance(args, str):
+        args = args.split(" ")
+
+    return subprocess.run(
+        args,
+        env=env,
+        encoding=sys.getdefaultencoding(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd,
+    )
+
+
+def test_no_riotfile(tmp_path: pathlib.Path) -> None:
+    result = run("riot", cwd=tmp_path)
     assert (
         result.stdout
         == """
@@ -33,7 +54,7 @@ Commands:
     assert result.stderr == ""
     assert result.returncode == 0
 
-    result = tdir.run("riot list")
+    result = run("riot list", cwd=tmp_path)
     assert (
         result.stderr
         == """
@@ -47,8 +68,8 @@ Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
     assert result.returncode == 2
 
 
-def test_bad_riotfile(tdir: TestDir) -> None:
-    result = tdir.run("riot --file rf.py")
+def test_bad_riotfile(tmp_path: pathlib.Path) -> None:
+    result = run("riot --file rf.py", tmp_path)
     assert (
         result.stderr
         == """
@@ -60,14 +81,14 @@ Error: Invalid value for '-f' / '--file': Path 'rf.py' does not exist.
     )
     assert result.returncode == 2
 
-    tdir.mkfile(
-        "rf",
+    rf_path = tmp_path / "rf"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv()
 """,
     )
-    result = tdir.run("riot --file rf list")
+    result = run("riot --file rf list", cwd=tmp_path)
     assert (
         result.stderr
         == """
@@ -77,14 +98,14 @@ Invalid file format for riotfile. Expected file with .py extension got 'rf'.
     )
     assert result.returncode == 1
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv()typo1234
 """,
     )
-    result = tdir.run("riot --file riotfile.py list")
+    result = run("riot --file riotfile.py list", cwd=tmp_path)
     assert (
         """
 Failed to construct config file:
@@ -101,8 +122,8 @@ SyntaxError: invalid syntax
     assert result.returncode == 1
 
 
-def test_help(tdir: TestDir) -> None:
-    result = tdir.run("riot --help")
+def test_help(tmp_path: pathlib.Path) -> None:
+    result = run("riot --help", cwd=tmp_path)
     assert (
         result.stdout
         == """
@@ -125,15 +146,15 @@ Commands:
     assert result.returncode == 0
 
 
-def test_version(tdir: TestDir) -> None:
-    result = tdir.run("riot --version")
+def test_version(tmp_path: pathlib.Path) -> None:
+    result = run("riot --version", cwd=tmp_path)
     assert result.stdout.startswith("riot, version ")
     assert result.stderr == ""
     assert result.returncode == 0
 
 
-def test_list_no_file_empty_file(tdir: TestDir) -> None:
-    result = tdir.run("riot list")
+def test_list_no_file_empty_file(tmp_path: pathlib.Path) -> None:
+    result = run("riot list", cwd=tmp_path)
     assert (
         result.stderr
         == """
@@ -145,21 +166,20 @@ Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
     )
     assert result.returncode == 2
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 """,
     )
-    result = tdir.run("riot list")
+    result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
     assert result.stdout == ""
     assert result.returncode == 0
 
-
-def test_list_configurations(tdir: TestDir) -> None:
-    tdir.mkfile(
-        "riotfile.py",
+def test_list_configurations(tmp_path: pathlib.Path) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -169,13 +189,12 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list")
+    result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
     assert result.stdout == "test  Interpreter(_hint='3') \n"
     assert result.returncode == 0
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -188,7 +207,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list")
+    result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
     assert re.search(
         r"""
@@ -199,8 +218,7 @@ test  .* 'pkg1==2.0'
     )
     assert result.returncode == 0
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -214,7 +232,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list")
+    result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
     assert re.search(
         r"""
@@ -227,8 +245,7 @@ test  .* 'pkg1==2.0' 'pkg2==3.0'
     )
     assert result.returncode == 0
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -254,7 +271,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list")
+    result = run("riot list", cwd=tmp_path)
     assert result.stderr == ""
     assert re.search(
         r"""
@@ -272,9 +289,9 @@ test2  .* 'pkg1==2.0' 'pkg2==4.0'
     assert result.returncode == 0
 
 
-def test_list_filter(tdir: TestDir) -> None:
-    tdir.mkfile(
-        "riotfile.py",
+def test_list_filter(tmp_path: pathlib.Path) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -284,13 +301,12 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list test")
+    result = run("riot list test", cwd=tmp_path)
     assert result.stderr == ""
     assert re.search(r"test .*", result.stdout)
     assert result.returncode == 0
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -304,7 +320,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list test")
+    result = run("riot list test", cwd=tmp_path)
     assert result.stderr == ""
     assert re.search(
         r"""
@@ -317,8 +333,7 @@ test  .* 'pkg1==2.0' 'pkg2==3.0'
     )
     assert result.returncode == 0
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -344,7 +359,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot list test2")
+    result = run("riot list test2", cwd=tmp_path)
     assert result.stderr == ""
     assert re.search(
         r"""
@@ -358,9 +373,9 @@ test2  .* 'pkg1==2.0' 'pkg2==4.0'
     assert result.returncode == 0
 
 
-def test_run(tdir: TestDir) -> None:
-    tdir.mkfile(
-        "riotfile.py",
+def test_run(tmp_path: pathlib.Path) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -381,21 +396,21 @@ venv = Venv(
 )
 """,
     )
-    tdir.mkfile(
-        "test_success.py",
+    success_path = tmp_path / "test_success.py"
+    success_path.write_text(
         """
 def test_success():
     assert 1 == 1
 """,
     )
-    tdir.mkfile(
-        "test_failure.py",
+    fail_path = tmp_path / "test_failure.py"
+    fail_path.write_text(
         """
 def test_failure():
     assert 1 == 0
 """,
     )
-    result = tdir.run("riot run -s pass")
+    result = run("riot run -s pass", cwd=tmp_path)
     assert re.search(
         r"""
 ============================= test session starts ==============================
@@ -414,15 +429,14 @@ test_success.py .*
     assert result.stderr == ""
     assert result.returncode == 0
 
-    result = tdir.run("riot run -s fail")
+    result = run("riot run -s fail", cwd=tmp_path)
     assert "✖️  fail:  Interpreter(_hint='3') 'pytest'\n" in result.stdout
     assert result.stderr == ""
     assert result.returncode == 1
 
-
-def test_run_cmdargs(tdir: TestDir) -> None:
-    tdir.mkfile(
-        "riotfile.py",
+def test_run_cmdargs(tmp_path: pathlib.Path) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -432,13 +446,12 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot run -s test_cmdargs -- -k filter")
+    result = run("riot run -s test_cmdargs -- -k filter", cwd=tmp_path)
     assert "cmdargs=-k filter" not in result.stdout
     assert result.stderr == ""
     assert result.returncode == 0
 
-    tdir.mkfile(
-        "riotfile.py",
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -448,15 +461,15 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot run -s test_cmdargs -- -k filter")
+    result = run("riot run -s test_cmdargs -- -k filter", cwd=tmp_path)
     assert "cmdargs=-k filter" in result.stdout
     assert result.stderr == ""
     assert result.returncode == 0
 
 
-def test_dev_install_fail(tdir: TestDir) -> None:
-    tdir.mkfile(
-        "riotfile.py",
+def test_dev_install_fail(tmp_path: pathlib.Path) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -466,7 +479,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot run test")
+    result = run("riot run test", cwd=tmp_path)
     assert (
         """
 ERROR: File "setup.py" not found. Directory cannot be installed in editable mode:
@@ -478,9 +491,9 @@ ERROR: File "setup.py" not found. Directory cannot be installed in editable mode
     assert result.returncode == 1
 
 
-def test_bad_interpreter(tdir: TestDir) -> None:
-    tdir.mkfile(
-        "riotfile.py",
+def test_bad_interpreter(tmp_path: pathlib.Path) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
         """
 from riot import Venv
 venv = Venv(
@@ -490,7 +503,7 @@ venv = Venv(
 )
 """,
     )
-    result = tdir.run("riot run -s -pDNE test")
+    result = run("riot run -s -pDNE test", cwd=tmp_path)
     assert (
         """
 FileNotFoundError: Python interpreter DNE not found
