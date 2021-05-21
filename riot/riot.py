@@ -258,7 +258,7 @@ class Venv:
         name (str): Name of the instance. Overrides parent value.
         command (str): Command to run in the virtual environment. Overrides parent value.
         pys  (List[str]): Python version(s) to use. Can be a file path to an interpreter, an executable name (locatable
-            on the PATH or a version number of an interpreter that can be found on the PATH. Overrides parent value.
+        on the PATH) or a version number of an interpreter that can be found on the PATH. Overrides parent value.
         pkgs (Dict[str, Union[str, List[str]]]): Packages and version(s) to install into the virtual env. Merges and overrides parent values.
         env  (Dict[str, Union[str, List[str]]]): Environment variables to define in the virtual env. Merges and overrides parent values.
         venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
@@ -333,7 +333,7 @@ class Venv:
                         yield VenvInstance(
                             name=resolved.name,
                             command=resolved.command,
-                            interpreter_version=py,
+                            interpreter_hint=py,
                             interpreter=interpreter,
                             env=env,
                             pkgs=pkgs,
@@ -346,7 +346,7 @@ class VenvInstance:
     env: t.Tuple[t.Tuple[str, str]]
     name: t.Optional[str]
     pkgs: t.Tuple[t.Tuple[str, str]]
-    interpreter_version: str
+    interpreter_hint: str
     """A null interpreter means that it was not found."""
     interpreter: t.Optional[Interpreter]
 
@@ -354,7 +354,7 @@ class VenvInstance:
         """Return path to directory of the instance."""
         if not self.interpreter:
             raise FileNotFoundError(
-                "No interpreter found for %r" % self.interpreter_version
+                "No interpreter found for %r" % self.interpreter_hint
             )
         base_path = self.interpreter.venv_path()
         venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
