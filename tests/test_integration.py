@@ -18,9 +18,6 @@ _T_Path = Union[str, "os.PathLike[Any]"]
 def run(
     args: Union[str, Sequence[str]], cwd: _T_Path, env: Optional[Dict[str, str]] = None
 ) -> _T_CompletedProcess:
-    if isinstance(args, str):
-        args = args.split(" ")
-
     return subprocess.run(
         args,
         env=env,
@@ -28,6 +25,7 @@ def run(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=cwd,
+        shell=isinstance(args, str),
     )
 
 
