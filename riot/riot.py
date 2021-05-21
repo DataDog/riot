@@ -3,6 +3,7 @@ import functools
 import importlib.abc
 import importlib.util
 import itertools
+import json
 import logging
 import os
 import shutil
@@ -95,6 +96,11 @@ class Interpreter:
         return t.cast(
             t.Tuple[int, int, int], tuple(map(int, self.version().split(".")))
         )
+
+    @property
+    def pythonpath(self) -> str:
+        path = self.path()
+        return ":".join(get_python_sitepackages(path))
 
     @functools.lru_cache()
     def path(self) -> str:
@@ -251,6 +257,18 @@ class VenvInstance:
         venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
         return f"{base_path}_{venv_postfix}"
 
+    @property
+    def pythonpath(self) -> str:
+        """Return the expected PYTHONPATH env variable for this Venv.
+
+        This will include the Interpreter's Python path, and if there
+        are pkgs defined, this venvs Python path appended.
+        """
+        paths = [self.py.pythonpath]
+        if self.pkgs:
+            paths.extend(get_venv_sitepackages(self.venv_path()))
+        return ":".join(paths)
+
 
 @dataclasses.dataclass
 class VenvInstanceResult:
@@ -392,7 +410,6 @@ class Session:
 
             # Add in the instance env vars.
             env.update(dict(inst.env))
-
             env["PYTHONPATH"] = inst.pythonpath
 
             try:
@@ -640,6 +657,28 @@ def run_cmd(
 def get_venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
+
+
+@functools.lru_cache()
+def get_python_sitepackages(python_ex: str) -> t.List[str]:
+    output = subprocess.check_output(
+        [
+            python_ex,
+            "-c",
+            "import json,site; print(json.dumps(site.getsitepackages()))",
+        ]
+    )
+    return t.cast(t.List[str], json.loads(output.decode()))
+
+
+@functools.lru_cache()
+def get_venv_sitepackages(venv_path: str) -> t.List[str]:
+    cmd = get_venv_command(
+        venv_path,
+        "python -c 'import json,site; print(json.dumps(site.getsitepackages()))'",
+    )
+    output = subprocess.check_output(cmd)
+    return t.cast(t.List[str], json.loads(output.decode()))
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
