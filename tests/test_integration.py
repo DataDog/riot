@@ -5,7 +5,9 @@ import subprocess
 import sys
 from typing import Any
 from typing import Dict
+from typing import Generator
 from typing import Optional
+from typing import Protocol
 from typing import Sequence
 from typing import Union
 
@@ -31,15 +33,25 @@ def run(
     )
 
 
+class _T_TmpRun(Protocol):
+    def __call__(
+        self,
+        args: Union[str, Sequence[str]],
+        cwd: Optional[_T_Path] = None,
+        env: Optional[Dict[str, str]] = None,
+    ) -> _T_CompletedProcess:
+        ...
+
+
 @pytest.fixture
-def tmp_run(tmp_path):
+def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
     """Run a command by default in tmp_path."""
 
     def _run(
         args: Union[str, Sequence[str]],
         cwd: Optional[_T_Path] = None,
         env: Optional[Dict[str, str]] = None,
-    ):
+    ) -> _T_CompletedProcess:
         if cwd is None:
             cwd = tmp_path
         return run(args, cwd, env)
@@ -47,7 +59,7 @@ def tmp_run(tmp_path):
     yield _run
 
 
-def test_no_riotfile(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot")
     assert (
         result.stdout
@@ -84,7 +96,7 @@ Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
     assert result.returncode == 2
 
 
-def test_bad_riotfile(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_bad_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --file rf.py", tmp_path)
     assert (
         result.stderr
@@ -138,7 +150,7 @@ SyntaxError: invalid syntax
     assert result.returncode == 1
 
 
-def test_help(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_help(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --help")
     assert (
         result.stdout
@@ -162,14 +174,14 @@ Commands:
     assert result.returncode == 0
 
 
-def test_version(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_version(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --version")
     assert result.stdout.startswith("riot, version ")
     assert result.stderr == ""
     assert result.returncode == 0
 
 
-def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot list")
     assert (
         result.stderr
@@ -194,7 +206,7 @@ from riot import Venv
     assert result.returncode == 0
 
 
-def test_list_configurations(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_list_configurations(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
@@ -306,7 +318,7 @@ test2  .* 'pkg1==2.0' 'pkg2==4.0'
     assert result.returncode == 0
 
 
-def test_list_filter(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_list_filter(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
@@ -390,7 +402,7 @@ test2  .* 'pkg1==2.0' 'pkg2==4.0'
     assert result.returncode == 0
 
 
-def test_run(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_run(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
@@ -454,7 +466,7 @@ test_success.py .*
     assert result.returncode == 1
 
 
-def test_run_cmdargs(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_run_cmdargs(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
@@ -487,7 +499,7 @@ venv = Venv(
     assert result.returncode == 0
 
 
-def test_dev_install_fail(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_dev_install_fail(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
@@ -506,7 +518,7 @@ venv = Venv(
     assert result.returncode == 1
 
 
-def test_bad_interpreter(tmp_path: pathlib.Path, tmp_run) -> None:
+def test_bad_interpreter(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
