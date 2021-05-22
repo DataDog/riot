@@ -611,11 +611,25 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, venv_pattern, pythons=None):
+    def list_venvs(
+        self,
+        pattern,
+        venv_pattern: t.Pattern[str],
+        pythons: t.Optional[t.Set[Interpreter]] = None,
+    ) -> None:
         for inst in self.venv.instances(pattern=pattern):
             if pythons and inst.interpreter not in pythons:
                 continue
-            if not inst.interpreter or not venv_pattern.search(inst.venv_path()):
+            if not inst.interpreter:
+                pkgs_str = " ".join(
+                    f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
+                )
+                env_str = env_to_str(inst.env)
+                click.echo(
+                    f"{inst.name} {env_str} <Interpreter missing for '{inst.interpreter_hint}'> {pkgs_str}"
+                )
+                continue
+            if not venv_pattern.search(inst.venv_path()):
                 continue
 
             pkgs_str = " ".join(
