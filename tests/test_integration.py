@@ -7,13 +7,12 @@ from typing import Any
 from typing import Dict
 from typing import Generator
 from typing import Optional
-from typing import Protocol
 from typing import Sequence
 from typing import Union
 
 import pytest
-
 from riot.riot import _T_CompletedProcess
+from typing_extensions import Protocol
 
 
 _T_Path = Union[str, "os.PathLike[Any]"]
