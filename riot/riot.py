@@ -651,11 +651,12 @@ class Session:
 
         for inst in self.venv.instances(pattern=pattern):
             if inst.interpreter is None:
-                logger.warning(
-                    "Interpreter for %r not found.", inst.interpreter_version
-                )
                 continue
-            if not pythons or inst.interpreter in pythons:
+            if (
+                not pythons
+                or inst.interpreter in pythons
+                and inst.interpreter in required_pys
+            ):
                 required_pys.append(inst.interpreter)
 
         logger.info(
