@@ -149,7 +149,7 @@ SyntaxError: invalid syntax
     assert result.returncode == 1
 
 
-def test_help(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+def test_help(tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --help")
     assert (
         result.stdout
@@ -173,7 +173,7 @@ Commands:
     assert result.returncode == 0
 
 
-def test_version(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+def test_version(tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --version")
     assert result.stdout.startswith("riot, version ")
     assert result.stderr == ""
