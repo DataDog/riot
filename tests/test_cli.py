@@ -57,72 +57,6 @@ def assert_args(args):
     )
 
 
-def test_main(cli: click.testing.CliRunner) -> None:
-    """Running main with no command returns usage."""
-    result = cli.invoke(riot.cli.main)
-    assert result.exit_code == 0
-    assert result.stdout.startswith("Usage: main")
-
-
-def test_main_help(cli: click.testing.CliRunner) -> None:
-    """Running main with --help returns usage."""
-    result = cli.invoke(riot.cli.main, ["--help"])
-    assert result.exit_code == 0
-    assert result.stdout.startswith("Usage: main")
-
-
-def test_main_version(cli: click.testing.CliRunner) -> None:
-    """Running main with --version returns version string."""
-    result = cli.invoke(riot.cli.main, ["--version"])
-    assert result.exit_code == 0
-    assert result.stdout.startswith("main, version ")
-
-
-def test_list_empty(cli: click.testing.CliRunner) -> None:
-    """Running list with an empty riotfile prints nothing."""
-    with with_riotfile(cli, "empty_riotfile.py"):
-        result = cli.invoke(riot.cli.main, ["list"])
-        assert result.exit_code == 0
-        assert result.stdout == ""
-
-
-def test_list_no_riotfile(cli: click.testing.CliRunner) -> None:
-    """Running list with no riotfile fails with an error."""
-    with without_riotfile(cli):
-        result = cli.invoke(riot.cli.main, ["list"])
-        assert result.exit_code == 2
-        assert result.stdout.startswith("Usage: main")
-        assert result.stdout.endswith(
-            "Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.\n"
-        )
-
-
-def test_list_default_pattern(cli: click.testing.CliRunner) -> None:
-    """Running list with no pattern passes through the default pattern."""
-    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
-        with with_riotfile(cli, "empty_riotfile.py"):
-            result = cli.invoke(riot.cli.main, ["list"])
-            # Success, but no output because we don't have a matching pattern
-            assert result.exit_code == 0
-            assert result.stdout == ""
-
-            list_venvs.assert_called_once()
-            assert list_venvs.call_args.args[0].pattern == ".*"
-
-
-def test_list_with_pattern(cli: click.testing.CliRunner) -> None:
-    """Running list with a pattern passes through the pattern."""
-    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
-        with with_riotfile(cli, "empty_riotfile.py"):
-            result = cli.invoke(riot.cli.main, ["list", "^pattern.*"])
-            # Success, but no output because we don't have a matching pattern
-            assert result.exit_code == 0
-            assert result.stdout == ""
-
-            list_venvs.assert_called_once()
-            assert list_venvs.call_args.args[0].pattern == "^pattern.*"
-
-
 def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
     """Running list with a venv pattern passes."""
     with with_riotfile(cli, "simple_riotfile.py"):
@@ -168,26 +102,6 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
                 Interpreter("3.8"),
                 Interpreter("2.7"),
             )
-
-
-def test_run(cli: click.testing.CliRunner) -> None:
-    """Running run with default options."""
-    with mock.patch("riot.cli.Session.run") as run:
-        with with_riotfile(cli, "empty_riotfile.py"):
-            result = cli.invoke(riot.cli.main, ["run"])
-            # Success, but no output because we mock run
-            assert result.exit_code == 0
-            assert result.stdout == ""
-
-            run.assert_called_once()
-            kwargs = run.call_args.kwargs
-            assert_args(kwargs)
-            assert kwargs["pattern"].pattern == ".*"
-            assert kwargs["venv_pattern"].pattern == ".*"
-            assert kwargs["recreate_venvs"] is False
-            assert kwargs["skip_base_install"] is False
-            assert kwargs["pass_env"] is False
-            assert kwargs["exit_first"] is False
 
 
 def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
