@@ -11,6 +11,7 @@ venv = Venv(
                 "pytest": latest,
                 "pytest-cov": latest,
                 "mock": latest,
+                "typing-extensions": latest,
             },
         ),
         Venv(

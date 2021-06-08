@@ -98,6 +98,15 @@ class Interpreter:
         )
 
     @functools.lru_cache()
+    def version_info(self) -> t.Tuple[int, int, int]:
+        version_head = "".join(
+            list(itertools.takewhile(lambda _: _.isdigit() or _ == ".", self.version()))
+        )
+        # Return (major, minor, patch)
+        version_info = tuple(int(_) for _ in version_head.split(".")) + (0, 0, 0)
+        return (version_info[0], version_info[1], version_info[2])
+
+    @functools.lru_cache()
     def path(self) -> str:
         """Return the Python interpreter path or raise.
 
@@ -119,6 +128,17 @@ class Interpreter:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
         return f".riot/venv_py{version}"
+
+    def site_packages_path(self) -> str:
+        version_info = self.version_info()
+        return os.path.abspath(
+            os.path.join(
+                self.venv_path(),
+                "lib",
+                f"python{version_info[0]}.{version_info[1]}",
+                "site-packages",
+            )
+        )
 
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
@@ -287,6 +307,17 @@ class VenvInstance:
         if self.needs_venv:
             paths.extend(get_venv_sitepackages(self.venv_path()))
         return ":".join(paths)
+
+    def site_packages_path(self) -> str:
+        py_version = self.py.version_info()
+        return os.path.abspath(
+            os.path.join(
+                self.venv_path(),
+                "lib",
+                f"python{py_version[0]}.{py_version[1]}",
+                "site-packages",
+            )
+        )
 
 
 @dataclasses.dataclass
