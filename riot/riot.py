@@ -443,7 +443,7 @@ class Session:
                         logger.info("Virtualenv '%s' already exists", venv_path)
 
                 # DEV: We need the venv to exist first since we query the venv
-                # python for it's site-packages directories
+                # python for its site-packages directories
                 env["PYTHONPATH"] = inst.pythonpath
 
                 if inst.pkg_str:
