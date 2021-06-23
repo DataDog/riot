@@ -46,7 +46,7 @@ venv = Venv(
         ),
         Venv(
             name="mypy",
-            command="mypy {cmdargs}",
+            command="mypy --install-types --non-interactive {cmdargs}",
             pkgs={
                 "mypy": latest,
                 "pytest": latest,
