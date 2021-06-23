@@ -129,16 +129,9 @@ class Interpreter:
         version = self.version().replace(".", "")
         return f".riot/venv_py{version}"
 
-    def site_packages_path(self) -> str:
-        version_info = self.version_info()
-        return os.path.abspath(
-            os.path.join(
-                self.venv_path(),
-                "lib",
-                f"python{version_info[0]}.{version_info[1]}",
-                "site-packages",
-            )
-        )
+    @property
+    def pythonpath(self) -> str:
+        return get_venv_sitepackages(self.venv_path())
 
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
@@ -303,21 +296,10 @@ class VenvInstance:
         This will include the Interpreter's Python path, and if there
         are pkgs defined, this venvs Python path appended.
         """
-        paths = get_venv_sitepackages(self.py.venv_path())
+        paths = self.py.pythonpath
         if self.needs_venv:
             paths.extend(get_venv_sitepackages(self.venv_path()))
         return ":".join(paths)
-
-    def site_packages_path(self) -> str:
-        py_version = self.py.version_info()
-        return os.path.abspath(
-            os.path.join(
-                self.venv_path(),
-                "lib",
-                f"python{py_version[0]}.{py_version[1]}",
-                "site-packages",
-            )
-        )
 
 
 @dataclasses.dataclass
