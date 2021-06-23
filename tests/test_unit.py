@@ -1,9 +1,7 @@
 import os
 import re
-import site
 import sys
 
-import mock
 import pytest
 from riot.riot import Interpreter, Venv, VenvInstance
 
