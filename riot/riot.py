@@ -98,14 +98,6 @@ class Interpreter:
         )
 
     @functools.lru_cache()
-    def version_info(self) -> t.Tuple[int, int, int]:
-        version_head = "".join(
-            list(itertools.takewhile(lambda _: _.isdigit() or _ == ".", self.version()))
-        )
-        # Return (major, minor, patch)
-        return tuple(map(int, version_head.split(".")))
-
-    @functools.lru_cache()
     def path(self) -> str:
         """Return the Python interpreter path or raise.
 
@@ -130,7 +122,7 @@ class Interpreter:
 
     @property
     def pythonpath(self) -> str:
-        return get_venv_sitepackages(self.venv_path())
+        return ":".join(get_venv_sitepackages(self.venv_path()))
 
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
@@ -295,7 +287,7 @@ class VenvInstance:
         This will include the Interpreter's Python path, and if there
         are pkgs defined, this venvs Python path appended.
         """
-        paths = self.py.pythonpath
+        paths = [self.py.pythonpath]
         if self.needs_venv:
             paths.extend(get_venv_sitepackages(self.venv_path()))
         return ":".join(paths)
