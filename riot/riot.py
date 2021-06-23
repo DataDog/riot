@@ -103,8 +103,7 @@ class Interpreter:
             list(itertools.takewhile(lambda _: _.isdigit() or _ == ".", self.version()))
         )
         # Return (major, minor, patch)
-        version_info = tuple(int(_) for _ in version_head.split(".")) + (0, 0, 0)
-        return (version_info[0], version_info[1], version_info[2])
+        return tuple(map(int, version_head.split(".")))
 
     @functools.lru_cache()
     def path(self) -> str:
