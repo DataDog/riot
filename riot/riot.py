@@ -266,7 +266,7 @@ class VenvInstance:
 
     @property
     def needs_venv(self) -> bool:
-        """Whether this ``VenvInstance`` needs it's own venv or not."""
+        """Whether this ``VenvInstance`` needs its own venv or not."""
         return bool(self.pkg_str)
 
     @property
