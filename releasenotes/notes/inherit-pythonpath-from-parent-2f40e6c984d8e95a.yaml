@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fix issue where packages from child ``Venv`` may get installed in parent ``Venv``.
+    Instead of copying the parent ``Venv`` to create the child, create a new ``Venv``
+    and add the parent ``Venv``s ``site-packages`` to the PYTHONPATH when running commands.

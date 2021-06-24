@@ -3,17 +3,11 @@ import pathlib
 import re
 import subprocess
 import sys
-from typing import Any
-from typing import Dict
-from typing import Generator
-from typing import Optional
-from typing import Sequence
-from typing import Union
+from typing import Any, Dict, Generator, Optional, Sequence, Union
 
 import pytest
 from riot.riot import _T_CompletedProcess
 from typing_extensions import Protocol
-
 
 _T_Path = Union[str, "os.PathLike[Any]"]
 
@@ -538,3 +532,74 @@ FileNotFoundError: Python interpreter DNE not found
     )
     assert result.stdout == ""
     assert result.returncode == 1
+
+
+def test_interpreter_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    name="test",
+    command="env",
+)
+""",
+    )
+    result = tmp_run("riot run -s test")
+    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    assert result.returncode == 0
+
+    venv_name = "venv_py{}".format("".join((str(_) for _ in sys.version_info[:3])))
+    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
+
+    expected = os.path.join(
+        ".riot",
+        venv_name,
+        "lib",
+        "python{}".format(py_dot_version),
+        "site-packages",
+    )
+    assert env["PYTHONPATH"].endswith(expected)
+    assert len(env["PYTHONPATH"].split(":")) == 1
+
+
+def test_venv_instance_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={"pip": ""},
+    name="test",
+    command="env",
+)
+""",
+    )
+    result = tmp_run("riot run -s test")
+    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    assert result.returncode == 0
+
+    venv_name = "venv_py{}_pip".format("".join((str(_) for _ in sys.version_info[:3])))
+    parent_venv_name = "venv_py{}".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
+
+    parent_venv_path = os.path.join(
+        ".riot",
+        parent_venv_name,
+        "lib",
+        "python{}".format(py_dot_version),
+        "site-packages",
+    )
+
+    venv_path = os.path.join(
+        ".riot", venv_name, "lib", "python{}".format(py_dot_version), "site-packages"
+    )
+
+    paths = env["PYTHONPATH"].split(":")
+    assert len(paths) == 2
+    assert paths[0].endswith(parent_venv_path)
+    assert paths[1].endswith(venv_path)

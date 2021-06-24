@@ -1,13 +1,23 @@
+import os
+import re
 import sys
 
 import pytest
-from riot.riot import Interpreter
+from riot.riot import Interpreter, Venv, VenvInstance
+
+default_venv_pattern = re.compile(r".*")
+current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
 
 
 @pytest.fixture
 def current_interpreter() -> Interpreter:
-    version = ".".join((str(sys.version_info[0]), str(sys.version_info[1])))
-    return Interpreter(version)
+    return Interpreter(current_py_hint)
+
+
+@pytest.fixture
+def current_venv() -> Venv:
+    # Without a command `.instances()` will not resolve anything
+    return Venv(pys=[current_py_hint], command="echo test")
 
 
 @pytest.mark.parametrize(
@@ -36,18 +46,30 @@ def test_interpreter(v1, v2, equal):
         assert repr(Interpreter(v1)) != repr(Interpreter(v2))
 
 
-def test_interpreter_version(current_interpreter: Interpreter) -> None:
-    version = "%s.%s.%s" % (
-        sys.version_info.major,
-        sys.version_info.minor,
-        sys.version_info.micro,
+def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
+    py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    assert current_interpreter.venv_path() == os.path.join(
+        ".riot", "venv_py{}".format(py_version)
     )
+
+
+def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
+    venv = VenvInstance(
+        command="echo test",
+        env=(("env", "test"),),
+        name="test",
+        pkgs=(("pip", ""),),
+        py=current_interpreter,
+    )
+
+    py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    assert venv.venv_path() == os.path.join(".riot", "venv_py{}_pip".format(py_version))
+
+
+def test_interpreter_version(current_interpreter: Interpreter) -> None:
+    version = "%s.%s.%s" % sys.version_info[:3]
     assert current_interpreter.version() == version
 
 
 def test_interpreter_version_info(current_interpreter: Interpreter) -> None:
-    assert current_interpreter.version_info() == (
-        sys.version_info[0],
-        sys.version_info[1],
-        sys.version_info[2],
-    )
+    assert current_interpreter.version_info() == sys.version_info[:3]

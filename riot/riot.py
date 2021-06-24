@@ -3,6 +3,7 @@ import functools
 import importlib.abc
 import importlib.util
 import itertools
+import json
 import logging
 import os
 import shutil
@@ -118,6 +119,10 @@ class Interpreter:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
         return f".riot/venv_py{version}"
+
+    @property
+    def pythonpath(self) -> str:
+        return ":".join(get_venv_sitepackages(self.venv_path()))
 
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
@@ -246,10 +251,46 @@ class VenvInstance:
     py: Interpreter
 
     def venv_path(self) -> str:
-        """Return path to directory of the instance."""
-        base_path = self.py.venv_path()
-        venv_postfix = "_".join([f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs])
-        return f"{base_path}_{venv_postfix}"
+        """Return path to directory of the venv this instance should use.
+
+        This will return a python version + package specific venv path name.
+
+        If no packages are defined it will return the ``Interpreter.venv_path()``.
+        """
+        venv_path = self.py.venv_path()
+        if self.needs_venv:
+            venv_path = "_".join(
+                [venv_path] + [f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs]
+            )
+        return venv_path
+
+    @property
+    def needs_venv(self) -> bool:
+        """Whether this ``VenvInstance`` needs its own venv or not."""
+        return bool(self.pkg_str)
+
+    @property
+    def pkg_str(self) -> str:
+        """Return pip friendly install string from defined packages."""
+        return " ".join(
+            [
+                f"'{get_pep_dep(lib, version)}'"
+                for lib, version in self.pkgs
+                if version is not None
+            ]
+        )
+
+    @property
+    def pythonpath(self) -> str:
+        """Return the expected PYTHONPATH env variable for this Venv.
+
+        This will include the Interpreter's Python path, and if there
+        are pkgs defined, this venvs Python path appended.
+        """
+        paths = [self.py.pythonpath]
+        if self.needs_venv:
+            paths.extend(get_venv_sitepackages(self.venv_path()))
+        return ":".join(paths)
 
 
 @dataclasses.dataclass
@@ -349,7 +390,7 @@ class Session:
                 continue
 
             try:
-                base_venv_path: str = inst.py.venv_path()
+                inst.py.venv_path()
             except FileNotFoundError:
                 if skip_missing:
                     logger.warning("Skipping missing interpreter %s", inst.py)
@@ -359,20 +400,7 @@ class Session:
 
             logger.info("Running with %s", inst.py)
 
-            # Resolve the packages required for this instance.
-            pkgs: t.Dict[str, str] = {
-                name: version for name, version in inst.pkgs if version is not None
-            }
-
-            if pkgs:
-                venv_path = inst.venv_path()
-                pkg_str = " ".join(
-                    [f"'{get_pep_dep(lib, version)}'" for lib, version in pkgs.items()]
-                )
-            else:
-                venv_path = base_venv_path
-                pkg_str = ""
-
+            venv_path = inst.venv_path()
             if not venv_pattern.search(venv_path):
                 logger.debug(
                     "Skipping venv instance '%s' due to pattern mismatch", venv_path
@@ -381,19 +409,32 @@ class Session:
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(
-                instance=inst, venv_name=venv_path, pkgstr=pkg_str
+                instance=inst, venv_name=venv_path, pkgstr=inst.pkg_str
             )
 
+            # Generate the environment for the instance.
+            if pass_env:
+                env = os.environ.copy()
+            else:
+                env = {}
+
+            # Add in the instance env vars.
+            env.update(dict(inst.env))
+
             try:
-                if pkgs:
-                    # Copy the base venv to use for this venv.
+                if inst.needs_venv:
+                    py_ex = inst.py.path()
                     logger.info(
-                        "Copying base virtualenv '%s' into virtualenv '%s'.",
-                        base_venv_path,
+                        "Creating virtualenv '%s' with interpreter '%s'.",
                         venv_path,
+                        py_ex,
                     )
+
                     try:
-                        shutil.copytree(base_venv_path, venv_path, symlinks=True)
+                        run_cmd(
+                            ["virtualenv", f"--python={py_ex}", venv_path],
+                            stdout=subprocess.PIPE,
+                        )
                     except FileNotFoundError:
                         logger.info("Base virtualenv '%s' does not exist", venv_path)
                         continue
@@ -401,26 +442,23 @@ class Session:
                         # Assume the venv already exists and works fine
                         logger.info("Virtualenv '%s' already exists", venv_path)
 
-                    logger.info("Installing venv dependencies %s.", pkg_str)
+                # DEV: We need the venv to exist first since we query the venv
+                # python for its site-packages directories
+                env["PYTHONPATH"] = inst.pythonpath
+
+                if inst.pkg_str:
+                    logger.info("Installing venv dependencies %s.", inst.pkg_str)
                     try:
                         self.run_cmd_venv(
                             venv_path,
-                            f"pip --disable-pip-version-check install {pkg_str}",
+                            f"pip --disable-pip-version-check install {inst.pkg_str}",
+                            env=env,
                         )
                     except CmdFailure as e:
                         raise CmdFailure(
-                            f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
+                            f"Failed to install venv dependencies {inst.pkg_str}\n{e.proc.stdout}",
                             e.proc,
                         )
-
-                # Generate the environment for the instance.
-                if pass_env:
-                    env = os.environ.copy()
-                else:
-                    env = {}
-
-                # Add in the instance env vars.
-                env.update(dict(inst.env))
 
                 # Finally, run the test in the venv.
                 if cmdargs is not None:
@@ -635,6 +673,16 @@ def run_cmd(
 def get_venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
+
+
+@functools.lru_cache()
+def get_venv_sitepackages(venv_path: str) -> t.List[str]:
+    cmd = get_venv_command(
+        venv_path,
+        "python -c 'import json,site; print(json.dumps(site.getsitepackages()))'",
+    )
+    r = run_cmd(cmd, shell=True)
+    return t.cast(t.List[str], json.loads(r.stdout))
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
