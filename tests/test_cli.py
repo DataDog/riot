@@ -3,7 +3,6 @@ import os
 import shutil
 import typing
 
-
 import _pytest.monkeypatch
 import click.testing
 import mock
@@ -11,7 +10,6 @@ import pytest
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
-
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(HERE, "data")
@@ -69,6 +67,9 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
                 "pytest543$",
             ],
         )
+        if result.exception:
+            raise result.exception
+        print(result.stdout)
         assert result.exit_code == 0
         assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
 
@@ -185,8 +186,12 @@ def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
                 "--skip-base-install",
             ],
         )
+        if result.exception:
+            raise result.exception
         assert result.exit_code == 0
-        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'" in result.stdout
+        assert (
+            "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'" in result.stdout
+        ), result.stdout
         assert "✓ test:  pythonInterpreter(_hint='3') 'pytest'" in result.stdout
         assert "2 passed with 0 warnings, 0 failed" in result.stdout
 
@@ -289,36 +294,30 @@ def test_run_suites_cmdargs(
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Venv
+from riot import Venv, Task
 
-venv = Venv(
-    venvs=[
-        Venv(
-            name="test_nocmdargs",
-            command="echo no cmdargs",
-            venvs=[
-                Venv(
-                    pys=[3],
-                ),
-            ],
-        ),
-        Venv(
-            name="test_cmdargs",
-            command="echo cmdargs={cmdargs}",
-            venvs=[
-                Venv(
-                    pys=[3],
-                ),
-            ],
-        ),
-    ]
-)
+venv = Venv(pys=[3])
+
+tasks = [
+    Task(
+        name="test_nocmdargs",
+        command="echo no cmdargs",
+        venvs=[venv],
+    ),
+    Task(
+        name="test_cmdargs",
+        command="echo cmdargs={cmdargs}",
+        venvs=[venv],
+    ),
+]
             """
             )
         with mock.patch("subprocess.run") as subprocess_run:
             subprocess_run.return_value.returncode = 0
             args = ["run", name] + cmdargs
             result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
+            if result.exception:
+                raise result.exception
             assert result.exit_code == 0
 
             subprocess_run.assert_called()
@@ -332,24 +331,27 @@ def test_nested_venv(cli: click.testing.CliRunner) -> None:
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Venv
+from riot import Task, Venv
 
 venv = Venv(
     pys=[3],
     pkgs={
         "pytest": [""],
     },
-    venvs=[
-        Venv(
-            name="success",
-            command="pytest test_success.py",
-        ),
-        Venv(
-            name="failure",
-            command="pytest test_failure.py",
-        ),
-    ],
 )
+
+tasks = [
+    Task(
+        name="success",
+        command="pytest test_success.py",
+        venvs=[venv],
+    ),
+    Task(
+        name="failure",
+        command="pytest test_failure.py",
+        venvs=[venv],
+    ),
+]
             """
             )
 
@@ -372,6 +374,8 @@ def test_failure():
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
+        if result.exception:
+            raise result.exception
         assert result.exit_code == 0
         assert "✓ success" in result.stdout
         assert "1 passed with 0 warnings, 0 failed" in result.stdout
@@ -389,22 +393,22 @@ def test_types(cli: click.testing.CliRunner) -> None:
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Venv
+from riot import Task, Venv
 
-venv = Venv(
-    venvs=[
-        Venv(
-            pys=[3],
-            name="success",
-            command="exit 0",
-        ),
-        Venv(
-            pys=[3],
-            name="success2",
-            command="exit 0",
-        ),
-    ],
-)
+venv = Venv(pys=[3])
+
+tasks = [
+    Task(
+        name="success",
+        command="exit 0",
+        venvs=[venv],
+    ),
+    Task(
+        name="success2",
+        command="exit 0",
+        venvs=[venv],
+    ),
+]
             """
             )
 
@@ -426,7 +430,7 @@ def test_env(cli: click.testing.CliRunner) -> None:
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Venv, latest
+from riot import Task, Venv, latest
 
 venv = Venv(
     pkgs={
@@ -434,13 +438,19 @@ venv = Venv(
     },
     venvs=[
         Venv(
-            env={"foobar": "baz"},
             pys=[3],
-            name="envtest",
-            command="pytest",
         ),
     ],
 )
+
+tasks = [
+    Task(
+        name="envtest",
+        command="pytest",
+        env={"foobar": "baz"},
+        venvs=[venv],
+    ),
+]
             """
             )
 
@@ -457,7 +467,9 @@ def test_success():
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
         )
-        assert result.exit_code == 0
+        if result.exception:
+            raise result.exception
+        assert result.exit_code == 0, result.stdout
         assert "✓ envtest" in result.stdout
 
 
@@ -468,7 +480,7 @@ def test_pass_env_always(
         with open("riotfile.py", "w") as f:
             f.write(
                 """
-from riot import Venv
+from riot import Task, Venv
 
 venv = Venv(
     pkgs={
@@ -477,11 +489,17 @@ venv = Venv(
     venvs=[
         Venv(
             pys=[3],
-            name="envtest",
-            command="pytest",
         ),
     ],
 )
+
+tasks = [
+    Task(
+        name="envtest",
+        command="pytest",
+        venvs=[venv],
+    )
+]
             """
             )
 
@@ -508,17 +526,23 @@ def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
         with open("riotfile", "w") as f:
             f.write(
                 """
-from riot import Venv
+from riot import Task, Venv
 
 venv = Venv(
     venvs=[
         Venv(
             pys=[3],
-            name="success",
-            command="echo hello",
         ),
     ],
 )
+
+tasks = [
+    Task(
+        name="success",
+        command="echo hello",
+        venvs=[venv],
+    )
+]
             """
             )
 

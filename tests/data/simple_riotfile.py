@@ -1,10 +1,8 @@
-from riot import Venv
+from riot import Task, Venv
 
 venv = Venv(
     venvs=[
         Venv(
-            name="test",
-            command="exit 0",
             venvs=[
                 Venv(
                     pkgs={
@@ -16,3 +14,12 @@ venv = Venv(
         ),
     ]
 )
+
+
+tasks = [
+    Task(
+        name="test",
+        command="echo hello",
+        venvs=[venv],
+    ),
+]

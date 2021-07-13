@@ -6,7 +6,7 @@ import sys
 from typing import Any, Dict, Generator, Optional, Sequence, Union
 
 import pytest
-from riot.riot import _T_CompletedProcess
+from riot.utils import _T_CompletedProcess
 from typing_extensions import Protocol
 
 _T_Path = Union[str, "os.PathLike[Any]"]
@@ -203,12 +203,16 @@ def test_list_configurations(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    name="test",
-    pys=[3],
-    command="echo hi",
-)
+from riot import Task, Venv
+venv = Venv(pys=[3])
+
+tasks = [
+    Task(
+        name="test",
+        venvs=[venv],
+        command="echo hi",
+    ),
+]
 """,
     )
     result = tmp_run("riot list")
@@ -218,15 +222,21 @@ venv = Venv(
 
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv
 venv = Venv(
-    name="test",
     pys=[3],
-    command="echo hi",
     pkgs={
         "pkg1": ["==1.0", "==2.0"],
-    }
+    },
 )
+
+tasks = [
+    Task(
+        name="test",
+        venvs=[venv],
+        command="echo hi",
+    ),
+]
 """,
     )
     result = tmp_run("riot list")
@@ -242,16 +252,23 @@ test  .* 'pkg1==2.0'
 
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv
+
 venv = Venv(
-    name="test",
     pys=[3],
-    command="echo hi",
     pkgs={
         "pkg1": ["==1.0", "==2.0"],
         "pkg2": ["==2.0", "==3.0"],
-    }
+    },
 )
+
+tasks = [
+    Task(
+        name="test",
+        venvs=[venv],
+        command="echo hi",
+    ),
+]
 """,
     )
     result = tmp_run("riot list")
@@ -269,28 +286,28 @@ test  .* 'pkg1==2.0' 'pkg2==3.0'
 
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv
+
 venv = Venv(
+    pkgs={
+        "pkg1": ["==1.0", "==2.0"],
+        "pkg2": ["==3.0", "==4.0"],
+    },
     pys=[3],
-    venvs=[
-        Venv(
-            name="test1",
-            command="echo hi",
-            pkgs={
-                "pkg1": ["==1.0", "==2.0"],
-                "pkg2": ["==3.0", "==4.0"],
-            }
-        ),
-        Venv(
-            name="test2",
-            command="echo hi",
-            pkgs={
-                "pkg1": ["==1.0", "==2.0"],
-                "pkg2": ["==3.0", "==4.0"],
-            }
-        ),
-    ]
 )
+
+tasks = [
+    Task(
+        name="test1",
+        command="echo hi",
+        venvs=[venv],
+    ),
+    Task(
+        name="test2",
+        command="echo hi",
+        venvs=[venv],
+    )
+]
 """,
     )
     result = tmp_run("riot list")
@@ -315,12 +332,15 @@ def test_list_filter(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    name="test",
-    pys=[3],
-    command="echo hi",
-)
+from riot import Task, Venv
+
+tasks = [
+    Task(
+        name="test",
+        command="echo hi",
+        venvs=[Venv(pys=[3])],
+    ),
+]
 """,
     )
     result = tmp_run("riot list test")
@@ -330,16 +350,23 @@ venv = Venv(
 
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv
+
 venv = Venv(
-    name="test",
     pys=[3],
-    command="echo hi",
     pkgs={
         "pkg1": ["==1.0", "==2.0"],
         "pkg2": ["==2.0", "==3.0"],
     }
 )
+
+tasks = [
+    Task(
+        name="test",
+        venvs=[venv],
+        command="echo hi",
+    ),
+]
 """,
     )
     result = tmp_run("riot list test")
@@ -357,28 +384,28 @@ test  .* 'pkg1==2.0' 'pkg2==3.0'
 
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv
+
 venv = Venv(
+    pkgs={
+        "pkg1": ["==1.0", "==2.0"],
+        "pkg2": ["==3.0", "==4.0"],
+    },
     pys=[3],
-    venvs=[
-        Venv(
-            name="test1",
-            command="echo hi",
-            pkgs={
-                "pkg1": ["==1.0", "==2.0"],
-                "pkg2": ["==3.0", "==4.0"],
-            }
-        ),
-        Venv(
-            name="test2",
-            command="echo hi",
-            pkgs={
-                "pkg1": ["==1.0", "==2.0"],
-                "pkg2": ["==3.0", "==4.0"],
-            }
-        ),
-    ]
 )
+
+tasks = [
+    Task(
+        name="test1",
+        command="echo hi",
+        venvs=[venv],
+    ),
+    Task(
+        name="test2",
+        command="echo hi",
+        venvs=[venv],
+    )
+]
 """,
     )
     result = tmp_run("riot list test2")
@@ -399,23 +426,27 @@ def test_run(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv
+
 venv = Venv(
     pys=[3],
     pkgs={
         "pytest": [""],
     },
-    venvs=[
-        Venv(
-            name="pass",
-            command="pytest test_success.py",
-        ),
-        Venv(
-            name="fail",
-            command="pytest test_failure.py",
-        ),
-    ],
 )
+
+tasks = [
+    Task(
+        name="pass",
+        command="pytest test_success.py",
+        venvs=[venv],
+    ),
+    Task(
+        name="fail",
+        command="pytest test_failure.py",
+        venvs=[venv],
+    ),
+]
 """,
     )
     success_path = tmp_path / "test_success.py"
@@ -433,12 +464,12 @@ def test_failure():
 """,
     )
     result = tmp_run("riot run -s pass")
-    print(result.stdout)
     assert re.search(
         r"""
 ============================= test session starts ==============================
 platform.*
-rootdir:.*
+rootdir:.*(
+plugins: .*)?
 collected 1 item
 
 test_success.py .*
@@ -449,7 +480,7 @@ test_success.py .*
 ✓ pass: .*
 1 passed with 0 warnings, 0 failed\n""".lstrip(),
         result.stdout,
-    )
+    ), result.stdout
     assert result.stderr == ""
     assert result.returncode == 0
 
@@ -463,12 +494,16 @@ def test_run_cmdargs(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    pys=[3],
-    name="test_cmdargs",
-    command="echo hi",
-)
+from riot import Task, Venv
+venv = Venv(pys=[3])
+
+tasks = [
+    Task(
+        name="test_cmdargs",
+        command="echo hi",
+        venvs=[venv],
+    ),
+]
 """,
     )
     result = tmp_run("riot run -s test_cmdargs -- -k filter")
@@ -478,12 +513,16 @@ venv = Venv(
 
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    pys=3,
-    name="test_cmdargs",
-    command="echo cmdargs={cmdargs}",
-)
+from riot import Task, Venv
+venv = Venv(pys=3)
+
+tasks = [
+    Task(
+        name="test_cmdargs",
+        command="echo cmdargs={cmdargs}",
+        venvs=[venv],
+    ),
+]
 """,
     )
     result = tmp_run("riot run -s test_cmdargs -- -k filter")
@@ -496,12 +535,15 @@ def test_dev_install_fail(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    pys=3,
+from riot import Task, Venv
+
+tasks = [
+    Task(
     name="test",
     command="echo hello",
-)
+    venvs=[Venv(pys=3)],
+    ),
+]
 """,
     )
     result = tmp_run("riot run test")
@@ -515,12 +557,14 @@ def test_bad_interpreter(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    pys="DNE",
-    name="test",
-    command="echo hello",
-)
+from riot import Task, Venv
+tasks = [
+    Task(
+        name="test",
+        command="echo hello",
+        venvs=[Venv(pys="DNE")],
+    ),
+]
 """,
     )
     result = tmp_run("riot run -s -pDNE test")
@@ -538,24 +582,36 @@ def test_interpreter_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> N
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
-venv = Venv(
-    pys=[3],
-    name="test",
-    command="env",
-)
+from riot import Task, Venv, latest
+tasks = [
+    Task(
+        name="test",
+        command="env",
+        venvs=[
+            Venv(
+                pys=[3],
+                pkgs={
+                    "pytest": [latest],
+                },
+            ),
+        ],
+    ),
+]
 """,
     )
     result = tmp_run("riot run -s test")
     env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0
 
-    venv_name = "venv_py{}".format("".join((str(_) for _ in sys.version_info[:3])))
+    venv_name = "venv_py{}_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
     expected = os.path.join(
         ".riot",
         venv_name,
+        "target",
         "lib",
         "python{}".format(py_dot_version),
         "site-packages",
@@ -568,21 +624,30 @@ def test_venv_instance_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) ->
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
         """
-from riot import Venv
+from riot import Task, Venv, latest
 venv = Venv(
     pys=[3],
-    pkgs={"pip": ""},
-    name="test",
-    command="env",
+    pkgs={"pip": latest},
+    venvs=[Venv(pkgs={"pytest": latest})],
 )
+
+tasks = [
+    Task(
+        name="test",
+        command="env",
+        venvs=[venv]
+    ),
+]
 """,
     )
     result = tmp_run("riot run -s test")
     env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0
 
-    venv_name = "venv_py{}_pip".format("".join((str(_) for _ in sys.version_info[:3])))
-    parent_venv_name = "venv_py{}".format(
+    venv_name = "venv_py{}_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+    parent_venv_name = "venv_py{}_pip".format(
         "".join((str(_) for _ in sys.version_info[:3]))
     )
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
@@ -590,16 +655,77 @@ venv = Venv(
     parent_venv_path = os.path.join(
         ".riot",
         parent_venv_name,
+        "target",
         "lib",
         "python{}".format(py_dot_version),
         "site-packages",
     )
 
     venv_path = os.path.join(
-        ".riot", venv_name, "lib", "python{}".format(py_dot_version), "site-packages"
+        ".riot",
+        venv_name,
+        "target",
+        "lib",
+        "python{}".format(py_dot_version),
+        "site-packages",
     )
 
     paths = env["PYTHONPATH"].split(":")
     assert len(paths) == 2
-    assert paths[0].endswith(parent_venv_path)
-    assert paths[1].endswith(venv_path)
+    assert paths[0] == str(tmp_path / venv_path)
+    assert paths[1] == str(tmp_path / parent_venv_path)
+
+
+def test_venv_instance_path(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Task, Venv, latest
+venv = Venv(
+    pys=[3],
+    pkgs={"pip": latest},
+    venvs=[Venv(pkgs={"pytest": latest})],
+)
+
+tasks = [
+    Task(
+        name="test",
+        command="env",
+        venvs=[venv]
+    ),
+]
+""",
+    )
+    result = tmp_run("riot run -s test")
+    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    assert result.returncode == 0
+
+    venv_name = "venv_py{}_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+    parent_venv_name = "venv_py{}_pip".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+
+    parent_venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            parent_venv_name,
+            "target",
+            "bin",
+        )
+    )
+
+    venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            venv_name,
+            "target",
+            "bin",
+        )
+    )
+
+    paths = env["PATH"].split(":")
+    assert paths.index(venv_path) < paths.index(parent_venv_path)

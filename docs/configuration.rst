@@ -26,5 +26,5 @@ A ``riotfile.py`` must define the following:
 Venv
 ----
 
-.. autoclass:: riot.riot.Venv
+.. autoclass:: riot.Task
    :members:
