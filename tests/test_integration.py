@@ -433,7 +433,6 @@ def test_failure():
 """,
     )
     result = tmp_run("riot run -s pass")
-    print(result.stdout)
     assert re.search(
         r"""
 ============================= test session starts ==============================
@@ -454,7 +453,9 @@ test_success.py .*
     assert result.returncode == 0
 
     result = tmp_run("riot run -s fail")
-    assert "x fail:  pythonInterpreter(_hint='3') 'pytest'\n" in result.stdout
+    assert (
+        "x fail:  pythonInterpreter(_hint='3') 'pytest'\n" in result.stdout
+    ), result.stdout
     assert result.stderr == ""
     assert result.returncode == 1
 
@@ -547,21 +548,26 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run -s test")
-    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0
 
-    venv_name = "venv_py{}".format("".join((str(_) for _ in sys.version_info[:3])))
+    version = "".join((str(_) for _ in sys.version_info[:3]))
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
-
-    expected = os.path.join(
-        ".riot",
-        venv_name,
-        "lib",
-        "python{}".format(py_dot_version),
-        "site-packages",
+    assert env["PYTHONPATH"] == ":".join(
+        (
+            str(
+                tmp_path
+                / os.path.join(
+                    ".riot",
+                    f"venv_py{version}",
+                    "lib",
+                    f"python{py_dot_version}",
+                    "site-packages",
+                )
+            ),
+            str(tmp_path),
+        )
     )
-    assert env["PYTHONPATH"].endswith(expected)
-    assert len(env["PYTHONPATH"].split(":")) == 1
 
 
 def test_venv_instance_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
@@ -574,6 +580,7 @@ venv = Venv(
     pkgs={"pip": ""},
     name="test",
     command="env",
+    venvs=[Venv(pkgs={"pytest": ""})]
 )
 """,
     )
@@ -581,25 +588,92 @@ venv = Venv(
     env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0
 
-    venv_name = "venv_py{}_pip".format("".join((str(_) for _ in sys.version_info[:3])))
-    parent_venv_name = "venv_py{}".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
-    )
+    version = "".join((str(_) for _ in sys.version_info[:3]))
+
+    venv_name = f"venv_py{version}_pytest"
+    parent_venv_name = f"venv_py{version}_pip"
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
-    parent_venv_path = os.path.join(
-        ".riot",
-        parent_venv_name,
-        "lib",
-        "python{}".format(py_dot_version),
-        "site-packages",
+    py_venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            f"venv_py{version}",
+            "lib",
+            "python{}".format(py_dot_version),
+            "site-packages",
+        )
     )
 
-    venv_path = os.path.join(
-        ".riot", venv_name, "lib", "python{}".format(py_dot_version), "site-packages"
+    parent_venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            parent_venv_name,
+            "lib",
+            "python{}".format(py_dot_version),
+            "site-packages",
+        )
+    )
+
+    venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            venv_name,
+            "lib",
+            "python{}".format(py_dot_version),
+            "site-packages",
+        )
     )
 
     paths = env["PYTHONPATH"].split(":")
-    assert len(paths) == 2
-    assert paths[0].endswith(parent_venv_path)
-    assert paths[1].endswith(venv_path)
+    assert paths == [venv_path, parent_venv_path, py_venv_path, str(tmp_path)]
+
+
+def test_venv_instance_path(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={"pip": ""},
+    name="test",
+    command="env",
+    venvs=[Venv(pkgs={"pytest": ""})]
+)
+""",
+    )
+    result = tmp_run("riot run -s test")
+    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    print(result.stderr)
+    assert result.returncode == 0
+
+    venv_name = "venv_py{}_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+    parent_venv_name = "venv_py{}_pip".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+
+    parent_venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            parent_venv_name,
+            "bin",
+        )
+    )
+
+    venv_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            venv_name,
+            "bin",
+        )
+    )
+
+    paths = env["PATH"].split(":")
+    assert paths.index(venv_path) < paths.index(parent_venv_path)
