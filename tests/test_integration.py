@@ -433,6 +433,7 @@ def test_failure():
 """,
     )
     result = tmp_run("riot run -s pass")
+    assert result.returncode == 0, result.stderr
     assert re.search(
         r"""
 ============================= test session starts ==============================
@@ -448,9 +449,8 @@ test_success.py .*
 ✓ pass: .*
 1 passed with 0 warnings, 0 failed\n""".lstrip(),
         result.stdout,
-    )
+    ), result.stdout
     assert result.stderr == ""
-    assert result.returncode == 0
 
     result = tmp_run("riot run -s fail")
     assert (

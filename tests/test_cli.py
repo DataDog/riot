@@ -203,9 +203,9 @@ def test_run_venv_pattern(cli: click.testing.CliRunner) -> None:
                 "pytest543$",
             ],
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.exception
         assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'"
-        assert "1 passed with 0 warnings, 0 failed" in result.stdout
+        assert "1 passed with 0 warnings, 0 failed" in result.stdout, result.stdout
 
 
 def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
@@ -322,7 +322,7 @@ venv = Venv(
             subprocess_run.assert_called()
 
             cmd = subprocess_run.call_args_list[-1].args[0]
-            assert cmd.endswith(cmdrun)
+            assert cmd.endswith(cmdrun), cmd
 
 
 def test_nested_venv(cli: click.testing.CliRunner) -> None:

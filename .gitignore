@@ -40,3 +40,6 @@ pip-delete-this-directory.txt
 
 # PyBuilder
 target/
+
+# Riot
+.riot/

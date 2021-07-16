@@ -63,7 +63,7 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     )
 
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert venv.venv_path == os.path.abspath(
+    assert venv.prefix == os.path.abspath(
         os.path.join(".riot", "venv_py{}_pip".format(py_version))
     )
 
