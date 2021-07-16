@@ -3,7 +3,6 @@ import os
 import shutil
 import typing
 
-
 import _pytest.monkeypatch
 import click.testing
 import mock
@@ -11,7 +10,6 @@ import pytest
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
-
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(HERE, "data")
@@ -69,7 +67,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
                 "pytest543$",
             ],
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.stdout
         assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
 
 

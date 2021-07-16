@@ -48,8 +48,8 @@ def test_interpreter(v1, v2, equal):
 
 def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert current_interpreter.venv_path() == os.path.join(
-        ".riot", "venv_py{}".format(py_version)
+    assert current_interpreter.venv_path == os.path.abspath(
+        os.path.join(".riot", "venv_py{}".format(py_version))
     )
 
 
@@ -63,7 +63,9 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     )
 
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert venv.venv_path() == os.path.join(".riot", "venv_py{}_pip".format(py_version))
+    assert venv.venv_path == os.path.abspath(
+        os.path.join(".riot", "venv_py{}_pip".format(py_version))
+    )
 
 
 def test_interpreter_version(current_interpreter: Interpreter) -> None:

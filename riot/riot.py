@@ -63,6 +63,10 @@ def to_list(x: t.Union[_K, t.List[_K]]) -> t.List[_K]:
 _T_stdio = t.Union[None, int, t.IO[t.Any]]
 
 
+class VenvError(Exception):
+    pass
+
+
 @dataclasses.dataclass(unsafe_hash=True, eq=True)
 class Interpreter:
     _T_hint = t.Union[float, int, str]
@@ -97,6 +101,15 @@ class Interpreter:
             t.Tuple[int, int, int], tuple(map(int, self.version().split(".")))
         )
 
+    @property
+    def bin_path(self) -> t.Optional[str]:
+        return os.path.join(self.venv_path, "bin")
+
+    @property
+    def site_packages_path(self) -> t.Optional[str]:
+        version = ".".join((str(_) for _ in self.version_info()[:2]))
+        return os.path.join(self.venv_path, "lib", f"python{version}", "site-packages")
+
     @functools.lru_cache()
     def path(self) -> str:
         """Return the Python interpreter path or raise.
@@ -111,22 +124,19 @@ class Interpreter:
             py_ex = shutil.which(f"python{self._hint}")
 
         if py_ex:
-            return py_ex
+            return os.path.abspath(py_ex)
 
         raise FileNotFoundError(f"Python interpreter {self._hint} not found")
 
+    @property
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        return f".riot/venv_py{version}"
-
-    @property
-    def pythonpath(self) -> str:
-        return ":".join(get_venv_sitepackages(self.venv_path()))
+        return os.path.abspath(f".riot/venv_py{version}")
 
     def create_venv(self, recreate: bool) -> str:
         """Attempt to create a virtual environment for this intepreter."""
-        path: str = self.venv_path()
+        path: str = self.venv_path
 
         if os.path.isdir(path) and not recreate:
             logger.info(
@@ -179,9 +189,11 @@ class Venv:
         venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
     """
 
-    pys: dataclasses.InitVar[t.List[Interpreter._T_hint]] = None
-    pkgs: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
-    env: dataclasses.InitVar[t.Dict[str, t.List[str]]] = None
+    pys: dataclasses.InitVar[
+        t.Union[Interpreter._T_hint, t.List[Interpreter._T_hint]]
+    ] = None
+    pkgs: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
+    env: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
     name: t.Optional[str] = None
     command: t.Optional[str] = None
     venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
@@ -192,77 +204,68 @@ class Venv:
         self.pkgs = rm_singletons(pkgs) if pkgs else {}
         self.env = rm_singletons(env) if env else {}
 
-    def resolve(self, parents: t.List["Venv"]) -> "Venv":
-        if not parents:
-            return self
-        else:
-            venv = Venv()
-            for parent in parents + [self]:
-                if parent.name:
-                    venv.name = parent.name
-                if parent.pys:
-                    venv.pys = parent.pys
-                if parent.command:
-                    venv.command = parent.command
-                venv.env.update(parent.env)
-                venv.pkgs.update(parent.pkgs)
-            return venv
-
     def instances(
         self,
-        pattern: t.Pattern[str],
-        parents: t.List["Venv"] = [],
+        parent: t.Optional["Venv"] = None,
+        parent_inst: t.Optional["VenvInstance"] = None,
     ) -> t.Generator["VenvInstance", None, None]:
-        for venv in self.venvs:
-            if venv.name and not pattern.match(venv.name):
-                logger.debug("Skipping venv '%s' due to mismatch.", venv.name)
-                continue
-            else:
-                for inst in venv.instances(parents=parents + [self], pattern=pattern):
-                    if inst:
+        # Expand out the instances for the venv.
+        for env in expand_specs(self.env):
+            # Bubble up pys
+            pys = (
+                self.pys
+                or (parent.pys if parent else None)
+                or [parent_inst.py if parent_inst else None]
+            )
+            for py in pys:
+                for pkgs in expand_specs(self.pkgs):
+                    inst = VenvInstance(
+                        # Bubble up name and command if not overridden
+                        name=self.name or (parent_inst.name if parent_inst else None),
+                        command=self.command
+                        or (parent_inst.command if parent_inst else None),
+                        py=py,
+                        env=env,
+                        pkgs=pkgs,
+                        parent=parent_inst,
+                    )
+                    if not self.venvs:
                         yield inst
-        else:
-            resolved = self.resolve(parents)
-
-            # If the venv doesn't have a command or python then skip it.
-            if not resolved.command or not resolved.pys:
-                logger.debug("Skipping venv %r as it's not runnable.", self)
-                return
-
-            # Expand out the instances for the venv.
-            for env in expand_specs(resolved.env):
-                for py in resolved.pys:
-                    for pkgs in expand_specs(resolved.pkgs):
-                        yield VenvInstance(
-                            name=resolved.name,
-                            command=resolved.command,
-                            py=py,
-                            env=env,
-                            pkgs=pkgs,
-                        )
+                    else:
+                        for venv in self.venvs:
+                            yield from venv.instances(self, inst)
 
 
 @dataclasses.dataclass
 class VenvInstance:
-    command: str
-    env: t.Tuple[t.Tuple[str, str]]
-    name: t.Optional[str]
     pkgs: t.Tuple[t.Tuple[str, str]]
     py: Interpreter
+    env: t.Tuple[t.Tuple[str, str]]
+    name: t.Optional[str] = None
+    command: t.Optional[str] = None
+    parent: t.Optional["VenvInstance"] = None
 
-    def venv_path(self) -> str:
+    @property
+    def venv_path(self) -> t.Optional[str]:
         """Return path to directory of the venv this instance should use.
 
         This will return a python version + package specific venv path name.
-
-        If no packages are defined it will return the ``Interpreter.venv_path()``.
+        If no packages are defined it will return the ``Interpreter.venv_path``.
         """
-        venv_path = self.py.venv_path()
+        if self.py is None:
+            return None
+
+        venv_path = self.py.venv_path
         if self.needs_venv:
             venv_path = "_".join(
                 [venv_path] + [f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs]
             )
         return venv_path
+
+    @property
+    def target(self) -> t.Optional[str]:
+        """Target path for package installation."""
+        return self.venv_path
 
     @property
     def needs_venv(self) -> bool:
@@ -272,25 +275,125 @@ class VenvInstance:
     @property
     def pkg_str(self) -> str:
         """Return pip friendly install string from defined packages."""
+        chain: t.List[VenvInstance] = []
+        current: t.Optional[VenvInstance] = self
+        while current is not None:
+            chain.append(current)
+            current = current.parent
+
+        pkgs: t.Dict[str, str] = {}
+        for inst in chain:
+            pkgs.update(dict(inst.pkgs))
+
         return " ".join(
             [
                 f"'{get_pep_dep(lib, version)}'"
-                for lib, version in self.pkgs
+                for lib, version in pkgs.items()
                 if version is not None
             ]
         )
 
     @property
-    def pythonpath(self) -> str:
-        """Return the expected PYTHONPATH env variable for this Venv.
+    def bin_path(self) -> t.Optional[str]:
+        target = self.target
+        if target is None:
+            return None
+        return os.path.join(target, "bin")
 
-        This will include the Interpreter's Python path, and if there
-        are pkgs defined, this venvs Python path appended.
-        """
-        paths = [self.py.pythonpath]
-        if self.needs_venv:
-            paths.extend(get_venv_sitepackages(self.venv_path()))
+    @property
+    def scriptpath(self):
+        paths = []
+
+        current: t.Optional[VenvInstance] = self
+        while current is not None:
+            if current.needs_venv:
+                assert current.bin_path is not None, current
+                paths.append(current.bin_path)
+            current = current.parent
+
+        if self.py:
+            if self.py.bin_path is not None:
+                paths.append(self.py.bin_path)
+
         return ":".join(paths)
+
+    @property
+    def site_packages_path(self) -> t.Optional[str]:
+        target = self.target
+        if target is None:
+            return None
+        version = ".".join((str(_) for _ in self.py.version_info()[:2]))
+        return os.path.join(target, "lib", f"python{version}", "site-packages")
+
+    @property
+    def pythonpath(self) -> str:
+        paths = []
+
+        current: t.Optional[VenvInstance] = self
+        while current is not None:
+            if current.needs_venv:
+                assert current.site_packages_path is not None, current
+                paths.append(current.site_packages_path)
+            current = current.parent
+
+        if self.py:
+            if self.py.site_packages_path is not None:
+                paths.append(self.py.site_packages_path)
+
+        # Finally add the CWD so that we can, e.g., find and run tests without 'python -m'
+        paths.append(os.getcwd())
+
+        return ":".join(paths)
+
+    def prepare(
+        self, env: t.Dict[str, str], py: t.Optional[Interpreter] = None
+    ) -> None:
+        # Propagate the interpreter down the parenting relation
+        self.py = py = py or self.py
+
+        if py is not None:
+            venv_path = self.venv_path
+            if venv_path is None:
+                return
+
+            if self.needs_venv:
+                py_ex = py.path()
+                logger.info(
+                    "Creating virtualenv '%s' with interpreter '%s'.",
+                    self.venv_path,
+                    py_ex,
+                )
+
+                try:
+                    run_cmd(
+                        ["virtualenv", f"--python={py_ex}", venv_path],
+                        stdout=subprocess.PIPE,
+                    )
+                except FileNotFoundError:
+                    raise VenvError("Base virtualenv '%s' does not exist", venv_path)
+
+                except FileExistsError:
+                    # Assume the venv already exists and works fine
+                    logger.info(
+                        "Virtualenv '%s' already exists and assumed to be OK",
+                        self.venv_path,
+                    )
+                else:
+                    if self.pkg_str:
+                        logger.info("Installing venv dependencies %s.", self.pkg_str)
+                        try:
+                            Session.run_cmd_venv(
+                                venv_path,
+                                f"pip --disable-pip-version-check install --prefix {self.target} --no-warn-script-location {self.pkg_str}",
+                                env=env,
+                            )
+                        except CmdFailure as e:
+                            raise CmdFailure(
+                                f"Failed to install venv dependencies {self.pkg_str}\n{e.proc.stdout}",
+                                e.proc,
+                            )
+        if self.parent is not None:
+            self.parent.prepare(env, py)
 
 
 @dataclasses.dataclass
@@ -382,7 +485,18 @@ class Session:
             pythons=pythons,
         )
 
-        for inst in self.venv.instances(pattern=pattern):
+        for inst in self.venv.instances():
+            if inst.command is None:
+                logger.debug("Skipping venv instance %s due to missing command", inst)
+                continue
+
+            if inst.name and not pattern.match(inst.name):
+                logger.debug(
+                    "Skipping venv instance %s due to name pattern mismatch.", inst
+                )
+                continue
+
+            assert inst.py is not None, inst
             if pythons and inst.py not in pythons:
                 logger.debug(
                     "Skipping venv instance %s due to interpreter mismatch", inst
@@ -390,7 +504,7 @@ class Session:
                 continue
 
             try:
-                inst.py.venv_path()
+                inst.py.venv_path
             except FileNotFoundError:
                 if skip_missing:
                     logger.warning("Skipping missing interpreter %s", inst.py)
@@ -400,7 +514,9 @@ class Session:
 
             logger.info("Running with %s", inst.py)
 
-            venv_path = inst.venv_path()
+            venv_path = inst.venv_path
+            assert venv_path is not None
+
             if not venv_pattern.search(venv_path):
                 logger.debug(
                     "Skipping venv instance '%s' due to pattern mismatch", venv_path
@@ -415,64 +531,39 @@ class Session:
             # Generate the environment for the instance.
             if pass_env:
                 env = os.environ.copy()
+                env.update(dict(inst.env))
             else:
-                env = {}
+                env = dict(inst.env)
 
-            # Add in the instance env vars.
-            env.update(dict(inst.env))
+            inst.prepare(env)
+
+            pythonpath = inst.pythonpath
+            if pythonpath:
+                env["PYTHONPATH"] = (
+                    f"{pythonpath}:{env['PYTHONPATH']}"
+                    if "PYTHONPATH" in env
+                    else pythonpath
+                )
+            script_path = inst.scriptpath
+            if script_path:
+                env["PATH"] = ":".join(
+                    (script_path, env.get("PATH", os.environ["PATH"]))
+                )
 
             try:
-                if inst.needs_venv:
-                    py_ex = inst.py.path()
-                    logger.info(
-                        "Creating virtualenv '%s' with interpreter '%s'.",
-                        venv_path,
-                        py_ex,
-                    )
-
-                    try:
-                        run_cmd(
-                            ["virtualenv", f"--python={py_ex}", venv_path],
-                            stdout=subprocess.PIPE,
-                        )
-                    except FileNotFoundError:
-                        logger.info("Base virtualenv '%s' does not exist", venv_path)
-                        continue
-                    except FileExistsError:
-                        # Assume the venv already exists and works fine
-                        logger.info("Virtualenv '%s' already exists", venv_path)
-
-                # DEV: We need the venv to exist first since we query the venv
-                # python for its site-packages directories
-                env["PYTHONPATH"] = inst.pythonpath
-
-                if inst.pkg_str:
-                    logger.info("Installing venv dependencies %s.", inst.pkg_str)
-                    try:
-                        self.run_cmd_venv(
-                            venv_path,
-                            f"pip --disable-pip-version-check install {inst.pkg_str}",
-                            env=env,
-                        )
-                    except CmdFailure as e:
-                        raise CmdFailure(
-                            f"Failed to install venv dependencies {inst.pkg_str}\n{e.proc.stdout}",
-                            e.proc,
-                        )
-
                 # Finally, run the test in the venv.
+                command = inst.command
+                assert command is not None
                 if cmdargs is not None:
-                    inst.command = inst.command.format(cmdargs=(" ".join(cmdargs)))
+                    command = command.format(cmdargs=(" ".join(cmdargs))).strip()
                 env_str = " ".join(f"{k}={v}" for k, v in env.items())
                 logger.info(
-                    "Running command '%s' with environment '%s'.", inst.command, env_str
+                    "Running command '%s' with environment '%s'.", command, env_str
                 )
                 try:
                     # Pipe the command output directly to `out` since we
                     # don't need to store it.
-                    output = self.run_cmd_venv(
-                        venv_path, inst.command, stdout=out, env=env
-                    )
+                    output = self.run_cmd_venv(venv_path, command, stdout=out, env=env)
                     result.output = output.stdout
                 except CmdFailure as e:
                     raise CmdFailure(
@@ -528,11 +619,14 @@ class Session:
             sys.exit(1)
 
     def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
-        for inst in self.venv.instances(pattern=pattern):
+        for inst in self.venv.instances():
+            if not inst.name or not pattern.match(inst.name):
+                continue
+
             if pythons and inst.py not in pythons:
                 continue
 
-            if not venv_pattern.search(inst.venv_path()):
+            if not venv_pattern.search(inst.venv_path):
                 continue
             pkgs_str = " ".join(
                 f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
@@ -551,7 +645,11 @@ class Session:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
         required_pys: t.Set[Interpreter] = set(
-            [inst.py for inst in self.venv.instances(pattern=pattern)]
+            [
+                inst.py
+                for inst in self.venv.instances()
+                if inst.py is not None and (not inst.name or pattern.match(inst.name))
+            ]
         )
         # Apply Python filters.
         if pythons:
@@ -584,8 +682,9 @@ class Session:
                     logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
                     sys.exit(1)
 
+    @classmethod
     def run_cmd_venv(
-        self,
+        cls,
         venv: str,
         args: str,
         stdout: _T_stdio = subprocess.PIPE,
@@ -594,10 +693,9 @@ class Session:
     ) -> _T_CompletedProcess:
         cmd = get_venv_command(venv, args)
 
-        if env is None:
-            env = {}
+        env = {} if env is None else env.copy()
 
-        for k in self.ALWAYS_PASS_ENV:
+        for k in cls.ALWAYS_PASS_ENV:
             if k in os.environ and k not in env:
                 env[k] = os.environ[k]
 
