@@ -56,9 +56,9 @@ def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
 def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     venv = VenvInstance(
         command="echo test",
-        env=(("env", "test"),),
+        env={"env": "test"},
         name="test",
-        pkgs=(("pip", ""),),
+        pkgs={"pip": ""},
         py=current_interpreter,
     )
 

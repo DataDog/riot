@@ -555,6 +555,8 @@ venv = Venv(
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
     assert env["PYTHONPATH"] == ":".join(
         (
+            "",
+            str(tmp_path),
             str(
                 tmp_path
                 / os.path.join(
@@ -565,7 +567,6 @@ venv = Venv(
                     "site-packages",
                 )
             ),
-            str(tmp_path),
         )
     )
 
@@ -628,7 +629,7 @@ venv = Venv(
     )
 
     paths = env["PYTHONPATH"].split(":")
-    assert paths == [venv_path, parent_venv_path, py_venv_path, str(tmp_path)]
+    assert paths == ["", str(tmp_path), venv_path, parent_venv_path, py_venv_path]
 
 
 def test_venv_instance_path(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
@@ -647,8 +648,7 @@ venv = Venv(
     )
     result = tmp_run("riot run -s test")
     env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
-    print(result.stderr)
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr
 
     venv_name = "venv_py{}_pytest".format(
         "".join((str(_) for _ in sys.version_info[:3]))
@@ -677,3 +677,28 @@ venv = Venv(
 
     paths = env["PATH"].split(":")
     assert paths.index(venv_path) < paths.index(parent_venv_path)
+
+
+def test_env_bubble_up(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={"pip": ""},
+    name="test",
+    command="env",
+    env={"foo": "42", "baz": "stillthesame"},
+    venvs=[Venv(pkgs={"pytest": ""}, env={"bar": "43", "foo": "40"})],
+)
+""",
+    )
+    result = tmp_run("riot -v run -s test")
+    print(result.stdout)
+    env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+
+    assert env["foo"] == "40"
+    assert env["bar"] == "43"
+    assert env["baz"] == "stillthesame"
