@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixed handling of environment variables, package installations and namespace
+    packages.

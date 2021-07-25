@@ -56,9 +56,9 @@ def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
 def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     venv = VenvInstance(
         command="echo test",
-        env=(("env", "test"),),
+        env={"env": "test"},
         name="test",
-        pkgs=(("pip", ""),),
+        pkgs={"pip": ""},
         py=current_interpreter,
     )
 
@@ -75,3 +75,23 @@ def test_interpreter_version(current_interpreter: Interpreter) -> None:
 
 def test_interpreter_version_info(current_interpreter: Interpreter) -> None:
     assert current_interpreter.version_info() == sys.version_info[:3]
+
+
+def test_venv_matching(current_interpreter: Interpreter) -> None:
+    venv = VenvInstance(
+        command="echo test",
+        env={"env": "test"},
+        name="test",
+        pkgs={"pip": ""},
+        parent=VenvInstance(
+            py=current_interpreter,
+            env={},
+            pkgs={"pytest": "==5.4.3"},
+        ),
+        py=current_interpreter,
+    )
+
+    assert venv.match_venv_pattern(re.compile("pytest543"))
+    assert not venv.match_venv_pattern(re.compile("pytest345"))
+    assert venv.match_venv_pattern(re.compile("pytest543_pip"))
+    assert not venv.match_venv_pattern(re.compile("pip_pytest543"))

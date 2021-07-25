@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import dataclasses
 import functools
 import importlib.abc
@@ -106,7 +107,7 @@ class Interpreter:
         return os.path.join(self.venv_path, "bin")
 
     @property
-    def site_packages_path(self) -> t.Optional[str]:
+    def site_packages_path(self) -> str:
         version = ".".join((str(_) for _ in self.version_info()[:2]))
         return os.path.join(self.venv_path, "lib", f"python{version}", "site-packages")
 
@@ -206,17 +207,17 @@ class Venv:
 
     def instances(
         self,
-        parent: t.Optional["Venv"] = None,
         parent_inst: t.Optional["VenvInstance"] = None,
     ) -> t.Generator["VenvInstance", None, None]:
         # Expand out the instances for the venv.
-        for env in expand_specs(self.env):
+        for env_spec in expand_specs(self.env):
+            # Bubble up env
+            env = parent_inst.env.copy() if parent_inst else {}
+            env.update(dict(env_spec))
+
             # Bubble up pys
-            pys = (
-                self.pys
-                or (parent.pys if parent else None)
-                or [parent_inst.py if parent_inst else None]
-            )
+            pys = self.pys or [parent_inst.py if parent_inst else None]
+
             for py in pys:
                 for pkgs in expand_specs(self.pkgs):
                     inst = VenvInstance(
@@ -226,21 +227,71 @@ class Venv:
                         or (parent_inst.command if parent_inst else None),
                         py=py,
                         env=env,
-                        pkgs=pkgs,
+                        pkgs=dict(pkgs),
                         parent=parent_inst,
                     )
                     if not self.venvs:
                         yield inst
                     else:
                         for venv in self.venvs:
-                            yield from venv.instances(self, inst)
+                            yield from venv.instances(inst)
+
+
+@contextmanager
+def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
+    src_ns_files = {}
+    dst_ns_files = []
+    moved_ns_files = []
+
+    venv_sitepkgs = inst.py.site_packages_path
+
+    # Collect the namespaces to copy over
+    for sitepkgs in (_ for _ in inst.site_packages_list[2:] if _ != venv_sitepkgs):
+        try:
+            for ns in (_ for _ in os.listdir(sitepkgs) if _.endswith("nspkg.pth")):
+                if ns not in src_ns_files:
+                    src_ns_files[ns] = sitepkgs
+        except FileNotFoundError:
+            pass
+
+    # Copy over the namespaces
+    for ns, src_sitepkgs in src_ns_files.items():
+        src_ns_path = os.path.join(src_sitepkgs, ns)
+        dst_ns_path = os.path.join(venv_sitepkgs, ns)
+
+        # if the destination file exists already we make a backup copy as it
+        # belongs to the base venv and we don't want to overwrite it
+        if os.path.isfile(dst_ns_path):
+            shutil.move(dst_ns_path, dst_ns_path + ".bak")
+            moved_ns_files.append(dst_ns_path)
+
+        with open(src_ns_path) as ns_in, open(dst_ns_path, "w") as ns_out:
+            # https://github.com/pypa/setuptools/blob/b62705a84ab599a2feff059ececd33800f364555/setuptools/namespaces.py#L44
+            # TODO: Cache the file content to avoid re-reading it
+            ns_out.write(
+                ns_in.read().replace(
+                    "sys._getframe(1).f_locals['sitedir']",
+                    f"'{src_sitepkgs}'",
+                )
+            )
+
+        dst_ns_files.append(dst_ns_path)
+
+    yield
+
+    # Clean up the base venv
+    for ns_file in dst_ns_files:
+        os.remove(ns_file)
+
+    for ns_file in moved_ns_files:
+        shutil.move(ns_file + ".bak", ns_file)
 
 
 @dataclasses.dataclass
 class VenvInstance:
-    pkgs: t.Tuple[t.Tuple[str, str]]
+    pkgs: t.Dict[str, str]
     py: Interpreter
-    env: t.Tuple[t.Tuple[str, str]]
+    env: t.Dict[str, str]
     name: t.Optional[str] = None
     command: t.Optional[str] = None
     parent: t.Optional["VenvInstance"] = None
@@ -267,28 +318,27 @@ class VenvInstance:
         """Return prefix identifier string based on packages."""
         if not self.pkgs:
             return None
-        return "_".join((f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs))
+        return "_".join((f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs.items()))
 
     @property
     def pkg_str(self) -> str:
         """Return pip friendly install string from defined packages."""
-        chain: t.List[VenvInstance] = []
+        return pip_deps(self.pkgs)
+
+    @property
+    def full_pkg_str(self) -> str:
+        """Return pip friendly install string from defined packages."""
+        chain: t.List[VenvInstance] = [self]
         current: t.Optional[VenvInstance] = self
         while current is not None:
-            chain.append(current)
+            chain.insert(0, current)
             current = current.parent
 
         pkgs: t.Dict[str, str] = {}
         for inst in chain:
             pkgs.update(dict(inst.pkgs))
 
-        return " ".join(
-            [
-                f"'{get_pep_dep(lib, version)}'"
-                for lib, version in pkgs.items()
-                if version is not None
-            ]
-        )
+        return pip_deps(pkgs)
 
     @property
     def bin_path(self) -> t.Optional[str]:
@@ -323,8 +373,13 @@ class VenvInstance:
         return os.path.join(prefix, "lib", f"python{version}", "site-packages")
 
     @property
-    def pythonpath(self) -> str:
-        paths = []
+    def site_packages_list(self) -> t.List[str]:
+        """Return a list of all the site-packages paths along the parenting relation.
+
+        The list starts with the empty string and is followed by the site-packages path
+        of the current instance, then the parent site-packages paths follow.
+        """
+        paths = ["", os.getcwd()]  # mimick 'python -m'
 
         current: t.Optional[VenvInstance] = self
         while current is not None:
@@ -337,22 +392,25 @@ class VenvInstance:
             if self.py.site_packages_path is not None:
                 paths.append(self.py.site_packages_path)
 
-        # Finally add the CWD so that we can, e.g., find and run tests without 'python -m'
-        paths.append(os.getcwd())
+        return paths
 
-        return ":".join(paths)
+    @property
+    def pythonpath(self) -> str:
+        return ":".join(self.site_packages_list)
 
-    def match_venv_pattern(self, pattern):
-        current = self
-        searched = False
+    def match_venv_pattern(self, pattern: t.Pattern[str]) -> bool:
+        current: t.Optional[VenvInstance] = self
+        idents = []
         while current is not None:
             ident = current.ident
             if ident is not None:
-                searched = True
-                if pattern.search(ident):
-                    return True
+                idents.append(ident)
             current = current.parent
-        return not searched
+
+        if not idents:
+            return True
+
+        return bool(pattern.search("_".join(idents[::-1])))
 
     def prepare(
         self, env: t.Dict[str, str], py: t.Optional[Interpreter] = None
@@ -367,7 +425,11 @@ class VenvInstance:
             if self.pkgs:
                 pkg_str = self.pkg_str
                 assert pkg_str is not None
-                logger.info("Installing venv dependencies %s.", pkg_str)
+                logger.info(
+                    "Installing venv dependencies %s in prefix %s.",
+                    pkg_str,
+                    self.prefix,
+                )
                 try:
                     Session.run_cmd_venv(
                         venv_path,
@@ -379,7 +441,6 @@ class VenvInstance:
                         f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
                         e.proc,
                     )
-
         if self.parent is not None:
             self.parent.prepare(env, py)
 
@@ -491,7 +552,7 @@ class Session:
                 continue
 
             try:
-                inst.py.venv_path
+                venv_path = inst.py.venv_path
             except FileNotFoundError:
                 if skip_missing:
                     logger.warning("Skipping missing interpreter %s", inst.py)
@@ -499,16 +560,13 @@ class Session:
                 else:
                     raise
 
-            logger.info("Running with %s", inst.py)
-
-            venv_path = inst.py.venv_path
-            assert venv_path is not None
-
             if not inst.match_venv_pattern(venv_pattern):
                 logger.debug(
                     "Skipping venv instance '%s' due to pattern mismatch", venv_path
                 )
                 continue
+
+            logger.info("Running with %s", inst.py)
 
             # Result which will be updated with the test outcome.
             result = VenvInstanceResult(instance=inst, venv_name=venv_path)
@@ -536,24 +594,28 @@ class Session:
                 )
 
             try:
-                # Finally, run the test in the venv.
+                # Finally, run the test in the base venv.
                 command = inst.command
                 assert command is not None
                 if cmdargs is not None:
                     command = command.format(cmdargs=(" ".join(cmdargs))).strip()
-                env_str = " ".join(f"{k}={v}" for k, v in env.items())
+                env_str = "\n".join(f"{k}={v}" for k, v in env.items())
                 logger.info(
-                    "Running command '%s' with environment '%s'.", command, env_str
+                    "Running command '%s' in venv '%s' with environment:\n%s.",
+                    command,
+                    venv_path,
+                    env_str,
                 )
-                try:
-                    # Pipe the command output directly to `out` since we
-                    # don't need to store it.
-                    output = self.run_cmd_venv(venv_path, command, stdout=out, env=env)
-                    result.output = output.stdout
-                except CmdFailure as e:
-                    raise CmdFailure(
-                        f"Test failed with exit code {e.proc.returncode}", e.proc
-                    )
+                with nspkgs(inst):
+                    try:
+                        output = self.run_cmd_venv(
+                            venv_path, command, stdout=out, env=env
+                        )
+                        result.output = output.stdout
+                    except CmdFailure as e:
+                        raise CmdFailure(
+                            f"Test failed with exit code {e.proc.returncode}", e.proc
+                        )
             except CmdFailure as e:
                 result.code = e.code
                 click.echo(click.style(e.msg, fg="red"))
@@ -581,7 +643,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             env_str = env_to_str(r.instance.env)
-            s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.instance.pkg_str}"
+            s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.instance.full_pkg_str}"
 
             if failed:
                 num_failed += 1
@@ -613,9 +675,7 @@ class Session:
 
             if not inst.match_venv_pattern(venv_pattern):
                 continue
-            pkgs_str = " ".join(
-                f"'{get_pep_dep(name, version)}'" for name, version in inst.pkgs
-            )
+            pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
             py_str = f"Python {inst.py}"
             click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
@@ -658,7 +718,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                logger.info("Installing dev package.")
+                logger.info("Installing dev package (edit mode) in %s.", venv_path)
                 try:
                     self.run_cmd_venv(
                         venv_path, "pip --disable-pip-version-check install -e ."
@@ -716,15 +776,15 @@ def get_pep_dep(libname: str, version: str) -> str:
     return f"{libname}{version}"
 
 
-def env_to_str(envs: t.Sequence[t.Tuple[str, str]]) -> str:
+def env_to_str(envs: t.Dict[str, str]) -> str:
     """Return a human-friendly representation of environment variables.
 
-    >>> env_to_str([("FOO", "BAR")])
+    >>> env_to_str({"FOO": "BAR"})
     'FOO=BAR'
-    >>> env_to_str([("K", "V"), ("K2", "V2")])
+    >>> env_to_str({"K": "V", "K2": "V2"})
     'K=V K2=V2'
     """
-    return " ".join(f"{k}={v}" for k, v in envs)
+    return " ".join(f"{k}={v}" for k, v in envs.items())
 
 
 def run_cmd(
@@ -785,3 +845,13 @@ def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K
 
     # Need to cast because the * star typeshed of itertools.product returns Any
     return t.cast(t.Iterator[t.Tuple[t.Tuple[_K, _V]]], itertools.product(*all_vals))
+
+
+def pip_deps(pkgs: t.Dict[str, str]) -> str:
+    return " ".join(
+        [
+            f"'{get_pep_dep(lib, version)}'"
+            for lib, version in pkgs.items()
+            if version is not None
+        ]
+    )

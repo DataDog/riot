@@ -67,6 +67,8 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
                 "pytest543$",
             ],
         )
+        if result.exception:
+            raise result.exception
         assert result.exit_code == 0, result.stdout
         assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
 
@@ -317,7 +319,7 @@ venv = Venv(
             subprocess_run.return_value.returncode = 0
             args = ["run", name] + cmdargs
             result = cli.invoke(riot.cli.main, args, catch_exceptions=False)
-            assert result.exit_code == 0
+            assert result.exit_code == 0, result.stdout
 
             subprocess_run.assert_called()
 
