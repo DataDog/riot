@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Fix handling of interpreter override to avoid repeated command invocations.

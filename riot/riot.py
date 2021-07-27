@@ -206,7 +206,6 @@ class Venv:
 
     def instances(
         self,
-        parent: t.Optional["Venv"] = None,
         parent_inst: t.Optional["VenvInstance"] = None,
     ) -> t.Generator["VenvInstance", None, None]:
         # Expand out the instances for the venv.
@@ -216,11 +215,7 @@ class Venv:
             env.update(dict(env_spec))
 
             # Bubble up pys
-            pys = (
-                self.pys
-                or (parent.pys if parent else None)
-                or [parent_inst.py if parent_inst else None]
-            )
+            pys = self.pys or [parent_inst.py if parent_inst else None]
 
             for py in pys:
                 for pkgs in expand_specs(self.pkgs):
@@ -238,7 +233,7 @@ class Venv:
                         yield inst
                     else:
                         for venv in self.venvs:
-                            yield from venv.instances(self, inst)
+                            yield from venv.instances(inst)
 
 
 @dataclasses.dataclass
