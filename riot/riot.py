@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 import dataclasses
 import functools
 import importlib.abc
@@ -10,8 +9,10 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import traceback
 import typing as t
+from contextlib import contextmanager
 
 import click
 
@@ -19,6 +20,16 @@ logger = logging.getLogger(__name__)
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
+SHELL_RCFILE = """. ~/.bashrc
+source {venv_path}/bin/activate
+echo ""
+echo "Riot Shell"
+echo ""
+echo "* Venv name   : {name}"
+echo "* Venv path   : {venv_path}"
+echo "* Interpreter : $( python -V )"
+PS1="\n(riot@`basename {venv_path}`) \h:\w\n$ "
+"""
 
 
 if t.TYPE_CHECKING or sys.version_info[:2] >= (3, 9):
@@ -318,7 +329,12 @@ class VenvInstance:
         """Return prefix identifier string based on packages."""
         if not self.pkgs:
             return None
-        return "_".join((f"{n}{rmchars('<=>.,', v)}" for n, v in self.pkgs.items()))
+        return "_".join(
+            (
+                f"{rmchars('<=>.,:+@/', n)}{rmchars('<=>.,:+@/', v)}"
+                for n, v in self.pkgs.items()
+            )
+        )
 
     @property
     def pkg_str(self) -> str:
@@ -666,7 +682,7 @@ class Session:
             sys.exit(1)
 
     def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
-        for inst in self.venv.instances():
+        for n, inst in enumerate(self.venv.instances()):
             if not inst.name or not pattern.match(inst.name):
                 continue
 
@@ -678,7 +694,7 @@ class Session:
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
             py_str = f"Python {inst.py}"
-            click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
+            click.echo(f"[{n}] {inst.name} {env_str} {py_str} {pkgs_str}")
 
     def generate_base_venvs(
         self,
@@ -726,6 +742,67 @@ class Session:
                 except CmdFailure as e:
                     logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
                     sys.exit(1)
+
+    def _generate_shell_rcfile(self):
+        with tempfile.NamedTemporaryFile() as rcfile:
+            rcfile.write()
+            rcfile.flush()
+
+    def shell(self, number, pass_env):
+        for n, inst in enumerate(self.venv.instances()):
+            if n != number:
+                continue
+
+            assert inst.py is not None, inst
+            try:
+                venv_path = inst.py.venv_path
+            except FileNotFoundError:
+                raise RuntimeError("%s not available" % inst.py)
+
+            logger.info("Launching shell inside venv instance %s", inst)
+
+            # Generate the environment for the instance.
+            if pass_env:
+                env = os.environ.copy()
+                env.update(dict(inst.env))
+            else:
+                env = dict(inst.env)
+
+            # Should we expect the venv to be ready?
+            inst.prepare(env)
+
+            pythonpath = inst.pythonpath
+            if pythonpath:
+                env["PYTHONPATH"] = (
+                    f"{pythonpath}:{env['PYTHONPATH']}"
+                    if "PYTHONPATH" in env
+                    else pythonpath
+                )
+            script_path = inst.scriptpath
+            if script_path:
+                env["PATH"] = ":".join(
+                    (script_path, env.get("PATH", os.environ["PATH"]))
+                )
+
+            with nspkgs(inst):
+                pid = os.fork()
+                if pid == 0:
+                    with tempfile.NamedTemporaryFile() as rcfile:
+                        rcfile.write(
+                            SHELL_RCFILE.format(
+                                venv_path=venv_path, name=inst.name
+                            ).encode()
+                        )
+                        rcfile.flush()
+                        os.execvpe("bash", ["bash", "--rcfile", rcfile.name], env)
+                os.wait()
+
+            break
+        else:
+            logger.error(
+                "No venv instance found for %s. Use 'riot list' to get a list of valid numbers.",
+                number,
+            )
 
     @classmethod
     def run_cmd_venv(

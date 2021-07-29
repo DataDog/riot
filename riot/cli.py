@@ -4,12 +4,10 @@ import logging
 import re
 import sys
 
-
 import click
 import pkg_resources
 
 from .riot import Interpreter, Session
-
 
 try:
     __version__ = pkg_resources.get_distribution("riot").version
@@ -138,4 +136,15 @@ def run(
         pythons=pythons,
         skip_missing=skip_missing,
         exit_first=exit_first,
+    )
+
+
+@main.command("shell", help="""Launch a shell inside a venv.""")
+@click.argument("number", type=int)
+@click.option("--pass-env", "pass_env", is_flag=True, default=False)
+@click.pass_context
+def shell(ctx, number, pass_env):
+    ctx.obj["session"].shell(
+        number=number,
+        pass_env=pass_env,
     )
