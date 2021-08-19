@@ -418,29 +418,31 @@ class VenvInstance:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
 
-        if py is not None:
+        # We only install dependencies if the prefix directory does not
+        # exist already. If it does exist, we assume it is in a good state.
+        if py is not None and self.pkgs and not os.path.isdir(self.prefix):
             venv_path = self.py.venv_path
             assert venv_path is not None, py
 
-            if self.pkgs:
-                pkg_str = self.pkg_str
-                assert pkg_str is not None
-                logger.info(
-                    "Installing venv dependencies %s in prefix %s.",
-                    pkg_str,
-                    self.prefix,
+            pkg_str = self.pkg_str
+            assert pkg_str is not None
+            logger.info(
+                "Installing venv dependencies %s in prefix %s.",
+                pkg_str,
+                self.prefix,
+            )
+            try:
+                Session.run_cmd_venv(
+                    venv_path,
+                    f"pip --disable-pip-version-check install --prefix {self.prefix} --no-warn-script-location {pkg_str}",
+                    env=env,
                 )
-                try:
-                    Session.run_cmd_venv(
-                        venv_path,
-                        f"pip --disable-pip-version-check install --prefix {self.prefix} --no-warn-script-location {pkg_str}",
-                        env=env,
-                    )
-                except CmdFailure as e:
-                    raise CmdFailure(
-                        f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
-                        e.proc,
-                    )
+            except CmdFailure as e:
+                raise CmdFailure(
+                    f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
+                    e.proc,
+                )
+
         if self.parent is not None:
             self.parent.prepare(env, py)
 
