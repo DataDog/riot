@@ -48,7 +48,7 @@ venv = Venv(
             name="mypy",
             command="mypy --install-types --non-interactive {cmdargs}",
             pkgs={
-                "mypy": latest,
+                "git+https://github.com/p403n1x87/mypy": "@fix-handle-prefix",
                 "pytest": latest,
             },
         ),

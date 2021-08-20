@@ -70,6 +70,7 @@ Commands:
   generate  Generate base virtual environments.
   list      List all virtual env instances matching a pattern.
   run       Run virtualenv instances with names matching a pattern.
+  shell     Launch a shell inside a venv.
 """.lstrip()
     )
     assert result.stderr == ""
@@ -161,6 +162,7 @@ Commands:
   generate  Generate base virtual environments.
   list      List all virtual env instances matching a pattern.
   run       Run virtualenv instances with names matching a pattern.
+  shell     Launch a shell inside a venv.
 """.lstrip()
     )
     assert result.stderr == ""
@@ -213,7 +215,7 @@ venv = Venv(
     )
     result = tmp_run("riot list")
     assert result.stderr == ""
-    assert result.stdout == "test  Python Interpreter(_hint='3') \n"
+    assert result.stdout == "[0] test  Python Interpreter(_hint='3') \n"
     assert result.returncode == 0
 
     rf_path.write_text(
@@ -233,8 +235,8 @@ venv = Venv(
     assert result.stderr == ""
     assert re.search(
         r"""
-test  .* 'pkg1==1.0'
-test  .* 'pkg1==2.0'
+\[0\] test  .* 'pkg1==1.0'
+\[1\] test  .* 'pkg1==2.0'
 """.lstrip(),
         result.stdout,
     )
@@ -258,10 +260,10 @@ venv = Venv(
     assert result.stderr == ""
     assert re.search(
         r"""
-test  .* 'pkg1==1.0' 'pkg2==2.0'
-test  .* 'pkg1==1.0' 'pkg2==3.0'
-test  .* 'pkg1==2.0' 'pkg2==2.0'
-test  .* 'pkg1==2.0' 'pkg2==3.0'
+\[0\] test  .* 'pkg1==1.0' 'pkg2==2.0'
+\[1\] test  .* 'pkg1==1.0' 'pkg2==3.0'
+\[2\] test  .* 'pkg1==2.0' 'pkg2==2.0'
+\[3\] test  .* 'pkg1==2.0' 'pkg2==3.0'
 """.lstrip(),
         result.stdout,
     )
@@ -297,14 +299,14 @@ venv = Venv(
     assert result.stderr == ""
     assert re.search(
         r"""
-test1  .* 'pkg1==1.0' 'pkg2==3.0'
-test1  .* 'pkg1==1.0' 'pkg2==4.0'
-test1  .* 'pkg1==2.0' 'pkg2==3.0'
-test1  .* 'pkg1==2.0' 'pkg2==4.0'
-test2  .* 'pkg1==1.0' 'pkg2==3.0'
-test2  .* 'pkg1==1.0' 'pkg2==4.0'
-test2  .* 'pkg1==2.0' 'pkg2==3.0'
-test2  .* 'pkg1==2.0' 'pkg2==4.0'
+\[0\] test1  .* 'pkg1==1.0' 'pkg2==3.0'
+\[1\] test1  .* 'pkg1==1.0' 'pkg2==4.0'
+\[2\] test1  .* 'pkg1==2.0' 'pkg2==3.0'
+\[3\] test1  .* 'pkg1==2.0' 'pkg2==4.0'
+\[4\] test2  .* 'pkg1==1.0' 'pkg2==3.0'
+\[5\] test2  .* 'pkg1==1.0' 'pkg2==4.0'
+\[6\] test2  .* 'pkg1==2.0' 'pkg2==3.0'
+\[7\] test2  .* 'pkg1==2.0' 'pkg2==4.0'
 """.lstrip(),
         result.stdout,
     )
@@ -346,10 +348,10 @@ venv = Venv(
     assert result.stderr == ""
     assert re.search(
         r"""
-test  .* 'pkg1==1.0' 'pkg2==2.0'
-test  .* 'pkg1==1.0' 'pkg2==3.0'
-test  .* 'pkg1==2.0' 'pkg2==2.0'
-test  .* 'pkg1==2.0' 'pkg2==3.0'
+\[0\] test  .* 'pkg1==1.0' 'pkg2==2.0'
+\[1\] test  .* 'pkg1==1.0' 'pkg2==3.0'
+\[2\] test  .* 'pkg1==2.0' 'pkg2==2.0'
+\[3\] test  .* 'pkg1==2.0' 'pkg2==3.0'
 """.lstrip(),
         result.stdout,
     )
@@ -385,10 +387,10 @@ venv = Venv(
     assert result.stderr == ""
     assert re.search(
         r"""
-test2  .* 'pkg1==1.0' 'pkg2==3.0'
-test2  .* 'pkg1==1.0' 'pkg2==4.0'
-test2  .* 'pkg1==2.0' 'pkg2==3.0'
-test2  .* 'pkg1==2.0' 'pkg2==4.0'
+\[4\] test2  .* 'pkg1==1.0' 'pkg2==3.0'
+\[5\] test2  .* 'pkg1==1.0' 'pkg2==4.0'
+\[6\] test2  .* 'pkg1==2.0' 'pkg2==3.0'
+\[7\] test2  .* 'pkg1==2.0' 'pkg2==4.0'
 """.lstrip(),
         result.stdout,
     )
@@ -506,9 +508,8 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run test")
-    assert 'ERROR: File "setup.py"' in result.stderr
-    assert "Dev install failed, aborting!" in result.stderr
-    assert result.stdout == ""
+    assert 'File "setup.py"' in result.stderr
+    assert "Dev install failed, aborting!" in result.stdout
     assert result.returncode == 1
 
 
@@ -531,7 +532,6 @@ FileNotFoundError: Python interpreter DNE not found
 """.strip()
         in result.stderr
     )
-    assert result.stdout == ""
     assert result.returncode == 1
 
 

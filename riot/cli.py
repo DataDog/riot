@@ -6,8 +6,12 @@ import sys
 
 import click
 import pkg_resources
+from rich.logging import RichHandler
 
 from .riot import Interpreter, Session
+
+FORMAT = "%(message)s"
+
 
 try:
     __version__ = pkg_resources.get_distribution("riot").version
@@ -55,7 +59,12 @@ PYTHON_VERSIONS_ARG = click.option(
 @click.pass_context
 def main(ctx, riotfile, log_level):
     if log_level:
-        logging.basicConfig(level=log_level)
+        logging.basicConfig(
+            level=log_level or logging.WARNING,
+            format=FORMAT,
+            datefmt="[%X]",
+            handlers=[RichHandler()],
+        )
 
     ctx.ensure_object(dict)
     try:

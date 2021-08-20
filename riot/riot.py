@@ -15,6 +15,7 @@ import typing as t
 from contextlib import contextmanager
 
 import click
+from rich.status import Status
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +23,21 @@ SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
 SHELL_RCFILE = """. ~/.bashrc
 source {venv_path}/bin/activate
+echo -e "\e[31;1m"
+echo "                 )  "
+echo " (   (        ( /(  "
+echo " )(  )\   (   )\()) "
+echo "(()\((_)  )\ (_))/  "
+echo " ((_)(_) ((_)| |_   "
+echo "| '_|| |/ _ \|  _|  "
+echo "|_|  |_|\___/ \__|  "
+echo -e "\e[0m"
+echo -e "\e[33;1mInteractive shell\e[0m"
 echo ""
-echo "Riot Shell"
-echo ""
-echo "* Venv name   : {name}"
-echo "* Venv path   : {venv_path}"
-echo "* Interpreter : $( python -V )"
-PS1="\n(riot@`basename {venv_path}`) \h:\w\n$ "
+echo -e "* Venv name   : \e[1m{name}\e[0m"
+echo -e "* Venv path   : \e[1m{venv_path}\e[0m"
+echo -e "* Interpreter : \e[1m$( python -V )\e[0m"
+PS1="\n(\e[31;1mriot\e[0m@\e[33;1m`basename {venv_path}`\e[0m) \e[36;1m\h\e[0m:\e[32;1m\w\e[0m\n$ "
 """
 
 
@@ -436,7 +445,12 @@ class VenvInstance:
 
         # We only install dependencies if the prefix directory does not
         # exist already. If it does exist, we assume it is in a good state.
-        if py is not None and self.pkgs and not os.path.isdir(self.prefix):
+        if (
+            py is not None
+            and self.pkgs
+            and self.prefix is not None
+            and not os.path.isdir(self.prefix)
+        ):
             venv_path = self.py.venv_path
             assert venv_path is not None, py
 
@@ -771,7 +785,9 @@ class Session:
                 env = dict(inst.env)
 
             # Should we expect the venv to be ready?
-            inst.prepare(env)
+            with Status("Preparing shell virtual environment"):
+                inst.py.create_venv(False)
+                inst.prepare(env)
 
             pythonpath = inst.pythonpath
             if pythonpath:
