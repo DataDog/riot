@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import dataclasses
 import functools
 import importlib.abc
@@ -12,7 +13,6 @@ import sys
 import tempfile
 import traceback
 import typing as t
-from contextlib import contextmanager
 
 import click
 from rich.status import Status
