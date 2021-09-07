@@ -51,6 +51,7 @@ venv = Venv(
                 "mypy": latest,
                 "pytest": latest,
             },
+            create=True,
         ),
         Venv(
             pys=[3],

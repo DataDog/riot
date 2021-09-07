@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Added the ``create`` argument that allows explicitly creating and using a
+    virtual environment instance with all the dependencies from parent instances
+    installed within it.
