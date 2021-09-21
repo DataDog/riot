@@ -481,7 +481,7 @@ class VenvInstance:
             try:
                 Session.run_cmd_venv(
                     venv_path,
-                    f"pip --disable-pip-version-check install --prefix {self.prefix} --no-warn-script-location {pkg_str}",
+                    f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location {pkg_str}",
                     env=env,
                 )
             except CmdFailure as e:
