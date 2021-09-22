@@ -732,3 +732,20 @@ venv = Venv(
     assert f"Running command 'echo $PYTHONPATH' in venv '{venv_path}'"
     assert result.stdout.startswith(":".join(("", str(tmp_path))))
     assert result.returncode == 0
+
+
+def test_extras(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test",
+    pys=["3"],
+    pkgs={"reno[sphinx]": latest},
+    command="python -c 'import reno'",
+)
+""",
+    )
+    result = tmp_run("riot -v run -s test")
+    assert result.returncode == 0
