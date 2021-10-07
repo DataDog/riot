@@ -702,3 +702,50 @@ venv = Venv(
     assert env["foo"] == "40"
     assert env["bar"] == "43"
     assert env["baz"] == "stillthesame"
+
+
+def test_create(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    name="test",
+    pys=[3],
+    pkgs={"pip": ""},
+    venvs=[
+        Venv(
+            name="child",
+            pkgs={"pytest": ""},
+            create=True,
+            command="echo $PYTHONPATH",
+        ),
+    ],
+)
+""",
+    )
+    result = tmp_run("riot -v run -s child")
+    venv_path = tmp_path / ".riot/venv_py{}_pip_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3]))
+    )
+    assert f"Creating virtualenv '{venv_path}'" in result.stderr
+    assert f"Running command 'echo $PYTHONPATH' in venv '{venv_path}'"
+    assert result.stdout.startswith(":".join(("", str(tmp_path))))
+    assert result.returncode == 0
+
+
+def test_extras(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test",
+    pys=["3"],
+    pkgs={"reno[sphinx]": latest},
+    command="python -c 'import reno'",
+)
+""",
+    )
+    result = tmp_run("riot -v run -s test")
+    assert result.returncode == 0

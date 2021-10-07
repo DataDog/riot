@@ -51,6 +51,7 @@ venv = Venv(
                 "git+https://github.com/p403n1x87/mypy": "@fix-handle-prefix",
                 "pytest": latest,
             },
+            create=True,
         ),
         Venv(
             pys=[3],

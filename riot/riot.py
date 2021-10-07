@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 import dataclasses
 import functools
 import importlib.abc
@@ -13,6 +12,7 @@ import sys
 import tempfile
 import traceback
 import typing as t
+from contextlib import contextmanager
 
 import click
 from rich.status import Status
@@ -155,20 +155,20 @@ class Interpreter:
         version = self.version().replace(".", "")
         return os.path.abspath(f".riot/venv_py{version}")
 
-    def create_venv(self, recreate: bool) -> str:
+    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> str:
         """Attempt to create a virtual environment for this intepreter."""
-        path: str = self.venv_path
+        venv_path: str = path or self.venv_path
 
-        if os.path.isdir(path) and not recreate:
+        if os.path.isdir(venv_path) and not recreate:
             logger.info(
-                "Skipping creation of virtualenv '%s' as it already exists.", path
+                "Skipping creation of virtualenv '%s' as it already exists.", venv_path
             )
-            return path
+            return venv_path
 
         py_ex = self.path()
-        logger.info("Creating virtualenv '%s' with interpreter '%s'.", path, py_ex)
-        run_cmd(["virtualenv", f"--python={py_ex}", path], stdout=subprocess.PIPE)
-        return path
+        logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
+        run_cmd(["virtualenv", f"--python={py_ex}", venv_path], stdout=subprocess.PIPE)
+        return venv_path
 
 
 @dataclasses.dataclass
@@ -208,6 +208,7 @@ class Venv:
         pkgs (Dict[str, Union[str, List[str]]]): Packages and version(s) to install into the virtual env. Merges and overrides parent values.
         env  (Dict[str, Union[str, List[str]]]): Environment variables to define in the virtual env. Merges and overrides parent values.
         venvs (List[Venv]): List of Venvs that inherit the properties of this Venv (unless they are overridden).
+        create (bool): Create the virtual environment instance. Defaults to ``False``, in which case only a prefix is created.
     """
 
     pys: dataclasses.InitVar[
@@ -218,6 +219,7 @@ class Venv:
     name: t.Optional[str] = None
     command: t.Optional[str] = None
     venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
+    create: bool = False
 
     def __post_init__(self, pys, pkgs, env):
         """Normalize the data."""
@@ -249,6 +251,7 @@ class Venv:
                         env=env,
                         pkgs=dict(pkgs),
                         parent=parent_inst,
+                        created=self.create,
                     )
                     if not self.venvs:
                         yield inst
@@ -315,6 +318,19 @@ class VenvInstance:
     name: t.Optional[str] = None
     command: t.Optional[str] = None
     parent: t.Optional["VenvInstance"] = None
+    created: bool = False
+
+    def __post_init__(self) -> None:
+        """Venv instance post-initialization."""
+        if self.created:
+            ancestor = self.parent
+            while ancestor:
+                for pkg in ancestor.pkgs:
+                    if pkg not in self.pkgs:
+                        self.pkgs[pkg] = ancestor.pkgs[pkg]
+                if ancestor.created:
+                    break
+                ancestor = ancestor.parent
 
     @property
     def prefix(self) -> t.Optional[str]:
@@ -332,6 +348,21 @@ class VenvInstance:
         ident = self.ident
         assert ident is not None, self
         return "_".join((venv_path, ident))
+
+    @property
+    def venv_path(self) -> t.Optional[str]:
+        # Try to take the closest created ancestor
+        current: t.Optional[VenvInstance] = self
+        while current:
+            if current.created:
+                return current.prefix
+            current = current.parent
+
+        # If no created ancestors, return the base venv path
+        if self.py is not None:
+            return self.py.venv_path
+
+        return None
 
     @property
     def ident(self) -> t.Optional[str]:
@@ -377,13 +408,13 @@ class VenvInstance:
         paths = []
 
         current: t.Optional[VenvInstance] = self
-        while current is not None:
+        while current is not None and not current.created:
             if current.pkgs:
                 assert current.bin_path is not None, current
                 paths.append(current.bin_path)
             current = current.parent
 
-        if self.py:
+        if not self.created and self.py:
             if self.py.bin_path is not None:
                 paths.append(self.py.bin_path)
 
@@ -407,13 +438,13 @@ class VenvInstance:
         paths = ["", os.getcwd()]  # mimick 'python -m'
 
         current: t.Optional[VenvInstance] = self
-        while current is not None:
+        while current is not None and not current.created:
             if current.pkgs:
                 assert current.site_packages_path is not None, current
                 paths.append(current.site_packages_path)
             current = current.parent
 
-        if self.py:
+        if not self.created and self.py:
             if self.py.site_packages_path is not None:
                 paths.append(self.py.site_packages_path)
 
@@ -438,7 +469,11 @@ class VenvInstance:
         return bool(pattern.search("_".join(idents[::-1])))
 
     def prepare(
-        self, env: t.Dict[str, str], py: t.Optional[Interpreter] = None
+        self,
+        env: t.Dict[str, str],
+        py: t.Optional[Interpreter] = None,
+        recreate: bool = False,
+        skip_deps: bool = False,
     ) -> None:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
@@ -451,20 +486,25 @@ class VenvInstance:
             and self.prefix is not None
             and not os.path.isdir(self.prefix)
         ):
-            venv_path = self.py.venv_path
+            venv_path = self.venv_path
             assert venv_path is not None, py
+
+            if self.created:
+                py.create_venv(recreate, venv_path)
+                if not skip_deps:
+                    install_dev_pkg(venv_path)
 
             pkg_str = self.pkg_str
             assert pkg_str is not None
             logger.info(
-                "Installing venv dependencies %s in prefix %s.",
+                "Installing venv dependencies %s at %s.",
                 pkg_str,
                 self.prefix,
             )
             try:
                 Session.run_cmd_venv(
                     venv_path,
-                    f"pip --disable-pip-version-check install --prefix {self.prefix} --no-warn-script-location {pkg_str}",
+                    f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location {pkg_str}",
                     env=env,
                 )
             except CmdFailure as e:
@@ -473,7 +513,7 @@ class VenvInstance:
                     e.proc,
                 )
 
-        if self.parent is not None:
+        if not self.created and self.parent is not None:
             self.parent.prepare(env, py)
 
 
@@ -584,7 +624,8 @@ class Session:
                 continue
 
             try:
-                venv_path = inst.py.venv_path
+                venv_path = inst.venv_path
+                assert venv_path is not None, inst
             except FileNotFoundError:
                 if skip_missing:
                     logger.warning("Skipping missing interpreter %s", inst.py)
@@ -610,7 +651,7 @@ class Session:
             else:
                 env = dict(inst.env)
 
-            inst.prepare(env)
+            inst.prepare(env, recreate=recreate_venvs, skip_deps=skip_base_install)
 
             pythonpath = inst.pythonpath
             if pythonpath:
@@ -750,14 +791,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                logger.info("Installing dev package (edit mode) in %s.", venv_path)
-                try:
-                    self.run_cmd_venv(
-                        venv_path, "pip --disable-pip-version-check install -e ."
-                    )
-                except CmdFailure as e:
-                    logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
-                    sys.exit(1)
+                install_dev_pkg(venv_path)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -950,3 +984,12 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
             if version is not None
         ]
     )
+
+
+def install_dev_pkg(venv_path):
+    logger.info("Installing dev package (edit mode) in %s.", venv_path)
+    try:
+        Session.run_cmd_venv(venv_path, "pip --disable-pip-version-check install -e .")
+    except CmdFailure as e:
+        logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
+        sys.exit(1)
