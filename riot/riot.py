@@ -1,5 +1,7 @@
+from contextlib import contextmanager
 import dataclasses
 import functools
+from hashlib import sha256
 import importlib.abc
 import importlib.util
 import itertools
@@ -12,9 +14,9 @@ import sys
 import tempfile
 import traceback
 import typing as t
-from contextlib import contextmanager
 
 import click
+from rich import print as rich_print
 from rich.status import Status
 
 logger = logging.getLogger(__name__)
@@ -396,6 +398,13 @@ class VenvInstance:
 
         return pip_deps(pkgs)
 
+    def __hash__(self):
+        """Compute a hash for the venv instance."""
+        h = sha256()
+        h.update(repr(self).encode())
+        h.update(self.full_pkg_str.encode())
+        return int(h.hexdigest(), 16)
+
     @property
     def bin_path(self) -> t.Optional[str]:
         prefix = self.prefix
@@ -738,7 +747,9 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
+    def list_venvs(
+        self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False
+    ):
         for n, inst in enumerate(self.venv.instances()):
             if not inst.name or not pattern.match(inst.name):
                 continue
@@ -750,8 +761,15 @@ class Session:
                 continue
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
-            py_str = f"Python {inst.py}"
-            click.echo(f"[{n}] {inst.name} {env_str} {py_str} {pkgs_str}")
+            if pipe_mode:
+                print(
+                    f"[#{n}]  {hex(hash(inst))[2:9]}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
+                )
+            else:
+                rich_print(
+                    f"[[cyan]#{n}[/cyan]]  [bold cyan]{hex(hash(inst))[2:9]}[/bold cyan]  [bold]{inst.name:12}[/bold] "
+                    f"[italic]{env_str} {inst.py} Packages({pkgs_str})[/italic]"
+                )
 
     def generate_base_venvs(
         self,
@@ -798,9 +816,9 @@ class Session:
             rcfile.write()
             rcfile.flush()
 
-    def shell(self, number, pass_env):
+    def shell(self, ident, pass_env):
         for n, inst in enumerate(self.venv.instances()):
-            if n != number:
+            if ident != f"#{n}" and not hex(hash(inst))[2:].startswith(ident):
                 continue
 
             assert inst.py is not None, inst
@@ -853,7 +871,7 @@ class Session:
         else:
             logger.error(
                 "No venv instance found for %s. Use 'riot list' to get a list of valid numbers.",
-                number,
+                ident,
             )
 
     @classmethod

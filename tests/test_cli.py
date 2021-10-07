@@ -71,7 +71,8 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
             raise result.exception
         assert result.exit_code == 0, result.stdout
         assert (
-            result.stdout == "[0] test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
+            result.stdout
+            == "[#0]  4375064  test          Interpreter(_hint='3') Packages('pytest==5.4.3')\n"
         )
 
 

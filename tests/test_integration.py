@@ -63,6 +63,7 @@ Options:
   -f, --file PATH  [default: riotfile.py]
   -v, --verbose
   -d, --debug
+  -P, --pipe
   --version        Show the version and exit.
   --help           Show this message and exit.
 
@@ -76,7 +77,7 @@ Commands:
     assert result.stderr == ""
     assert result.returncode == 0
 
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert (
         result.stderr
         == """
@@ -155,6 +156,7 @@ Options:
   -f, --file PATH  [default: riotfile.py]
   -v, --verbose
   -d, --debug
+  -P, --pipe
   --version        Show the version and exit.
   --help           Show this message and exit.
 
@@ -177,7 +179,7 @@ def test_version(tmp_run: _T_TmpRun) -> None:
 
 
 def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert (
         result.stderr
         == """
@@ -195,7 +197,7 @@ Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 from riot import Venv
 """,
     )
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert result.stderr == ""
     assert result.stdout == ""
     assert result.returncode == 0
@@ -213,9 +215,12 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert result.stderr == ""
-    assert result.stdout == "[0] test  Python Interpreter(_hint='3') \n"
+    assert (
+        result.stdout
+        == "[#0]  1c31170  test          Interpreter(_hint='3') Packages()\n"
+    )
     assert result.returncode == 0
 
     rf_path.write_text(
@@ -231,12 +236,12 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert result.stderr == ""
     assert re.search(
         r"""
-\[0\] test  .* 'pkg1==1.0'
-\[1\] test  .* 'pkg1==2.0'
+\[\#0\]  [0-9a-f]{7}  test  .* Packages\('pkg1==1.0'\)
+\[\#1\]  [0-9a-f]{7}  test  .* Packages\('pkg1==2.0'\)
 """.lstrip(),
         result.stdout,
     )
@@ -256,14 +261,14 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert result.stderr == ""
     assert re.search(
         r"""
-\[0\] test  .* 'pkg1==1.0' 'pkg2==2.0'
-\[1\] test  .* 'pkg1==1.0' 'pkg2==3.0'
-\[2\] test  .* 'pkg1==2.0' 'pkg2==2.0'
-\[3\] test  .* 'pkg1==2.0' 'pkg2==3.0'
+\[\#0\]  [0-9a-f]{7}  test  .* Packages\('pkg1==1.0' 'pkg2==2.0'\)
+\[\#1\]  [0-9a-f]{7}  test  .* Packages\('pkg1==1.0' 'pkg2==3.0'\)
+\[\#2\]  [0-9a-f]{7}  test  .* Packages\('pkg1==2.0' 'pkg2==2.0'\)
+\[\#3\]  [0-9a-f]{7}  test  .* Packages\('pkg1==2.0' 'pkg2==3.0'\)
 """.lstrip(),
         result.stdout,
     )
@@ -295,18 +300,18 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list")
+    result = tmp_run("riot -P list")
     assert result.stderr == ""
     assert re.search(
         r"""
-\[0\] test1  .* 'pkg1==1.0' 'pkg2==3.0'
-\[1\] test1  .* 'pkg1==1.0' 'pkg2==4.0'
-\[2\] test1  .* 'pkg1==2.0' 'pkg2==3.0'
-\[3\] test1  .* 'pkg1==2.0' 'pkg2==4.0'
-\[4\] test2  .* 'pkg1==1.0' 'pkg2==3.0'
-\[5\] test2  .* 'pkg1==1.0' 'pkg2==4.0'
-\[6\] test2  .* 'pkg1==2.0' 'pkg2==3.0'
-\[7\] test2  .* 'pkg1==2.0' 'pkg2==4.0'
+\[\#0\]  [0-9a-f]{7}  test1  .* Packages\('pkg1==1.0' 'pkg2==3.0'\)
+\[\#1\]  [0-9a-f]{7}  test1  .* Packages\('pkg1==1.0' 'pkg2==4.0'\)
+\[\#2\]  [0-9a-f]{7}  test1  .* Packages\('pkg1==2.0' 'pkg2==3.0'\)
+\[\#3\]  [0-9a-f]{7}  test1  .* Packages\('pkg1==2.0' 'pkg2==4.0'\)
+\[\#4\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==1.0' 'pkg2==3.0'\)
+\[\#5\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==1.0' 'pkg2==4.0'\)
+\[\#6\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==2.0' 'pkg2==3.0'\)
+\[\#7\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==2.0' 'pkg2==4.0'\)
 """.lstrip(),
         result.stdout,
     )
@@ -325,7 +330,7 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list test")
+    result = tmp_run("riot -P list test")
     assert result.stderr == ""
     assert re.search(r"test .*", result.stdout)
     assert result.returncode == 0
@@ -344,14 +349,14 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list test")
+    result = tmp_run("riot -P list test")
     assert result.stderr == ""
     assert re.search(
         r"""
-\[0\] test  .* 'pkg1==1.0' 'pkg2==2.0'
-\[1\] test  .* 'pkg1==1.0' 'pkg2==3.0'
-\[2\] test  .* 'pkg1==2.0' 'pkg2==2.0'
-\[3\] test  .* 'pkg1==2.0' 'pkg2==3.0'
+\[\#0\]  [0-9a-f]{7}  test  .* Packages\('pkg1==1.0' 'pkg2==2.0'\)
+\[\#1\]  [0-9a-f]{7}  test  .* Packages\('pkg1==1.0' 'pkg2==3.0'\)
+\[\#2\]  [0-9a-f]{7}  test  .* Packages\('pkg1==2.0' 'pkg2==2.0'\)
+\[\#3\]  [0-9a-f]{7}  test  .* Packages\('pkg1==2.0' 'pkg2==3.0'\)
 """.lstrip(),
         result.stdout,
     )
@@ -383,14 +388,14 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot list test2")
+    result = tmp_run("riot -P list test2")
     assert result.stderr == ""
     assert re.search(
         r"""
-\[4\] test2  .* 'pkg1==1.0' 'pkg2==3.0'
-\[5\] test2  .* 'pkg1==1.0' 'pkg2==4.0'
-\[6\] test2  .* 'pkg1==2.0' 'pkg2==3.0'
-\[7\] test2  .* 'pkg1==2.0' 'pkg2==4.0'
+\[\#4\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==1.0' 'pkg2==3.0'\)
+\[\#5\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==1.0' 'pkg2==4.0'\)
+\[\#6\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==2.0' 'pkg2==3.0'\)
+\[\#7\]  [0-9a-f]{7}  test2  .* Packages\('pkg1==2.0' 'pkg2==4.0'\)
 """.lstrip(),
         result.stdout,
     )
@@ -508,8 +513,8 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run test")
-    assert 'File "setup.py"' in result.stderr
-    assert "Dev install failed, aborting!" in result.stdout
+    assert 'File "setup.py"' in result.stderr, result.stderr
+    assert "Dev install failed, aborting!" in result.stderr, result.stderr
     assert result.returncode == 1
 
 
@@ -724,12 +729,14 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot -v run -s child")
-    venv_path = tmp_path / ".riot/venv_py{}_pip_pytest".format(
+    result = tmp_run("riot -Pv run -s child")
+    venv_path = tmp_path / ".riot/venv_py{}_pytest_pip".format(
         "".join((str(_) for _ in sys.version_info[:3]))
     )
-    assert f"Creating virtualenv '{venv_path}'" in result.stderr
-    assert f"Running command 'echo $PYTHONPATH' in venv '{venv_path}'"
+    assert f"Creating virtualenv '{venv_path}'" in result.stderr, result.stderr
+    assert (
+        f"Running command 'echo $PYTHONPATH' in venv '{venv_path}'" in result.stderr
+    ), result.stderr
     assert result.stdout.startswith(":".join(("", str(tmp_path))))
     assert result.returncode == 0
 
