@@ -137,7 +137,7 @@ Failed to parse riotfile 'riotfile.py'.
     assert (
         """
 SyntaxError: invalid syntax
-""".lstrip()
+""".strip()
         in result.stderr
     )
     assert result.returncode == 1

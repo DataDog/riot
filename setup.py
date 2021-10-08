@@ -1,6 +1,5 @@
 from setuptools import find_packages, setup
 
-
 with open("README.md", "r") as f:
     long_description = f.read()
 
@@ -17,6 +16,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     entry_points={"console_scripts": ["riot = riot.__main__:main"]},
     long_description=long_description,
