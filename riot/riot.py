@@ -4,7 +4,6 @@ import functools
 import importlib.abc
 import importlib.util
 import itertools
-import json
 import logging
 import os
 import shutil
@@ -859,16 +858,6 @@ def run_cmd(
 def get_venv_command(venv_path: str, cmd: str) -> str:
     """Return the command string used to execute `cmd` in virtual env located at `venv_path`."""
     return f"source {venv_path}/bin/activate && {cmd}"
-
-
-@functools.lru_cache()
-def get_venv_sitepackages(venv_path: str) -> t.List[str]:
-    cmd = get_venv_command(
-        venv_path,
-        "python -c 'import json,site; print(json.dumps(site.getsitepackages()))'",
-    )
-    r = run_cmd(cmd, shell=True)
-    return t.cast(t.List[str], json.loads(r.stdout))
 
 
 def expand_specs(specs: t.Dict[_K, t.List[_V]]) -> t.Iterator[t.Tuple[t.Tuple[_K, _V]]]:
