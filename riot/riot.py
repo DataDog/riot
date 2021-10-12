@@ -513,6 +513,7 @@ class CmdFailure(Exception):
 @dataclasses.dataclass
 class Session:
     venv: Venv
+    are_base_venvs_generated: bool
     warnings = (
         "deprecated",
         "deprecation",
@@ -568,6 +569,7 @@ class Session:
         recreate_venvs: bool = False,
         out: t.TextIO = sys.stdout,
         pass_env: bool = False,
+        build:  bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[Interpreter]] = None,
         skip_missing: bool = False,
@@ -575,12 +577,15 @@ class Session:
     ) -> None:
         results = []
 
-        self.generate_base_venvs(
-            pattern,
-            recreate=recreate_venvs,
-            skip_deps=skip_base_install,
-            pythons=pythons,
-        )
+        # if not installed or build option is set to true
+        if not self.are_base_venvs_generated or build:
+            self.generate_base_venvs(
+                pattern,
+                recreate=recreate_venvs,
+                skip_deps=skip_base_install,
+                pythons=pythons,
+                build=build,
+            )
 
         for inst in self.venv.instances():
             if inst.command is None:
@@ -769,6 +774,8 @@ class Session:
 
                 # Install the dev package into the base venv.
                 install_dev_pkg(venv_path)
+
+        self.are_base_venvs_generated = True
 
     @classmethod
     def run_cmd_venv(

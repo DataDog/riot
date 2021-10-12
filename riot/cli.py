@@ -111,6 +111,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
+@click.option("-b", "--build", "build", is_flag=True, default=False)
 @PYTHON_VERSIONS_ARG
 @click.option("--skip-missing", "skip_missing", is_flag=True, default=False)
 @click.option("--exitfirst", "-x", "exit_first", is_flag=True, default=False)
@@ -122,6 +123,7 @@ def run(
     recreate_venvs,
     skip_base_install,
     pass_env,
+    build,
     pythons,
     skip_missing,
     exit_first,
@@ -136,6 +138,7 @@ def run(
         pass_env=pass_env,
         cmdargs=ctx.args,
         pythons=pythons,
+        build=build,
         skip_missing=skip_missing,
         exit_first=exit_first,
     )
