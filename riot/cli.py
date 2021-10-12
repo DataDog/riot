@@ -56,7 +56,14 @@ PYTHON_VERSIONS_ARG = click.option(
 )
 @click.option("-v", "--verbose", "log_level", flag_value=logging.INFO)
 @click.option("-d", "--debug", "log_level", flag_value=logging.DEBUG)
-@click.option("-P", "--pipe", "pipe_mode", is_flag=True, default=False)
+@click.option(
+    "-P",
+    "--pipe",
+    "pipe_mode",
+    is_flag=True,
+    default=False,
+    help="Pipe mode. Makes riot emit plain output.",
+)
 @click.version_option(__version__)
 @click.pass_context
 def main(ctx, riotfile, log_level, pipe_mode):
