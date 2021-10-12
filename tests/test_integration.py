@@ -742,8 +742,8 @@ from riot import Venv, latest
 venv = Venv(
     name="test",
     pys=["3"],
-    pkgs={"reno[sphinx]": latest},
-    command="python -c 'import reno'",
+    pkgs={"requests[socks]": latest},
+    command="python -c 'import requests'",
 )
 """,
     )
