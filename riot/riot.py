@@ -17,13 +17,16 @@ import typing as t
 
 import click
 from rich import print as rich_print
+from rich.pretty import Pretty
 from rich.status import Status
+from rich.table import Table
 
 logger = logging.getLogger(__name__)
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
-SHELL_RCFILE = """. ~/.bashrc
+SHELL_RCFILE = """
+if [ -f ~/.bashrc ]; then . ~/.bashrc; fi
 source {venv_path}/bin/activate
 echo -e "\e[31;1m"
 echo "                 )  "
@@ -39,7 +42,7 @@ echo ""
 echo -e "* Venv name   : \e[1m{name}\e[0m"
 echo -e "* Venv path   : \e[1m{venv_path}\e[0m"
 echo -e "* Interpreter : \e[1m$( python -V )\e[0m"
-PS1="\n(\e[31;1mriot\e[0m@\e[33;1m`basename {venv_path}`\e[0m) \e[36;1m\h\e[0m:\e[32;1m\w\e[0m\n$ "
+PS1="\n(\e[31;1mriot\e[0m@\e[33;1m`basename {venv_path}`\e[0m) \e[36;1m\h\e[0m:\e[32;1m\w\e[0m\n🔥 "
 """
 
 
@@ -750,6 +753,18 @@ class Session:
     def list_venvs(
         self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False
     ):
+        table = None
+        if not pipe_mode:
+            table = Table(
+                "No.",
+                "Hash",
+                "Name",
+                "Interpreter",
+                "Environment",
+                "Packages",
+                box=None,
+            )
+
         for n, inst in enumerate(self.venv.instances()):
             if not inst.name or not pattern.match(inst.name):
                 continue
@@ -766,10 +781,17 @@ class Session:
                     f"[#{n}]  {hex(hash(inst))[2:9]}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
                 )
             else:
-                rich_print(
-                    f"[[cyan]#{n}[/cyan]]  [bold cyan]{hex(hash(inst))[2:9]}[/bold cyan]  [bold]{inst.name:12}[/bold] "
-                    f"[italic]{env_str} {inst.py} Packages({pkgs_str})[/italic]"
+                table.add_row(
+                    f"[cyan]#{n}[/cyan]",
+                    f"[bold cyan]{hex(hash(inst))[2:9]}[/bold cyan]",
+                    f"[bold]{inst.name}[/bold]",
+                    Pretty(inst.py),
+                    env_str or "--",
+                    f"[italic]{pkgs_str}[/italic]",
                 )
+
+        if table:
+            rich_print(table)
 
     def generate_base_venvs(
         self,

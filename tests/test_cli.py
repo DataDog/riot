@@ -61,6 +61,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
         result = cli.invoke(
             riot.cli.main,
             [
+                "-P",
                 "list",
                 "test",
                 "--venv-pattern",

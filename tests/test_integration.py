@@ -63,7 +63,7 @@ Options:
   -f, --file PATH  [default: riotfile.py]
   -v, --verbose
   -d, --debug
-  -P, --pipe
+  -P, --pipe       Pipe mode. Makes riot emit plain output.
   --version        Show the version and exit.
   --help           Show this message and exit.
 
@@ -156,7 +156,7 @@ Options:
   -f, --file PATH  [default: riotfile.py]
   -v, --verbose
   -d, --debug
-  -P, --pipe
+  -P, --pipe       Pipe mode. Makes riot emit plain output.
   --version        Show the version and exit.
   --help           Show this message and exit.
 
