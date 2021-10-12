@@ -512,7 +512,8 @@ class CmdFailure(Exception):
 @dataclasses.dataclass
 class Session:
     venv: Venv
-    are_base_venvs_generated: bool
+    are_base_venvs_generated: bool = False
+
     warnings = (
         "deprecated",
         "deprecation",
@@ -568,7 +569,7 @@ class Session:
         recreate_venvs: bool = False,
         out: t.TextIO = sys.stdout,
         pass_env: bool = False,
-        build:  bool = False,
+        build: bool = False,
         cmdargs: t.Optional[t.Sequence[str]] = None,
         pythons: t.Optional[t.Set[Interpreter]] = None,
         skip_missing: bool = False,
