@@ -647,7 +647,9 @@ class Session:
                 command = inst.command
                 assert command is not None
                 if cmdargs is not None:
-                    command = command.format(cmdargs=(" ".join(cmdargs))).strip()
+                    command = command.format(
+                        cmdargs=(" ".join(f"'{arg}'" for arg in cmdargs))
+                    ).strip()
                 env_str = "\n".join(f"{k}={v}" for k, v in env.items())
                 logger.info(
                     "Running command '%s' in venv '%s' with environment:\n%s.",
