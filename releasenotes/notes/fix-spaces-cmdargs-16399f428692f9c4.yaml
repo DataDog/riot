@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    It is now possible to pass command line arguments ("cmdargs") that contain
+    spaces. That means command line such as ``riot run foobar -- -k 'not
+    this'`` is now interpolated correctly in the command line.
