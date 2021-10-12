@@ -51,6 +51,7 @@ def assert_args(args):
             "pythons",
             "skip_missing",
             "exit_first",
+            "build",
         ]
     )
 
