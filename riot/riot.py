@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import dataclasses
 import functools
+from hashlib import sha256
 import importlib.abc
 import importlib.util
 import itertools
@@ -9,15 +10,39 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import traceback
 import typing as t
 
 import click
+from rich import print as rich_print
+from rich.pretty import Pretty
+from rich.status import Status
+from rich.table import Table
 
 logger = logging.getLogger(__name__)
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
+SHELL_RCFILE = """
+if [ -f ~/.bashrc ]; then . ~/.bashrc; fi
+source {venv_path}/bin/activate
+echo -e "\e[31;1m"
+echo "                 )  "
+echo " (   (        ( /(  "
+echo " )(  )\   (   )\()) "
+echo "(()\((_)  )\ (_))/  "
+echo " ((_)(_) ((_)| |_   "
+echo "| '_|| |/ _ \|  _|  "
+echo "|_|  |_|\___/ \__|  "
+echo -e "\e[0m"
+echo -e "\e[33;1mInteractive shell\e[0m"
+echo ""
+echo -e "* Venv name   : \e[1m{name}\e[0m"
+echo -e "* Venv path   : \e[1m{venv_path}\e[0m"
+echo -e "* Interpreter : \e[1m$( python -V )\e[0m"
+PS1="\n(\e[31;1mriot\e[0m@\e[33;1m`basename {venv_path}`\e[0m) \e[36;1m\h\e[0m:\e[32;1m\w\e[0m\n🔥 "
+"""
 
 
 if t.TYPE_CHECKING or sys.version_info[:2] >= (3, 9):
@@ -349,7 +374,10 @@ class VenvInstance:
         if not self.pkgs:
             return None
         return "_".join(
-            (f"{n}{rmchars('<=>.,', v)}" for n, v in sorted(self.pkgs.items()))
+            (
+                f"{rmchars('<=>.,:+@/', n)}{rmchars('<=>.,:+@/', v)}"
+                for n, v in self.pkgs.items()
+            )
         )
 
     @property
@@ -371,6 +399,13 @@ class VenvInstance:
             pkgs.update(dict(inst.pkgs))
 
         return pip_deps(pkgs)
+
+    def __hash__(self):
+        """Compute a hash for the venv instance."""
+        h = sha256()
+        h.update(repr(self).encode())
+        h.update(self.full_pkg_str.encode())
+        return int(h.hexdigest(), 16)
 
     @property
     def bin_path(self) -> t.Optional[str]:
@@ -716,8 +751,22 @@ class Session:
         if any(True for r in results if r.code != 0):
             sys.exit(1)
 
-    def list_venvs(self, pattern, venv_pattern, pythons=None, out=sys.stdout):
-        for inst in self.venv.instances():
+    def list_venvs(
+        self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False
+    ):
+        table = None
+        if not pipe_mode:
+            table = Table(
+                "No.",
+                "Hash",
+                "Name",
+                "Interpreter",
+                "Environment",
+                "Packages",
+                box=None,
+            )
+
+        for n, inst in enumerate(self.venv.instances()):
             if not inst.name or not pattern.match(inst.name):
                 continue
 
@@ -728,8 +777,22 @@ class Session:
                 continue
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
-            py_str = f"Python {inst.py}"
-            click.echo(f"{inst.name} {env_str} {py_str} {pkgs_str}")
+            if pipe_mode:
+                print(
+                    f"[#{n}]  {hex(hash(inst))[2:9]}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
+                )
+            else:
+                table.add_row(
+                    f"[cyan]#{n}[/cyan]",
+                    f"[bold cyan]{hex(hash(inst))[2:9]}[/bold cyan]",
+                    f"[bold]{inst.name}[/bold]",
+                    Pretty(inst.py),
+                    env_str or "--",
+                    f"[italic]{pkgs_str}[/italic]",
+                )
+
+        if table:
+            rich_print(table)
 
     def generate_base_venvs(
         self,
@@ -770,6 +833,69 @@ class Session:
 
                 # Install the dev package into the base venv.
                 install_dev_pkg(venv_path)
+
+    def _generate_shell_rcfile(self):
+        with tempfile.NamedTemporaryFile() as rcfile:
+            rcfile.write()
+            rcfile.flush()
+
+    def shell(self, ident, pass_env):
+        for n, inst in enumerate(self.venv.instances()):
+            if ident != f"#{n}" and not hex(hash(inst))[2:].startswith(ident):
+                continue
+
+            assert inst.py is not None, inst
+            try:
+                venv_path = inst.py.venv_path
+            except FileNotFoundError:
+                raise RuntimeError("%s not available" % inst.py)
+
+            logger.info("Launching shell inside venv instance %s", inst)
+
+            # Generate the environment for the instance.
+            if pass_env:
+                env = os.environ.copy()
+                env.update(dict(inst.env))
+            else:
+                env = dict(inst.env)
+
+            # Should we expect the venv to be ready?
+            with Status("Preparing shell virtual environment"):
+                inst.py.create_venv(False)
+                inst.prepare(env)
+
+            pythonpath = inst.pythonpath
+            if pythonpath:
+                env["PYTHONPATH"] = (
+                    f"{pythonpath}:{env['PYTHONPATH']}"
+                    if "PYTHONPATH" in env
+                    else pythonpath
+                )
+            script_path = inst.scriptpath
+            if script_path:
+                env["PATH"] = ":".join(
+                    (script_path, env.get("PATH", os.environ["PATH"]))
+                )
+
+            with nspkgs(inst):
+                pid = os.fork()
+                if pid == 0:
+                    with tempfile.NamedTemporaryFile() as rcfile:
+                        rcfile.write(
+                            SHELL_RCFILE.format(
+                                venv_path=venv_path, name=inst.name
+                            ).encode()
+                        )
+                        rcfile.flush()
+                        os.execvpe("bash", ["bash", "--rcfile", rcfile.name], env)
+                os.wait()
+
+            break
+        else:
+            logger.error(
+                "No venv instance found for %s. Use 'riot list' to get a list of valid numbers.",
+                ident,
+            )
 
     @classmethod
     def run_cmd_venv(

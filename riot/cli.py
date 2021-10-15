@@ -4,11 +4,14 @@ import logging
 import re
 import sys
 
-
 import click
 import pkg_resources
+from rich.console import Console
+from rich.logging import RichHandler
 
 from .riot import Interpreter, Session
+
+FORMAT = "%(message)s"
 
 
 try:
@@ -53,13 +56,30 @@ PYTHON_VERSIONS_ARG = click.option(
 )
 @click.option("-v", "--verbose", "log_level", flag_value=logging.INFO)
 @click.option("-d", "--debug", "log_level", flag_value=logging.DEBUG)
+@click.option(
+    "-P",
+    "--pipe",
+    "pipe_mode",
+    is_flag=True,
+    default=False,
+    help="Pipe mode. Makes riot emit plain output.",
+)
 @click.version_option(__version__)
 @click.pass_context
-def main(ctx, riotfile, log_level):
-    if log_level:
-        logging.basicConfig(level=log_level)
+def main(ctx, riotfile, log_level, pipe_mode):
+    if pipe_mode:
+        if log_level:
+            logging.basicConfig(level=log_level)
+    else:
+        logging.basicConfig(
+            level=log_level or logging.WARNING,
+            format=FORMAT,
+            datefmt="[%X]",
+            handlers=[RichHandler(console=Console(stderr=True))],
+        )
 
     ctx.ensure_object(dict)
+    ctx.obj["pipe"] = pipe_mode
     try:
         ctx.obj["session"] = Session.from_config_file(riotfile)
     except Exception as e:
@@ -74,7 +94,10 @@ def main(ctx, riotfile, log_level):
 @click.pass_context
 def list_venvs(ctx, pythons, pattern, venv_pattern):
     ctx.obj["session"].list_venvs(
-        re.compile(pattern), re.compile(venv_pattern), pythons=pythons
+        re.compile(pattern),
+        re.compile(venv_pattern),
+        pythons=pythons,
+        pipe_mode=ctx.obj["pipe"],
     )
 
 
@@ -138,4 +161,15 @@ def run(
         pythons=pythons,
         skip_missing=skip_missing,
         exit_first=exit_first,
+    )
+
+
+@main.command("shell", help="""Launch a shell inside a venv.""")
+@click.argument("ident", type=str)
+@click.option("--pass-env", "pass_env", is_flag=True, default=False)
+@click.pass_context
+def shell(ctx, ident, pass_env):
+    ctx.obj["session"].shell(
+        ident=ident,
+        pass_env=pass_env,
     )

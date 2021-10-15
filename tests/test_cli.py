@@ -61,6 +61,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
         result = cli.invoke(
             riot.cli.main,
             [
+                "-P",
                 "list",
                 "test",
                 "--venv-pattern",
@@ -70,7 +71,10 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
         if result.exception:
             raise result.exception
         assert result.exit_code == 0, result.stdout
-        assert result.stdout == "test  Python Interpreter(_hint='3') 'pytest==5.4.3'\n"
+        assert (
+            result.stdout
+            == "[#0]  4375064  test          Interpreter(_hint='3') Packages('pytest==5.4.3')\n"
+        )
 
 
 def test_list_with_python(cli: click.testing.CliRunner) -> None:

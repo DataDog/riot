@@ -29,6 +29,7 @@ setup(
         "dataclasses; python_version<'3.7'",
         "click>=7,<8",
         "virtualenv",
+        "rich",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
