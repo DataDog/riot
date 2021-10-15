@@ -280,7 +280,7 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
     "name,cmdargs,cmdrun",
     [
         ("test_cmdargs", [], "echo cmdargs="),
-        ("test_cmdargs", ["--", "-k", "filter"], "echo cmdargs=-k filter"),
+        ("test_cmdargs", ["--", "-k", "filter"], "echo cmdargs='-k' 'filter'"),
         ("test_nocmdargs", [], "echo no cmdargs"),
         ("test_nocmdargs", ["--", "-k", "filter"], "echo no cmdargs"),
     ],
