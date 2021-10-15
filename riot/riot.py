@@ -197,6 +197,7 @@ class Venv:
     env: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
     name: t.Optional[str] = None
     command: t.Optional[str] = None
+    pip_install_args: t.Optional[str] = None
     venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
     create: bool = False
 
@@ -226,6 +227,8 @@ class Venv:
                         name=self.name or (parent_inst.name if parent_inst else None),
                         command=self.command
                         or (parent_inst.command if parent_inst else None),
+                        pip_install_args=self.pip_install_args
+                        or (parent_inst.pip_install_args if parent_inst else None),
                         py=py,
                         env=env,
                         pkgs=dict(pkgs),
@@ -296,6 +299,7 @@ class VenvInstance:
     env: t.Dict[str, str]
     name: t.Optional[str] = None
     command: t.Optional[str] = None
+    pip_install_args: t.Optional[str] = None
     parent: t.Optional["VenvInstance"] = None
     created: bool = False
 
@@ -477,10 +481,11 @@ class VenvInstance:
                 pkg_str,
                 self.prefix,
             )
+
             try:
                 Session.run_cmd_venv(
                     venv_path,
-                    f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location {pkg_str}",
+                    f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location {self.pip_install_args or ''} {pkg_str}",
                     env=env,
                 )
             except CmdFailure as e:
