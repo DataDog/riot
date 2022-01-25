@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Match pattern against ``VenvInstance.name`` and ``VenvInstance.short_hash``.
+    This allows you to ``riot run <hash>`` to run only a specific instance.

@@ -336,6 +336,15 @@ class VenvInstance:
                     break
                 ancestor = ancestor.parent
 
+    def matches_pattern(self, pattern: t.Pattern[str]) -> bool:
+        """Return whether this VenvInstance matches the provided pattern.
+
+        The pattern is checked against the instance ``name`` and ``short_hash``.
+        """
+        if self.name and pattern.match(self.name):
+            return True
+        return bool(pattern.match(self.short_hash))
+
     @property
     def prefix(self) -> t.Optional[str]:
         """Return path to directory where dependencies should be installed.
@@ -399,6 +408,10 @@ class VenvInstance:
             pkgs.update(dict(inst.pkgs))
 
         return pip_deps(pkgs)
+
+    @property
+    def short_hash(self) -> str:
+        return hex(hash(self))[2:9]
 
     def __hash__(self):
         """Compute a hash for the venv instance."""
@@ -621,7 +634,7 @@ class Session:
                 logger.debug("Skipping venv instance %s due to missing command", inst)
                 continue
 
-            if inst.name and not pattern.match(inst.name):
+            if inst.name and not inst.matches_pattern(pattern):
                 logger.debug(
                     "Skipping venv instance %s due to name pattern mismatch.", inst
                 )
@@ -767,7 +780,7 @@ class Session:
             )
 
         for n, inst in enumerate(self.venv.instances()):
-            if not inst.name or not pattern.match(inst.name):
+            if not inst.name or not inst.matches_pattern(pattern):
                 continue
 
             if pythons and inst.py not in pythons:
@@ -779,7 +792,7 @@ class Session:
             env_str = env_to_str(inst.env)
             if pipe_mode:
                 print(
-                    f"[#{n}]  {hex(hash(inst))[2:9]}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
+                    f"[#{n}]  {inst.short_hash}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
                 )
             else:
                 table.add_row(
@@ -807,7 +820,8 @@ class Session:
             [
                 inst.py
                 for inst in self.venv.instances()
-                if inst.py is not None and (not inst.name or pattern.match(inst.name))
+                if inst.py is not None
+                and (not inst.name or inst.matches_pattern(pattern))
             ]
         )
         # Apply Python filters.
