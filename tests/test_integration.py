@@ -401,6 +401,17 @@ venv = Venv(
     )
     assert result.returncode == 0
 
+    # Listing by hash works
+    result = tmp_run("riot -P list 144c8c4")
+    assert result.stderr == ""
+    assert re.search(
+        r"""
+\[\#7\]  144c8c4  test2  .* Packages\('pkg1==2.0' 'pkg2==4.0'\)
+""".lstrip(),
+        result.stdout,
+    )
+    assert result.returncode == 0
+
 
 def test_run(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
@@ -465,6 +476,30 @@ test_success.py .*
     ), result.stdout
     assert result.stderr == ""
     assert result.returncode == 1
+
+
+def test_run_hash(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={
+        "pytest": [""],
+    },
+    venvs=[
+        Venv(
+            name="pass",
+            command="echo pass",
+        ),
+    ],
+)
+""",
+    )
+    # DEV: The hash is consistent as long as no settings change
+    result = tmp_run("riot run -s 163716e")
+    assert result.returncode == 0, result.stderr
 
 
 def test_run_cmdargs(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
