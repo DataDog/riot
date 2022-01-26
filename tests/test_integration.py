@@ -513,9 +513,9 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run test")
-    assert 'File "setup.py"' in result.stderr, result.stderr
-    assert "Dev install failed, aborting!" in result.stderr, result.stderr
     assert result.returncode == 1
+    assert "setup.py" in result.stderr, result.stderr
+    assert "Dev install failed, aborting!" in result.stderr, result.stderr
 
 
 def test_bad_interpreter(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
