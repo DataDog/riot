@@ -95,3 +95,37 @@ def test_venv_matching(current_interpreter: Interpreter) -> None:
     assert not venv.match_venv_pattern(re.compile("pytest345"))
     assert venv.match_venv_pattern(re.compile("pytest543_pip"))
     assert not venv.match_venv_pattern(re.compile("pip_pytest543"))
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        # Name
+        "test",
+        "te",
+        ".*st",
+        ".*es.*",
+        "^test",
+        "test$",
+        "^test$",
+        "^(no_match)|(test)$",
+        # Short hash
+        "137331a",
+        ".*733.*",
+        "[0-9]*a",
+        "^137331a",
+        "137331a$",
+        "^137331a$",
+        "^(no_match)|(137331a)$",
+    ],
+)
+def test_venv_name_matching(pattern: str) -> None:
+    venv = VenvInstance(
+        command="echo test",
+        env={"env": "test"},
+        name="test",
+        pkgs={"pip": ""},
+        py=Interpreter("3"),
+    )
+    assert venv.short_hash == "137331a"
+    assert venv.matches_pattern(re.compile(pattern))
