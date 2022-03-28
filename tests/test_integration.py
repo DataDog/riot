@@ -464,16 +464,18 @@ test_success.py .*
 ============================== 1 passed in .*s ===============================
 
 -------------------summary-------------------
-✓ pass: .*
+✓ pass: \[[0-9a-f]{7}\].*
 1 passed with 0 warnings, 0 failed\n""".lstrip(),
         result.stdout,
     ), result.stdout
     assert result.stderr == ""
 
     result = tmp_run("riot run -s fail")
-    assert (
-        "x fail:  pythonInterpreter(_hint='3') 'pytest'\n" in result.stdout
-    ), result.stdout
+    assert re.search(
+        r"x fail: \[[0-9a-f]{7}\]  pythonInterpreter\(_hint='3'\) 'pytest'",
+        result.stdout,
+        re.MULTILINE,
+    )
     assert result.stderr == ""
     assert result.returncode == 1
 

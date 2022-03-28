@@ -1,5 +1,6 @@
 import contextlib
 import os
+import re
 import shutil
 import typing
 
@@ -190,8 +191,16 @@ def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
             ],
         )
         assert result.exit_code == 0
-        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest==5.4.3'" in result.stdout
-        assert "✓ test:  pythonInterpreter(_hint='3') 'pytest'" in result.stdout
+        assert re.search(
+            r"✓ test: \[[0-9a-f]{7}\]  pythonInterpreter\(_hint='3'\) 'pytest==5.4.3'",
+            result.stdout,
+            re.MULTILINE,
+        )
+        assert re.search(
+            r"✓ test: \[[0-9a-f]{7}\]  pythonInterpreter\(_hint='3'\) 'pytest'",
+            result.stdout,
+            re.MULTILINE,
+        )
         assert "2 passed with 0 warnings, 0 failed" in result.stdout
 
 
@@ -377,14 +386,14 @@ def test_failure():
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ success" in result.stdout
+        assert re.search(r"✓ success: \[[0-9a-f]{7}\]", result.stdout)
         assert "1 passed with 0 warnings, 0 failed" in result.stdout
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "failure"], catch_exceptions=False
         )
         assert result.exit_code == 1
-        assert "x failure" in result.stdout
+        assert re.search(r"x failure: \[[0-9a-f]{7}\]", result.stdout)
         assert "0 passed with 0 warnings, 1 failed" in result.stdout
 
 
@@ -416,13 +425,13 @@ venv = Venv(
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ success" in result.stdout
+        assert re.search(r"✓ success: \[[0-9a-f]{7}\]", result.stdout)
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success2"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ success2" in result.stdout
+        assert re.search(r"✓ success2: \[[0-9a-f]{7}\]", result.stdout)
 
 
 def test_env(cli: click.testing.CliRunner) -> None:
@@ -462,7 +471,7 @@ def test_success():
             riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ envtest" in result.stdout
+        assert re.search(r"✓ envtest: \[[0-9a-f]{7}\]", result.stdout)
 
 
 def test_pass_env_always(
@@ -504,7 +513,7 @@ def test_success():
             riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        assert "✓ envtest" in result.stdout
+        assert re.search(r"✓ envtest: \[[0-9a-f]{7}\]", result.stdout)
 
 
 def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
