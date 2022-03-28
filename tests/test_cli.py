@@ -474,6 +474,53 @@ def test_success():
         assert re.search(r"✓ envtest: \[[0-9a-f]{7}\]", result.stdout)
 
 
+def test_default_env(cli: click.testing.CliRunner) -> None:
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write(
+                """
+from riot import Venv, latest
+
+venv = Venv(
+    pkgs={
+        "pytest": latest,
+    },
+    venvs=[
+        Venv(
+            pys=[3],
+            pkgs={"packaging": ">=21.3"},
+            name="envtest",
+            command="pytest",
+        ),
+    ],
+)
+            """
+            )
+
+        with open("test_success.py", "w") as f:
+            f.write(
+                """
+import os
+
+def test_success():
+    assert os.environ["RIOT"] == "1"
+    assert os.environ["RIOT_PYTHON_HINT"] == "Interpreter(_hint='3')"
+    assert os.environ["RIOT_PYTHON_VERSION"].startswith("3.")
+    assert os.environ["RIOT_VENV_HASH"] == "f8691e0"
+    assert os.environ["RIOT_VENV_IDENT"] == "packaging213"
+    assert os.environ["RIOT_VENV_NAME"] == "envtest"
+    assert os.environ["RIOT_VENV_PKGS"] == "'packaging>=21.3'"
+    assert os.environ["RIOT_VENV_FULL_PKGS"] == "'pytest' 'packaging>=21.3'"
+            """
+            )
+
+        result = cli.invoke(
+            riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+        assert "✓ envtest" in result.stdout
+
+
 def test_pass_env_always(
     cli: click.testing.CliRunner, monkeypatch: _pytest.monkeypatch.MonkeyPatch
 ) -> None:

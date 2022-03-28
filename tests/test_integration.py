@@ -628,7 +628,7 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run -s test")
-    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0
 
     version = "".join((str(_) for _ in sys.version_info[:3]))
@@ -689,7 +689,7 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run -s test")
-    env = dict(_.split("=") for _ in result.stdout.splitlines() if "=" in _)
+    env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0, result.stderr
 
     venv_name = "venv_py{}_pytest".format(
