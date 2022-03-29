@@ -742,7 +742,7 @@ class Session:
         for r in results:
             failed = r.code != 0
             env_str = env_to_str(r.instance.env)
-            s = f"{r.instance.name}: {env_str} python{r.instance.py} {r.instance.full_pkg_str}"
+            s = f"{r.instance.name}: [{r.instance.short_hash}] {env_str} python{r.instance.py} {r.instance.full_pkg_str}"
 
             if failed:
                 num_failed += 1
