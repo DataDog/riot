@@ -1,0 +1,15 @@
+---
+features:
+  - |
+    Inject riot virtualenv instance data into each run via environment variables:
+
+      - ``RIOT``: always set to ``"1"``
+      - ``RIOT_PYTHON_HINT``: the Python version hint provided to riot, e.g. ``"3.6"``
+      - ``RIOT_PYTHON_VERSION``: the actual Python found/used by riot, e.g. ``"3.6.10"``
+      - ``RIOT_VENV_HASH``: the short hash for the running virtualenv instance, e.g. ``"d36fc71"``
+      - ``RIOT_VENV_IDENT``: the string identifier used to create the virtualenv, e.g. ``"pytest_pytest-cov_mock_typing-extensions"``
+        - Note: This is only set if the virtualenv instance has defined packages
+      - ``RIOT_VENV_NAME``: the name of the virtualenv instance running, e.g. ``"test"``, ``"mypy"``, etc
+      - ``RIOT_VENV_PKGS``: the string of packages + versions this virtualenv instance provided to the ``pip install`` command, e.g. ``"'pytest' 'pytest-cov' 'flask>=2.0.0'"``
+        - Note: this may be empty if only parent virtualenv packages are used
+      - ``RIOT_VENV_FULL_PKGS``: the full list of packages this virtualenv instance and all of it's parents provided to the ``pip install`` command, e.g. ``"'pytest' 'pytest-cov' 'flask>=2.0.0'"``

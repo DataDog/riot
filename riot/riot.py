@@ -675,6 +675,20 @@ class Session:
             else:
                 env = dict(inst.env)
 
+            # Add riot specific environment variables
+            env.update(
+                {
+                    "RIOT": "1",
+                    "RIOT_PYTHON_HINT": str(inst.py),
+                    "RIOT_PYTHON_VERSION": inst.py.version(),
+                    "RIOT_VENV_HASH": inst.short_hash,
+                    "RIOT_VENV_IDENT": inst.ident or "",
+                    "RIOT_VENV_NAME": inst.name or "",
+                    "RIOT_VENV_PKGS": inst.pkg_str,
+                    "RIOT_VENV_FULL_PKGS": inst.full_pkg_str,
+                }
+            )
+
             inst.prepare(env, recreate=recreate_venvs, skip_deps=skip_base_install)
 
             pythonpath = inst.pythonpath
