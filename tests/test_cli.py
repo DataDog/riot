@@ -8,7 +8,6 @@ import _pytest.monkeypatch
 import click.testing
 import mock
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
@@ -608,7 +607,9 @@ this is invalid syntax
         assert "SyntaxError: invalid syntax" in result.stdout
 
 
-def test_run_pass_env(cli: click.testing.CliRunner, monkeypatch: MonkeyPatch) -> None:
+def test_run_pass_env(
+    cli: click.testing.CliRunner, monkeypatch: _pytest.monkeypatch.MonkeyPatch
+) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
             f.write(
