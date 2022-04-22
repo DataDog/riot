@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    The shell command now uses the system default shell as specified by the
+    ``SHELL`` variable instead of enforcing the use of bash.

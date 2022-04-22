@@ -30,6 +30,7 @@ setup(
         "click>=7,<8",
         "virtualenv",
         "rich",
+        "pexpect",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
