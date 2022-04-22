@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
 SHELL_RCFILE = """
-if [ -f ~/.bashrc ]; then . ~/.bashrc; fi
 source {venv_path}/bin/activate
 echo -e "\e[31;1m"
 echo "                 )  "
@@ -915,7 +914,7 @@ class Session:
                     rcfile.flush()
 
                     w, h = os.get_terminal_size()
-                    c = pexpect.spawn(SHELL, ["-i"], dimensions=(h, w))
+                    c = pexpect.spawn(SHELL, ["-i"], dimensions=(h, w), env=env)
                     c.setecho(False)
                     c.sendline(f"source {rcfile.name}")
                     c.interact()

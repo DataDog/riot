@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fix issue with ``riot shell`` not passing required environment variables
+  - |
+    Fix issues with ``riot shell`` always trying to source ``~/.bashrc``
