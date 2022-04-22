@@ -15,6 +15,7 @@ import traceback
 import typing as t
 
 import click
+import pexpect
 from rich import print as rich_print
 from rich.pretty import Pretty
 from rich.status import Status
@@ -41,7 +42,6 @@ echo ""
 echo -e "* Venv name   : \e[1m{name}\e[0m"
 echo -e "* Venv path   : \e[1m{venv_path}\e[0m"
 echo -e "* Interpreter : \e[1m$( python -V )\e[0m"
-PS1="\n(\e[31;1mriot\e[0m@\e[33;1m`basename {venv_path}`\e[0m) \e[36;1m\h\e[0m:\e[32;1m\w\e[0m\n🔥 "
 """
 
 
@@ -906,19 +906,22 @@ class Session:
                 )
 
             with nspkgs(inst):
-                pid = os.fork()
-                if pid == 0:
-                    with tempfile.NamedTemporaryFile() as rcfile:
-                        rcfile.write(
-                            SHELL_RCFILE.format(
-                                venv_path=venv_path, name=inst.name
-                            ).encode()
-                        )
-                        rcfile.flush()
-                        os.execvpe("bash", ["bash", "--rcfile", rcfile.name], env)
-                os.wait()
+                with tempfile.NamedTemporaryFile() as rcfile:
+                    rcfile.write(
+                        SHELL_RCFILE.format(
+                            venv_path=venv_path, name=inst.name
+                        ).encode()
+                    )
+                    rcfile.flush()
 
-            break
+                    w, h = os.get_terminal_size()
+                    c = pexpect.spawn(SHELL, ["-i"], dimensions=(h, w))
+                    c.setecho(False)
+                    c.sendline(f"source {rcfile.name}")
+                    c.interact()
+                    c.close()
+                    sys.exit(c.exitstatus)
+
         else:
             logger.error(
                 "No venv instance found for %s. Use 'riot list' to get a list of valid numbers.",
