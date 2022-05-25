@@ -873,11 +873,12 @@ class Session:
 
             assert inst.py is not None, inst
             try:
-                venv_path = inst.py.venv_path
+                venv_path = inst.venv_path
             except FileNotFoundError:
                 raise RuntimeError("%s not available" % inst.py)
 
             logger.info("Launching shell inside venv instance %s", inst)
+            logger.debug("Setting venv path to %s", venv_path)
 
             # Generate the environment for the instance.
             if pass_env:
@@ -913,11 +914,17 @@ class Session:
                     )
                     rcfile.flush()
 
-                    w, h = os.get_terminal_size()
+                    try:
+                        w, h = os.get_terminal_size()
+                    except OSError:
+                        w, h = 80, 24
                     c = pexpect.spawn(SHELL, ["-i"], dimensions=(h, w), env=env)
                     c.setecho(False)
                     c.sendline(f"source {rcfile.name}")
-                    c.interact()
+                    try:
+                        c.interact()
+                    except Exception:
+                        pass
                     c.close()
                     sys.exit(c.exitstatus)
 

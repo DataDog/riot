@@ -13,10 +13,14 @@ _T_Path = Union[str, "os.PathLike[Any]"]
 
 
 def run(
-    args: Union[str, Sequence[str]], cwd: _T_Path, env: Optional[Dict[str, str]] = None
+    args: Union[str, Sequence[str]],
+    cwd: _T_Path,
+    env: Optional[Dict[str, str]] = None,
+    input: Optional[str] = None,  # noqa
 ) -> _T_CompletedProcess:
     return subprocess.run(
         args,
+        input=input,
         env=env,
         encoding=sys.getdefaultencoding(),
         stdout=subprocess.PIPE,
@@ -32,6 +36,7 @@ class _T_TmpRun(Protocol):
         args: Union[str, Sequence[str]],
         cwd: Optional[_T_Path] = None,
         env: Optional[Dict[str, str]] = None,
+        input: Optional[str] = None,  # noqa
     ) -> _T_CompletedProcess:
         ...
 
@@ -44,10 +49,11 @@ def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
         args: Union[str, Sequence[str]],
         cwd: Optional[_T_Path] = None,
         env: Optional[Dict[str, str]] = None,
+        input: Optional[str] = None,  # noqa
     ) -> _T_CompletedProcess:
         if cwd is None:
             cwd = tmp_path
-        return run(args, cwd, env)
+        return run(args, cwd, env, input)
 
     yield _run
 
@@ -793,3 +799,67 @@ venv = Venv(
     )
     result = tmp_run("riot -v run -s test")
     assert result.returncode == 0
+
+
+def test_shell(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test",
+    pys=["3"],
+    pkgs={"requests": latest},
+    command="python -c 'import requests'",
+)
+""",
+    )
+
+    result = tmp_run("riot -vd --pipe shell '#0'", input="exit\n")
+    assert (
+        re.search(
+            r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
+        )
+        is None
+    )
+    assert re.search(r"Setting venv path to .+[.]riot/venv_py[0-9]+", result.stderr)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_shell_created(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test",
+    pys=["3"],
+    pkgs={"requests": latest},
+    command="python -c 'import requests'",
+    create=True,
+)
+""",
+    )
+    setup_path = tmp_path / "setup.py"
+    setup_path.write_text(
+        """
+from setuptools import setup, find_packages
+
+setup(
+    name='foo',
+    version='1.0.0',
+    url='https://github.com/bar/foo.git',
+    author='Me',
+    author_email='author@email.com',
+    description='Noop',
+    packages=find_packages(),
+    install_requires=[],
+)
+""",
+    )
+    result = tmp_run("riot -vd --pipe shell '#0'", input="exit\n")
+    assert re.search(
+        r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
+    )
+    assert result.returncode == 0, result.stderr
