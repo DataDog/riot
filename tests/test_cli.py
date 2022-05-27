@@ -74,7 +74,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
         assert result.exit_code == 0, result.stdout
         assert (
             result.stdout
-            == "[#0]  4375064  test          Interpreter(_hint='3') Packages('pytest==5.4.3')\n"
+            == "[#0]  c396b3d  test          Interpreter(_hint='3') Packages('pytest==5.4.3')\n"
         )
 
 
@@ -506,7 +506,7 @@ def test_success():
     assert os.environ["RIOT"] == "1"
     assert os.environ["RIOT_PYTHON_HINT"] == "Interpreter(_hint='3')"
     assert os.environ["RIOT_PYTHON_VERSION"].startswith("3.")
-    assert os.environ["RIOT_VENV_HASH"] == "f8691e0"
+    assert os.environ["RIOT_VENV_HASH"] == "1ddc9da"
     assert os.environ["RIOT_VENV_IDENT"] == "packaging213"
     assert os.environ["RIOT_VENV_NAME"] == "envtest"
     assert os.environ["RIOT_VENV_PKGS"] == "'packaging>=21.3'"

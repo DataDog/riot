@@ -50,8 +50,8 @@ else:
     _T_CompletedProcess = subprocess.CompletedProcess
 
 
-_K = t.TypeVar("_K")
-_V = t.TypeVar("_V")
+_K = t.TypeVar("_K", bound=str)
+_V = t.TypeVar("_V", bound=str)
 
 
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
@@ -174,7 +174,6 @@ class Interpreter:
         return venv_path
 
 
-@dataclasses.dataclass
 class Venv:
     """Specifies how to build and run a virtual environment.
 
@@ -214,21 +213,26 @@ class Venv:
         create (bool): Create the virtual environment instance. Defaults to ``False``, in which case only a prefix is created.
     """
 
-    pys: dataclasses.InitVar[
-        t.Union[Interpreter._T_hint, t.List[Interpreter._T_hint]]
-    ] = None
-    pkgs: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
-    env: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
-    name: t.Optional[str] = None
-    command: t.Optional[str] = None
-    venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
-    create: bool = False
-
-    def __post_init__(self, pys, pkgs, env):
+    def __init__(
+        self,
+        pys: t.Optional[t.Union[_K, t.List[_K]]] = None,
+        pkgs: t.Optional[t.Dict[_K, t.Union[_V, t.List[_V]]]] = None,
+        env: t.Optional[t.Dict[_K, t.Union[_V, t.List[_V]]]] = None,
+        name: t.Optional[str] = None,
+        command: t.Optional[str] = None,
+        venvs: t.Optional[t.List["Venv"]] = None,
+        create: bool = False,
+    ):
         """Normalize the data."""
-        self.pys = [Interpreter(py) for py in to_list(pys)] if pys is not None else []
+        self.pys: t.List[t.Optional[Interpreter]] = (
+            [Interpreter(py) for py in to_list(pys)] if pys is not None else []
+        )
         self.pkgs = rm_singletons(pkgs) if pkgs else {}
         self.env = rm_singletons(env) if env else {}
+        self.name = name
+        self.command = command
+        self.venvs = venvs or []
+        self.create = create
 
     def instances(
         self,
@@ -241,7 +245,7 @@ class Venv:
             env.update(dict(env_spec))
 
             # Bubble up pys
-            pys = self.pys or [parent_inst.py if parent_inst else None]
+            pys = self.pys or [parent_inst.py if parent_inst is not None else None]
 
             for py in pys:
                 for pkgs in expand_specs(self.pkgs):
@@ -269,39 +273,40 @@ def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
     dst_ns_files = []
     moved_ns_files = []
 
-    venv_sitepkgs = inst.py.site_packages_path
+    if inst.py is not None:
+        venv_sitepkgs = inst.py.site_packages_path
 
-    # Collect the namespaces to copy over
-    for sitepkgs in (_ for _ in inst.site_packages_list[2:] if _ != venv_sitepkgs):
-        try:
-            for ns in (_ for _ in os.listdir(sitepkgs) if _.endswith("nspkg.pth")):
-                if ns not in src_ns_files:
-                    src_ns_files[ns] = sitepkgs
-        except FileNotFoundError:
-            pass
+        # Collect the namespaces to copy over
+        for sitepkgs in (_ for _ in inst.site_packages_list[2:] if _ != venv_sitepkgs):
+            try:
+                for ns in (_ for _ in os.listdir(sitepkgs) if _.endswith("nspkg.pth")):
+                    if ns not in src_ns_files:
+                        src_ns_files[ns] = sitepkgs
+            except FileNotFoundError:
+                pass
 
-    # Copy over the namespaces
-    for ns, src_sitepkgs in src_ns_files.items():
-        src_ns_path = os.path.join(src_sitepkgs, ns)
-        dst_ns_path = os.path.join(venv_sitepkgs, ns)
+        # Copy over the namespaces
+        for ns, src_sitepkgs in src_ns_files.items():
+            src_ns_path = os.path.join(src_sitepkgs, ns)
+            dst_ns_path = os.path.join(venv_sitepkgs, ns)
 
-        # if the destination file exists already we make a backup copy as it
-        # belongs to the base venv and we don't want to overwrite it
-        if os.path.isfile(dst_ns_path):
-            shutil.move(dst_ns_path, dst_ns_path + ".bak")
-            moved_ns_files.append(dst_ns_path)
+            # if the destination file exists already we make a backup copy as it
+            # belongs to the base venv and we don't want to overwrite it
+            if os.path.isfile(dst_ns_path):
+                shutil.move(dst_ns_path, dst_ns_path + ".bak")
+                moved_ns_files.append(dst_ns_path)
 
-        with open(src_ns_path) as ns_in, open(dst_ns_path, "w") as ns_out:
-            # https://github.com/pypa/setuptools/blob/b62705a84ab599a2feff059ececd33800f364555/setuptools/namespaces.py#L44
-            # TODO: Cache the file content to avoid re-reading it
-            ns_out.write(
-                ns_in.read().replace(
-                    "sys._getframe(1).f_locals['sitedir']",
-                    f"'{src_sitepkgs}'",
+            with open(src_ns_path) as ns_in, open(dst_ns_path, "w") as ns_out:
+                # https://github.com/pypa/setuptools/blob/b62705a84ab599a2feff059ececd33800f364555/setuptools/namespaces.py#L44
+                # TODO: Cache the file content to avoid re-reading it
+                ns_out.write(
+                    ns_in.read().replace(
+                        "sys._getframe(1).f_locals['sitedir']",
+                        f"'{src_sitepkgs}'",
+                    )
                 )
-            )
 
-        dst_ns_files.append(dst_ns_path)
+            dst_ns_files.append(dst_ns_path)
 
     yield
 
@@ -316,8 +321,8 @@ def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
 @dataclasses.dataclass
 class VenvInstance:
     pkgs: t.Dict[str, str]
-    py: Interpreter
     env: t.Dict[str, str]
+    py: t.Optional[Interpreter] = None
     name: t.Optional[str] = None
     command: t.Optional[str] = None
     parent: t.Optional["VenvInstance"] = None
@@ -446,7 +451,7 @@ class VenvInstance:
     @property
     def site_packages_path(self) -> t.Optional[str]:
         prefix = self.prefix
-        if prefix is None:
+        if prefix is None or self.py is None:
             return None
         version = ".".join((str(_) for _ in self.py.version_info()[:2]))
         return os.path.join(prefix, "lib", f"python{version}", "site-packages")

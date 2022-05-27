@@ -110,13 +110,13 @@ def test_venv_matching(current_interpreter: Interpreter) -> None:
         "^test$",
         "^(no_match)|(test)$",
         # Short hash
-        "137331a",
-        ".*733.*",
-        "[0-9]*a",
-        "^137331a",
-        "137331a$",
-        "^137331a$",
-        "^(no_match)|(137331a)$",
+        "158a715",
+        ".*8a7.*",
+        "[0-9]*5",
+        "^158a715",
+        "158a715$",
+        "^158a715$",
+        "^(no_match)|(158a715)$",
     ],
 )
 def test_venv_name_matching(pattern: str) -> None:
@@ -127,5 +127,5 @@ def test_venv_name_matching(pattern: str) -> None:
         pkgs={"pip": ""},
         py=Interpreter("3"),
     )
-    assert venv.short_hash == "137331a"
+    assert venv.short_hash == "158a715"
     assert venv.matches_pattern(re.compile(pattern))
