@@ -176,14 +176,14 @@ def test_interpreter_venv_creation(interpreter_virtualenv: Dict[str, str]) -> No
     venv = interpreter_virtualenv
 
     run_cmd(
-        ["python", "-m", "pip", "install", "itsdangerous==2.1.2"],
+        ["python", "-m", "pip", "install", "itsdangerous==1.1.0"],
         stdout=subprocess.PIPE,
         env=venv,
     )
     result = run_cmd(
         ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=venv
     )
-    assert result.stdout == "itsdangerous==2.1.2\n"
+    assert result.stdout == "itsdangerous==1.1.0\n"
 
 
 def test_interpreter_venv_recreation(
@@ -192,7 +192,7 @@ def test_interpreter_venv_recreation(
     venv = interpreter_virtualenv
 
     run_cmd(
-        ["python", "-m", "pip", "install", "itsdangerous==2.1.2"],
+        ["python", "-m", "pip", "install", "itsdangerous==1.1.0"],
         stdout=subprocess.PIPE,
         env=venv,
     )
