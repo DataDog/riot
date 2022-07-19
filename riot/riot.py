@@ -169,9 +169,7 @@ class Interpreter:
             return venv_path
 
         if recreate:
-            logger.info(
-                "Deleting virtualenv '%s'", venv_path
-            )
+            logger.info("Deleting virtualenv '%s'", venv_path)
             shutil.rmtree(venv_path, ignore_errors=True)
 
         py_ex = self.path()

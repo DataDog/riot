@@ -24,7 +24,9 @@ def current_venv() -> Venv:
 
 
 @pytest.fixture
-def interpreter_virtualenv(current_interpreter: Interpreter) -> Generator[Dict[str, str], None, None]:
+def interpreter_virtualenv(
+    current_interpreter: Interpreter,
+) -> Generator[Dict[str, str], None, None]:
     venv_path = ""
     try:
         # Define env paths and variables
