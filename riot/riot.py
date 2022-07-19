@@ -235,16 +235,16 @@ class Venv:
         parent_inst: t.Optional["VenvInstance"] = None,
     ) -> t.Generator["VenvInstance", None, None]:
         # Expand out the instances for the venv.
-        for env_spec in expand_specs(self.env):
+        for env_spec in expand_specs(self.env):  # type: ignore[attr-defined]
             # Bubble up env
             env = parent_inst.env.copy() if parent_inst else {}
             env.update(dict(env_spec))
 
             # Bubble up pys
-            pys = self.pys or [parent_inst.py if parent_inst else None]
+            pys = self.pys or [parent_inst.py if parent_inst else None]  # type: ignore[attr-defined]
 
             for py in pys:
-                for pkgs in expand_specs(self.pkgs):
+                for pkgs in expand_specs(self.pkgs):  # type: ignore[attr-defined]
                     inst = VenvInstance(
                         # Bubble up name and command if not overridden
                         name=self.name or (parent_inst.name if parent_inst else None),
