@@ -1,9 +1,12 @@
 import os
 import re
+import shutil
+import subprocess
 import sys
+from typing import Dict, Generator
 
 import pytest
-from riot.riot import Interpreter, Venv, VenvInstance
+from riot.riot import Interpreter, run_cmd, Venv, VenvInstance
 
 default_venv_pattern = re.compile(r".*")
 current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
@@ -18,6 +21,42 @@ def current_interpreter() -> Interpreter:
 def current_venv() -> Venv:
     # Without a command `.instances()` will not resolve anything
     return Venv(pys=[current_py_hint], command="echo test")
+
+
+@pytest.fixture
+def interpreter_virtualenv(current_interpreter: Interpreter) -> Generator[Dict[str, str], None, None]:
+    venv_path = ""
+    try:
+        # Define env paths and variables
+        env_name = "test_interpreter_venv_creation"
+        venv_path = os.path.abspath(os.path.join(".riot", env_name))
+        venv_site_packages_path = os.path.abspath(
+            os.path.join(venv_path, "lib", "python3.8", "site-packages")
+        )
+        venv_python_path = os.path.join(venv_path, "bin")
+        command_env = {
+            "PYTHONPATH": venv_python_path,
+            "PATH": venv_python_path + ":" + venv_site_packages_path,
+            "VENV_PATH": venv_path,
+        }
+
+        # Create the virtualenv
+        current_interpreter.create_venv(recreate=True, path=str(venv_path))
+
+        # Check exists and is empty of packages
+        result = run_cmd(
+            ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=command_env
+        )
+        assert os.path.isdir(venv_path)
+        assert result.stdout == ""
+
+        # return the cmmand environment to reuse in other commands
+        yield command_env
+
+        assert os.path.isdir(venv_path)
+    finally:
+        if venv_path:
+            shutil.rmtree(venv_path, ignore_errors=True)
 
 
 @pytest.mark.parametrize(
@@ -129,3 +168,36 @@ def test_venv_name_matching(pattern: str) -> None:
     )
     assert venv.short_hash == "137331a"
     assert venv.matches_pattern(re.compile(pattern))
+
+
+def test_interpreter_venv_creation(interpreter_virtualenv: Dict[str, str]) -> None:
+    venv = interpreter_virtualenv
+
+    run_cmd(
+        ["python", "-m", "pip", "install", "itsdangerous==2.1.2"],
+        stdout=subprocess.PIPE,
+        env=venv,
+    )
+    result = run_cmd(
+        ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=venv
+    )
+    assert result.stdout == "itsdangerous==2.1.2\n"
+
+
+def test_interpreter_venv_recreation(
+    current_interpreter: Interpreter, interpreter_virtualenv: Dict[str, str]
+) -> None:
+    venv = interpreter_virtualenv
+
+    run_cmd(
+        ["python", "-m", "pip", "install", "itsdangerous==2.1.2"],
+        stdout=subprocess.PIPE,
+        env=venv,
+    )
+
+    current_interpreter.create_venv(recreate=True, path=str(venv["VENV_PATH"]))
+
+    result = run_cmd(
+        ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=venv
+    )
+    assert result.stdout == ""

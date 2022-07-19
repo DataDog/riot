@@ -168,6 +168,12 @@ class Interpreter:
             )
             return venv_path
 
+        if recreate:
+            logger.info(
+                "Deleting virtualenv '%s'", venv_path
+            )
+            shutil.rmtree(venv_path, ignore_errors=True)
+
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
         run_cmd(["virtualenv", f"--python={py_ex}", venv_path], stdout=subprocess.PIPE)
