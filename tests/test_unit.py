@@ -35,9 +35,7 @@ def interpreter_virtualenv(
         command_env = _get_env(env_name)
 
         # Create the virtualenv
-        current_interpreter.create_venv(
-            recreate=True, path=command_env["VENV_PATH"]
-        )
+        current_interpreter.create_venv(recreate=True, path=command_env["VENV_PATH"])
 
         # Check folder exists and is empty of packages
         result = _get_pip_freeze(command_env)
