@@ -156,7 +156,8 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        return os.path.abspath(f".riot/venv_py{version}")
+        env_base_path = os.environ.get("RIOT_ENV_BASE_PATH") or ".riot/venv_py"
+        return os.path.abspath(f"{env_base_path}{version}")
 
     def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> str:
         """Attempt to create a virtual environment for this intepreter."""
