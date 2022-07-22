@@ -23,6 +23,9 @@ from rich.table import Table
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_RIOT_PATH = ".riot"
+DEFAULT_RIOT_ENV_PREFIX = "venv_py"
+
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
 SHELL_RCFILE = """
@@ -156,8 +159,10 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        env_base_path = os.environ.get("RIOT_ENV_BASE_PATH") or ".riot/venv_py"
-        return os.path.abspath(f"{env_base_path}{version}")
+        env_base_path = os.environ.get("RIOT_ENV_BASE_PATH") or DEFAULT_RIOT_PATH
+        return os.path.abspath(
+            os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
+        )
 
     def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> str:
         """Attempt to create a virtual environment for this intepreter."""
