@@ -6,8 +6,11 @@ import sys
 from typing import Dict, Generator
 
 import pytest
-from riot.riot import Interpreter, run_cmd, Venv, VenvInstance
+from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
+from tests.test_cli import DATA_DIR
 
+
+RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
 default_venv_pattern = re.compile(r".*")
 current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
 
@@ -27,38 +30,69 @@ def current_venv() -> Venv:
 def interpreter_virtualenv(
     current_interpreter: Interpreter,
 ) -> Generator[Dict[str, str], None, None]:
-    venv_path = ""
     try:
-        # Define env paths and variables
         env_name = "test_interpreter_venv_creation"
-        venv_path = os.path.abspath(os.path.join(".riot", env_name))
-        venv_site_packages_path = os.path.abspath(
-            os.path.join(venv_path, "lib", "python3.8", "site-packages")
-        )
-        venv_python_path = os.path.join(venv_path, "bin")
-        command_env = {
-            "PYTHONPATH": venv_python_path,
-            "PATH": venv_python_path + ":" + venv_site_packages_path,
-            "VENV_PATH": venv_path,
-        }
+        command_env = _get_env(env_name)
 
         # Create the virtualenv
-        current_interpreter.create_venv(recreate=True, path=str(venv_path))
-
-        # Check exists and is empty of packages
-        result = run_cmd(
-            ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=command_env
+        current_interpreter.create_venv(
+            recreate=True, path=command_env["VENV_PATH"]
         )
-        assert os.path.isdir(venv_path)
-        assert result.stdout == ""
 
-        # return the cmmand environment to reuse in other commands
+        # Check folder exists and is empty of packages
+        result = _get_pip_freeze(command_env)
+        assert os.path.isdir(command_env["VENV_PATH"])
+        assert result == ""
+
+        # return the command environment to reuse in other commands
         yield command_env
 
-        assert os.path.isdir(venv_path)
+        assert os.path.isdir(command_env["VENV_PATH"])
     finally:
-        if venv_path:
-            shutil.rmtree(venv_path, ignore_errors=True)
+        shutil.rmtree(RIOT_TESTS_PATH, ignore_errors=True)
+
+
+@pytest.fixture
+def session_virtualenv() -> Generator[Session, None, None]:
+    try:
+        session = Session.from_config_file(os.path.join(DATA_DIR, "nested_riotfile.py"))
+        os.environ["RIOT_ENV_BASE_PATH"] = os.path.join(RIOT_TESTS_PATH, "venv_py")
+
+        session.generate_base_venvs(re.compile(""), True, False, set())
+        yield session
+    finally:
+        shutil.rmtree(RIOT_TESTS_PATH, ignore_errors=True)
+
+
+def _get_env(env_name: str) -> Dict[str, str]:
+    """Return a dictionary with riot venv paths to add to the environment."""
+    venv_path = os.path.join(RIOT_TESTS_PATH, env_name)
+    venv_site_packages_path = os.path.join(
+        venv_path, "lib", f"python{current_py_hint}", "site-packages"
+    )
+
+    venv_python_path = os.path.join(venv_path, "bin")
+    command_env = {
+        "PYTHONPATH": venv_python_path,
+        "PATH": venv_python_path + ":" + venv_site_packages_path,
+        "VENV_PATH": venv_path,
+    }
+    return command_env
+
+
+def _get_pip_freeze(venv: Dict[str, str]) -> str:
+    result = run_cmd(
+        ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=venv
+    )
+    return result.stdout
+
+
+def _run_pip_install(package: str, venv: Dict[str, str]) -> None:
+    run_cmd(
+        ["python", "-m", "pip", "install", package],
+        stdout=subprocess.PIPE,
+        env=venv,
+    )
 
 
 @pytest.mark.parametrize(
@@ -172,34 +206,143 @@ def test_venv_name_matching(pattern: str) -> None:
     assert venv.matches_pattern(re.compile(pattern))
 
 
-def test_interpreter_venv_creation(interpreter_virtualenv: Dict[str, str]) -> None:
-    venv = interpreter_virtualenv
+def test_interpreter_venv_creation(
+    current_interpreter: Interpreter, interpreter_virtualenv: Dict[str, str]
+) -> None:
+    """Validate interpreter, creation of virtualenv.
 
-    run_cmd(
-        ["python", "-m", "pip", "install", "itsdangerous==1.1.0"],
-        stdout=subprocess.PIPE,
-        env=venv,
-    )
-    result = run_cmd(
-        ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=venv
-    )
-    assert result.stdout == "itsdangerous==1.1.0\n"
+    Install a package with pip in interpreter virtualenv and validate
+    if we re-run create_venv with recreate equal to False, the dependencies aren't
+    override
+    """
+    venv = interpreter_virtualenv
+    python_package = "itsdangerous==1.1.0"
+    _run_pip_install(python_package, venv)
+
+    current_interpreter.create_venv(recreate=False, path=str(venv["VENV_PATH"]))
+
+    result = _get_pip_freeze(venv)
+    assert result == "{}\n".format(python_package)
 
 
 def test_interpreter_venv_recreation(
     current_interpreter: Interpreter, interpreter_virtualenv: Dict[str, str]
 ) -> None:
+    """Validate interpreter, recreation of virtualenv.
+
+    Install a package with pip in interpreter virtualenv and validate
+    if we re-run create_venv with recreate equal to True, the dependencies are restored.
+    """
     venv = interpreter_virtualenv
 
-    run_cmd(
-        ["python", "-m", "pip", "install", "itsdangerous==1.1.0"],
-        stdout=subprocess.PIPE,
-        env=venv,
-    )
+    python_package = "itsdangerous==1.1.0"
+    _run_pip_install(python_package, venv)
 
     current_interpreter.create_venv(recreate=True, path=str(venv["VENV_PATH"]))
 
-    result = run_cmd(
-        ["python", "-m", "pip", "freeze"], stdout=subprocess.PIPE, env=venv
+    result = _get_pip_freeze(venv)
+    assert result == ""
+
+
+def _get_base_env_path() -> str:
+    return os.path.abspath(
+        os.path.join(
+            RIOT_TESTS_PATH,
+            "venv_py{}{}{}".format(
+                sys.version_info.major,
+                sys.version_info.minor,
+                sys.version_info.micro,
+            ),
+        )
     )
-    assert result.stdout == ""
+
+
+def test_session_generate(session_virtualenv: Session) -> None:
+    """Validate session, generation of virtualenvs.
+
+    Generate new base venv and validate the virtualenv exists
+    """
+    venv_path = _get_base_env_path()
+    assert os.path.isdir(venv_path)
+
+
+def test_session_run(session_virtualenv: Session) -> None:
+    """Validate session run method.
+
+    Generate new base venv and validate the nested packages.
+    """
+    session_virtualenv.run(re.compile(""), re.compile(""), False, False)
+
+    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    command_env = _get_env(env_name)
+    # Check exists and is empty of packages
+    result = _get_pip_freeze(command_env)
+    regex = r"isort==5\.10\.1itsdangerous==1\.1\.0(.*)six==1\.15\.0"
+    expected = re.match(regex, result.replace("\n", ""))
+    assert expected
+
+
+def test_session_run_check_environment_modifications(
+    session_virtualenv: Session,
+) -> None:
+    """Validate session run method.
+
+    Generate new base venv, edit the packages installed with pip isntall
+    and validate the nested packages are different.
+    """
+    session_virtualenv.run(re.compile(""), re.compile(""), False, False)
+
+    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    command_env = _get_env(env_name)
+    _run_pip_install("itsdangerous==0.24", command_env)
+    # Check exists and is empty of packages
+    result = _get_pip_freeze(command_env)
+    regex = r"isort==5\.10\.1itsdangerous==0\.24(.*)six==1\.15\.0"
+    expected = re.match(regex, result.replace("\n", ""))
+    assert expected
+
+
+def test_session_run_check_environment_modifications_and_recreate_false(
+    session_virtualenv: Session,
+) -> None:
+    """Validate session run method.
+
+    Create nested environments, edit the packages installed with pip isntall
+    and validate the nested packages are different after execute again session.run
+    with recreate_venvs equal to False.
+    """
+    session_virtualenv.run(re.compile(""), re.compile(""), False, False)
+
+    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    command_env = _get_env(env_name)
+    _run_pip_install("itsdangerous==0.24", command_env)
+
+    session_virtualenv.run(re.compile(""), re.compile(""), False, False)
+
+    result = _get_pip_freeze(command_env)
+    regex = r"isort==5\.10\.1itsdangerous==0\.24(.*)six==1\.15\.0"
+    expected = re.match(regex, result.replace("\n", ""))
+    assert expected
+
+
+def test_session_run_check_environment_modifications_and_recreate_true(
+    session_virtualenv: Session,
+) -> None:
+    """Validate session run method.
+
+    Create nested environments, edit the packages installed with pip isntall
+    and validate the nested packages are restored after execute again session.run
+    with recreate_venvs equal to True.
+    """
+    session_virtualenv.run(re.compile(""), re.compile(""), False, False)
+
+    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    command_env = _get_env(env_name)
+    _run_pip_install("itsdangerous==0.24", command_env)
+
+    session_virtualenv.run(re.compile(""), re.compile(""), False, True)
+
+    result = _get_pip_freeze(command_env)
+    regex = r"isort==5\.10\.1itsdangerous==1\.1\.0(.*)six==1\.15\.0"
+    expected = re.match(regex, result.replace("\n", ""))
+    assert expected, "error: {}".format(result)
