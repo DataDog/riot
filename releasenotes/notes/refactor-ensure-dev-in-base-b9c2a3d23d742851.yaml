@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Riot can now be used to run commands in virtual environments even when a
+    Python setup file is not available in the working directory. A warning will
+    be issued in these cases instead.
+fixes:
+  - |
+    Ensure that the dev package is always installed in the base environment when
+    it is created for the first time, if any exist.
