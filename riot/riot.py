@@ -163,15 +163,14 @@ class Interpreter:
         """Attempt to create a virtual environment for this intepreter."""
         venv_path: str = path or self.venv_path
 
-        if os.path.isdir(venv_path) and not recreate:
-            logger.info(
-                "Skipping creation of virtualenv '%s' as it already exists.", venv_path
-            )
-            return venv_path
-
-        if recreate:
+        if os.path.isdir(venv_path):
+            if not recreate:
+                logger.info(
+                    "Skipping creation of virtualenv '%s' as it already exists.", venv_path
+                )
+                return venv_path
             logger.info("Deleting virtualenv '%s'", venv_path)
-            shutil.rmtree(venv_path, ignore_errors=True)
+            shutil.rmtree(venv_path)
 
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
