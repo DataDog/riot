@@ -456,7 +456,7 @@ def test_failure():
     assert 1 == 0
 """,
     )
-    result = tmp_run("riot run -s pass")
+    result = tmp_run("riot --pipe run -s pass")
     assert result.returncode == 0, result.stderr
     assert re.search(
         r"""
@@ -474,7 +474,10 @@ test_success.py .*
 1 passed with 0 warnings, 0 failed\n""".lstrip(),
         result.stdout,
     ), result.stdout
-    assert result.stderr == ""
+    assert (
+        "No Python setup file found. Skipping dev package installation."
+        in result.stderr
+    )
 
     result = tmp_run("riot run -s fail")
     assert re.search(
@@ -522,9 +525,12 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot run -s test_cmdargs -- -k filter")
+    result = tmp_run("riot --pipe run -s test_cmdargs -- -k filter")
     assert "cmdargs=-k filter" not in result.stdout
-    assert result.stderr == ""
+    assert (
+        "No Python setup file found. Skipping dev package installation."
+        in result.stderr
+    )
     assert result.returncode == 0
 
     rf_path.write_text(
@@ -555,10 +561,12 @@ venv = Venv(
 )
 """,
     )
-    result = tmp_run("riot run test")
-    assert result.returncode == 1
-    assert "setup.py" in result.stderr, result.stderr
-    assert "Dev install failed, aborting!" in result.stderr, result.stderr
+    result = tmp_run("riot --pipe run test")
+    assert result.returncode == 0
+    assert (
+        "No Python setup file found. Skipping dev package installation."
+        in result.stderr
+    )
 
 
 def test_bad_interpreter(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
