@@ -148,7 +148,16 @@ class Interpreter:
             py_ex = shutil.which(f"python{self._hint}")
 
         if py_ex:
-            return os.path.abspath(py_ex)
+            # Ensure that we are getting the path of the actual executable,
+            # rather than some wrapping shell script.
+
+            return os.path.abspath(
+                subprocess.check_output(
+                    [py_ex, "-c", "import sys;print(sys.executable)"]
+                )
+                .decode()
+                .strip()
+            )
 
         raise FileNotFoundError(f"Python interpreter {self._hint} not found")
 
