@@ -35,7 +35,7 @@ venv = Venv(
             name="flake8",
             command="flake8 {cmdargs}",
             pkgs={
-                "flake8": latest,
+                "flake8": "<5.0.0",
                 "flake8-blind-except": latest,
                 "flake8-builtins": latest,
                 "flake8-docstrings": latest,
