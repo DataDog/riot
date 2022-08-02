@@ -166,7 +166,8 @@ class Interpreter:
         if os.path.isdir(venv_path):
             if not recreate:
                 logger.info(
-                    "Skipping creation of virtualenv '%s' as it already exists.", venv_path
+                    "Skipping creation of virtualenv '%s' as it already exists.",
+                    venv_path,
                 )
                 return venv_path
             logger.info("Deleting virtualenv '%s'", venv_path)
