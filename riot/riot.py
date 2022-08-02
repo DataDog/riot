@@ -151,7 +151,16 @@ class Interpreter:
             py_ex = shutil.which(f"python{self._hint}")
 
         if py_ex:
-            return os.path.abspath(py_ex)
+            # Ensure that we are getting the path of the actual executable,
+            # rather than some wrapping shell script.
+
+            return os.path.abspath(
+                subprocess.check_output(
+                    [py_ex, "-c", "import sys;print(sys.executable)"]
+                )
+                .decode()
+                .strip()
+            )
 
         raise FileNotFoundError(f"Python interpreter {self._hint} not found")
 
@@ -164,20 +173,29 @@ class Interpreter:
             os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
         )
 
-    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> str:
-        """Attempt to create a virtual environment for this intepreter."""
+    def exists(self) -> bool:
+        """Return whether the virtual environment for this interpreter exists."""
+        return os.path.isdir(self.venv_path)
+
+    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> bool:
+        """Attempt to create a virtual environment for this intepreter.
+
+        Returns ``True`` if the virtual environment was created or ``False`` if
+        it already existed.
+        """
         venv_path: str = path or self.venv_path
 
         if os.path.isdir(venv_path) and not recreate:
             logger.info(
                 "Skipping creation of virtualenv '%s' as it already exists.", venv_path
             )
-            return venv_path
+            return False
 
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
         run_cmd(["virtualenv", f"--python={py_ex}", venv_path], stdout=subprocess.PIPE)
-        return venv_path
+
+        return True
 
 
 @dataclasses.dataclass
@@ -854,18 +872,21 @@ class Session:
 
         for py in required_pys:
             try:
-                venv_path = py.create_venv(recreate)
+                # We check if the venv existed already. If it didn't, we know we
+                # have to install the dev package. Otherwise we assume that it
+                # already has the dev package installed.
+                existed = not py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
                 logger.error("Python version '%s' not found.", py)
             else:
-                if skip_deps:
+                if existed and skip_deps:
                     logger.info("Skipping global deps install.")
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(venv_path)
+                install_dev_pkg(py.venv_path)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1058,6 +1079,13 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
 
 
 def install_dev_pkg(venv_path):
+    for setup_file in {"setup.py", "pyproject.toml"}:
+        if os.path.exists(setup_file):
+            break
+    else:
+        logger.warning("No Python setup file found. Skipping dev package installation.")
+        return
+
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
         Session.run_cmd_venv(
