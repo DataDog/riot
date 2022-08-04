@@ -168,7 +168,7 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        env_base_path = os.environ.get("RIOT_ENV_BASE_PATH") or DEFAULT_RIOT_PATH
+        env_base_path = os.environ.get("RIOT_ENV_BASE_PATH", DEFAULT_RIOT_PATH)
         return os.path.abspath(
             os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
         )
