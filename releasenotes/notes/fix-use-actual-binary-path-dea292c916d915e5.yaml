@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Riot will now use the path of the actual discovered Python binary to create
+    virtual environments, instead of using wrapping shell scripts (e.g. pyenv
+    shims).
