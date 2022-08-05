@@ -54,7 +54,7 @@ def interpreter_virtualenv(
 def session_virtualenv() -> Generator[Session, None, None]:
     try:
         session = Session.from_config_file(os.path.join(DATA_DIR, "nested_riotfile.py"))
-        os.environ["RIOT_ENV_BASE_PATH"] = os.path.join(RIOT_TESTS_PATH, "venv_py")
+        os.environ["RIOT_ENV_BASE_PATH"] = RIOT_TESTS_PATH
 
         session.generate_base_venvs(re.compile(""), True, False, set())
         yield session
@@ -71,6 +71,7 @@ def _get_env(env_name: str) -> Dict[str, str]:
 
     venv_python_path = os.path.join(venv_path, "bin")
     command_env = {
+        "RIOT_ENV_BASE_PATH": RIOT_TESTS_PATH,
         "PYTHONPATH": venv_python_path,
         "PATH": venv_python_path + ":" + venv_site_packages_path,
         "VENV_PATH": venv_path,

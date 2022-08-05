@@ -191,7 +191,7 @@ class Interpreter:
                     "Skipping creation of virtualenv '%s' as it already exists.",
                     venv_path,
                 )
-                return venv_path
+                return False
             logger.info("Deleting virtualenv '%s'", venv_path)
             shutil.rmtree(venv_path)
 
@@ -879,13 +879,13 @@ class Session:
                 # We check if the venv existed already. If it didn't, we know we
                 # have to install the dev package. Otherwise we assume that it
                 # already has the dev package installed.
-                existed = not py.create_venv(recreate)
+                install_deps = py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
                 logger.error("Python version '%s' not found.", py)
             else:
-                if existed and skip_deps:
+                if not install_deps and skip_deps:
                     logger.info("Skipping global deps install.")
                     continue
 
