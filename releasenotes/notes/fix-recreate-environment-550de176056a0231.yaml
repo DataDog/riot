@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Ensure a "restart" of virtualenv deleting the old one with recreation option (-r)
