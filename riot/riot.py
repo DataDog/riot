@@ -7,6 +7,7 @@ import importlib.util
 import itertools
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RIOT_PATH = ".riot"
 DEFAULT_RIOT_ENV_PREFIX = "venv_py"
+SETUP_FILES = ["setup.py", "pyproject.toml"]
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
@@ -882,8 +884,16 @@ class Session:
                 logger.error("Python version '%s' not found.", py)
             else:
                 if existed and skip_deps:
-                    logger.info("Skipping global deps install.")
-                    continue
+                    hash_file = Path(py.venv_path) / ".riot-setup-hash"
+                    if (
+                        hash_file.exists()
+                        and hash_file.read_text().strip() == setup_hash()
+                    ):
+                        logger.info("Skipping global deps install.")
+                        continue
+                    logger.info(
+                        "Re-installing development package because of setup hash mismatch."
+                    )
 
                 # Install the dev package into the base venv.
                 install_dev_pkg(py.venv_path)
@@ -1078,9 +1088,21 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
     )
 
 
+def setup_hash() -> t.Optional[str]:
+    """Generate a hash from the current setup files."""
+    setup_hash = ""
+
+    for setup_file in SETUP_FILES:
+        path = Path(setup_file)
+        if path.exists():
+            setup_hash += sha256(path.read_bytes()).hexdigest()
+
+    return setup_hash or None
+
+
 def install_dev_pkg(venv_path):
-    for setup_file in {"setup.py", "pyproject.toml"}:
-        if os.path.exists(setup_file):
+    for setup_file in SETUP_FILES:
+        if Path(setup_file).exists():
             break
     else:
         logger.warning("No Python setup file found. Skipping dev package installation.")
@@ -1094,3 +1116,6 @@ def install_dev_pkg(venv_path):
     except CmdFailure as e:
         logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
         sys.exit(1)
+
+    # Store setup hash in the interpreter venv
+    (Path(venv_path) / ".riot-setup-hash").write_text(setup_hash())
