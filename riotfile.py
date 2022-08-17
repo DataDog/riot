@@ -5,11 +5,12 @@ venv = Venv(
     venvs=[
         Venv(
             name="test",
-            command="pytest {cmdargs}",
+            command="pytest -n auto --dist loadscope {cmdargs}",
             pys=["3.6", "3.7", "3.8", "3.9", "3.10"],
             pkgs={
                 "pytest": latest,
                 "pytest-cov": latest,
+                "pytest-xdist": latest,
                 "mock": latest,
                 "typing-extensions": latest,
             },
