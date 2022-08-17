@@ -187,11 +187,15 @@ class Interpreter:
         """
         venv_path: str = path or self.venv_path
 
-        if os.path.isdir(venv_path) and not recreate:
-            logger.info(
-                "Skipping creation of virtualenv '%s' as it already exists.", venv_path
-            )
-            return False
+        if os.path.isdir(venv_path):
+            if not recreate:
+                logger.info(
+                    "Skipping creation of virtualenv '%s' as it already exists.",
+                    venv_path,
+                )
+                return False
+            logger.info("Deleting virtualenv '%s'", venv_path)
+            shutil.rmtree(venv_path)
 
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
@@ -533,7 +537,7 @@ class VenvInstance:
             py is not None
             and self.pkgs
             and self.prefix is not None
-            and not os.path.isdir(self.prefix)
+            and (not os.path.isdir(self.prefix) or recreate)
         ):
             venv_path = self.venv_path
             assert venv_path is not None, py
@@ -877,13 +881,13 @@ class Session:
                 # We check if the venv existed already. If it didn't, we know we
                 # have to install the dev package. Otherwise we assume that it
                 # already has the dev package installed.
-                existed = not py.create_venv(recreate)
+                install_deps = py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
                 logger.error("Python version '%s' not found.", py)
             else:
-                if existed and skip_deps:
+                if not install_deps and skip_deps:
                     hash_file = Path(py.venv_path) / ".riot-setup-hash"
                     if (
                         hash_file.exists()
