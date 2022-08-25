@@ -17,9 +17,7 @@ venv = Venv(
         ),
         Venv(
             pkgs={
-                "black": "==20.8b1",
-                # See https://github.com/psf/black/issues/2964 for incompatibility with click==8.1.0
-                "click": "<8.1.0",
+                "black": "==22.6.0",
             },
             venvs=[
                 Venv(
