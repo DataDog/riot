@@ -43,6 +43,9 @@ SKIP_BASE_INSTALL_ARG = click.option(
 PYTHON_VERSIONS_ARG = click.option(
     "-p", "--python", "pythons", type=InterpreterParamType(), default=[], multiple=True
 )
+INTERPRETERS_ONLY_ARG = click.option(
+    "-i", "--interpreters-only", "interpreters_only", is_flag=True, default=False,
+)
 
 
 @click.group()
@@ -91,13 +94,15 @@ def main(ctx, riotfile, log_level, pipe_mode):
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
 @VENV_PATTERN_ARG
+@INTERPRETERS_ONLY_ARG
 @click.pass_context
-def list_venvs(ctx, pythons, pattern, venv_pattern):
+def list_venvs(ctx, pythons, pattern, venv_pattern, interpreters_only):
     ctx.obj["session"].list_venvs(
         re.compile(pattern),
         re.compile(venv_pattern),
         pythons=pythons,
         pipe_mode=ctx.obj["pipe"],
+        interpreters_only=interpreters_only,
     )
 
 

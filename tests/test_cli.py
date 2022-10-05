@@ -109,6 +109,20 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
             )
 
 
+def test_list_with_interpreters_only(cli: click.testing.CliRunner) -> None:
+    """Running list with --interpreters-only should print only unique Python interpreter versions for matching venvs."""
+    with with_riotfile(cli, "empty_riotfile.py"):
+        result = cli.invoke(riot.cli.main, ["list", "--interpreters-only"])
+        # Success, but no output because no venvs to list
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+    with with_riotfile(cli, "simple_riotfile.py"):
+        result = cli.invoke(riot.cli.main, ["list", "--interpreters-only"])
+        # Success, should list 2 venvs with py=3
+        assert result.exit_code == 0, result.stdout
+        assert result.stdout == "3\n"
+
 def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
     """Running run with long option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
