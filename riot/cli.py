@@ -44,7 +44,11 @@ PYTHON_VERSIONS_ARG = click.option(
     "-p", "--python", "pythons", type=InterpreterParamType(), default=[], multiple=True
 )
 INTERPRETERS_ARG = click.option(
-    "-i", "--interpreters", "interpreters", is_flag=True, default=False,
+    "-i",
+    "--interpreters",
+    "interpreters",
+    is_flag=True,
+    default=False,
 )
 
 

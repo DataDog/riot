@@ -123,6 +123,7 @@ def test_list_with_interpreters_only(cli: click.testing.CliRunner) -> None:
         assert result.exit_code == 0, result.stdout
         assert result.stdout == "3\n"
 
+
 def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
     """Running run with long option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:

@@ -806,7 +806,13 @@ class Session:
             sys.exit(1)
 
     def list_venvs(
-        self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False, interpreters=False,
+        self,
+        pattern,
+        venv_pattern,
+        pythons=None,
+        out=sys.stdout,
+        pipe_mode=False,
+        interpreters=False,
     ):
         python_interpreters = set()
         table = None
