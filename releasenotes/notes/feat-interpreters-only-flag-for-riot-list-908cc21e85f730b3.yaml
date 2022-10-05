@@ -1,5 +1,5 @@
 ---
 features:
   - |
-    An interpreters-only flag has been added to the riot list command, which will output a list containing 
-    only the unique python versions corresponding to each matching riot venv instead of a table.
+    An interpreters flag has been added to the riot list command, which will output a list containing 
+    the unique python versions corresponding to each matching riot venv.

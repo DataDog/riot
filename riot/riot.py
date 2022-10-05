@@ -806,11 +806,11 @@ class Session:
             sys.exit(1)
 
     def list_venvs(
-        self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False, interpreters_only=False,
+        self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False, interpreters=False,
     ):
-        interpreters = set()
+        python_interpreters = set()
         table = None
-        if not (pipe_mode or interpreters_only):
+        if not (pipe_mode or interpreters):
             table = Table(
                 "No.",
                 "Hash",
@@ -832,8 +832,8 @@ class Session:
                 continue
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
-            if interpreters_only:
-                interpreters.add(inst.py._hint)
+            if interpreters:
+                python_interpreters.add(inst.py._hint)
                 continue
             if pipe_mode:
                 print(
@@ -852,8 +852,8 @@ class Session:
         if table:
             rich_print(table)
 
-        if interpreters_only and interpreters:
-            print(",".join(interpreters))
+        if interpreters and python_interpreters:
+            print(",".join(python_interpreters))
 
     def generate_base_venvs(
         self,
