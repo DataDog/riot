@@ -7,6 +7,8 @@ import importlib.util
 import itertools
 import logging
 import os
+from packaging.version import parse
+from packaging.version import Version
 import shutil
 import subprocess
 import sys
@@ -859,7 +861,7 @@ class Session:
             rich_print(table)
 
         if interpreters and python_interpreters:
-            print(",".join(python_interpreters))
+            print("\n".join(sorted(python_interpreters, key=Version)))
 
     def generate_base_venvs(
         self,

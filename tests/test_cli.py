@@ -119,9 +119,13 @@ def test_list_with_interpreters_only(cli: click.testing.CliRunner) -> None:
 
     with with_riotfile(cli, "simple_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list", "--interpreters"])
-        # Success, should list 2 venvs with py=3
         assert result.exit_code == 0, result.stdout
         assert result.stdout == "3\n"
+
+    with with_riotfile(cli, "diff_pys_riotfile.py"):
+        result = cli.invoke(riot.cli.main, ["list", "--interpreters"])
+        assert result.exit_code == 0, result.stdout
+        assert result.stdout == "2.7\n3.5\n3.6\n3.7\n3.8\n3.9\n"
 
 
 def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
