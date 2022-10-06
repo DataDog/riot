@@ -31,6 +31,7 @@ setup(
         "virtualenv",
         "rich",
         "pexpect",
+        "packaging",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,

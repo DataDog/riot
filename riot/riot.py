@@ -7,8 +7,6 @@ import importlib.util
 import itertools
 import logging
 import os
-from packaging.version import parse
-from packaging.version import Version
 import shutil
 import subprocess
 import sys
@@ -17,6 +15,7 @@ import traceback
 import typing as t
 
 import click
+from packaging.version import Version
 import pexpect
 from rich import print as rich_print
 from rich.pretty import Pretty
