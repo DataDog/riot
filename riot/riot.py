@@ -15,6 +15,7 @@ import traceback
 import typing as t
 
 import click
+from packaging.version import Version
 import pexpect
 from rich import print as rich_print
 from rich.pretty import Pretty
@@ -859,7 +860,7 @@ class Session:
             rich_print(table)
 
         if interpreters and python_interpreters:
-            print(",".join(python_interpreters))
+            print("\n".join(sorted(python_interpreters, key=Version)))
 
     def generate_base_venvs(
         self,
