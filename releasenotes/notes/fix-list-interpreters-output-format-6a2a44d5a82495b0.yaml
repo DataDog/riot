@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Modified the output of the ``--interpreters`` flag for the riot list command to be sorted by versions and
+    be newline-separated instead of comma-separated.
