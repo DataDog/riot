@@ -13,11 +13,13 @@ venv = Venv(
                 "pytest-xdist": latest,
                 "mock": latest,
                 "typing-extensions": latest,
+                "packaging": latest,
             },
         ),
         Venv(
             pkgs={
                 "black": "==22.6.0",
+                "packaging": latest,
             },
             venvs=[
                 Venv(
@@ -43,6 +45,7 @@ venv = Venv(
                 "flake8-rst-docstrings": latest,
                 # needed for some features from flake8-rst-docstrings
                 "pygments": latest,
+                "packaging": latest,
             },
         ),
         Venv(
@@ -51,6 +54,7 @@ venv = Venv(
             pkgs={
                 "mypy": latest,
                 "pytest": latest,
+                "packaging": latest,
             },
             create=True,
         ),
