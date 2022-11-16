@@ -814,10 +814,12 @@ class Session:
         out=sys.stdout,
         pipe_mode=False,
         interpreters=False,
+        hash_only=False,
     ):
         python_interpreters = set()
+        venv_hashes = set()
         table = None
-        if not (pipe_mode or interpreters):
+        if not (pipe_mode or interpreters or hash_only):
             table = Table(
                 "No.",
                 "Hash",
@@ -839,9 +841,11 @@ class Session:
                 continue
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
-            if interpreters:
+            if interpreters or hash_only:
                 python_interpreters.add(inst.py._hint)
+                venv_hashes.add(inst.short_hash)
                 continue
+
             if pipe_mode:
                 print(
                     f"[#{n}]  {inst.short_hash}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
@@ -859,7 +863,10 @@ class Session:
         if table:
             rich_print(table)
 
-        if interpreters and python_interpreters:
+        elif hash_only and venv_hashes:
+            print("\n".join(sorted(venv_hashes)))
+
+        elif interpreters and python_interpreters:
             print("\n".join(sorted(python_interpreters, key=Version)))
 
     def generate_base_venvs(

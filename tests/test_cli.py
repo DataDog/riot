@@ -128,6 +128,28 @@ def test_list_with_interpreters_only(cli: click.testing.CliRunner) -> None:
         assert result.stdout == "2.7\n3.5\n3.6\n3.7\n3.8\n3.9\n"
 
 
+def test_list_with_hash_only(cli: click.testing.CliRunner) -> None:
+    """Running list with --hash-only should print unique test venv short hashes only."""
+    with with_riotfile(cli, "empty_riotfile.py"):
+        result = cli.invoke(riot.cli.main, ["list", "--hash-only"])
+        # Success, but no output because no venvs to list
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+    with with_riotfile(cli, "simple_riotfile.py"):
+        result = cli.invoke(riot.cli.main, ["list", "--hash-only"])
+        assert result.exit_code == 0, result.stdout
+        assert result.stdout == "2dd7a54\n4375064\n"
+
+    with with_riotfile(cli, "diff_pys_riotfile.py"):
+        result = cli.invoke(riot.cli.main, ["list", "--hash-only"])
+        assert result.exit_code == 0, result.stdout
+        assert (
+            result.stdout
+            == "10caf25\n1148750\n1a47d0a\n1e9988e\n453e5ba\n5a99917\n6039693\n6bc39d3\n6e52e25\n77d5b15\n8d17393\nf65004c\n"
+        )
+
+
 def test_run_with_long_args(cli: click.testing.CliRunner) -> None:
     """Running run with long option names uses those options."""
     with mock.patch("riot.cli.Session.run") as run:
