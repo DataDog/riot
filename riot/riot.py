@@ -246,6 +246,7 @@ class Venv:
     pys: dataclasses.InitVar[
         t.Union[Interpreter._T_hint, t.List[Interpreter._T_hint]]
     ] = None
+    install_options: str = ""
     pkgs: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
     env: dataclasses.InitVar[t.Dict[str, t.Union[str, t.List[str]]]] = None
     name: t.Optional[str] = None
@@ -284,6 +285,8 @@ class Venv:
                         pkgs=dict(pkgs),
                         parent=parent_inst,
                         created=self.create,
+                        install_options=self.install_options
+                        or (parent_inst.install_options if parent_inst else ""),
                     )
                     if not self.venvs:
                         yield inst
@@ -347,6 +350,7 @@ class VenvInstance:
     pkgs: t.Dict[str, str]
     py: Interpreter
     env: t.Dict[str, str]
+    install_options: str = ""
     name: t.Optional[str] = None
     command: t.Optional[str] = None
     parent: t.Optional["VenvInstance"] = None
@@ -544,7 +548,7 @@ class VenvInstance:
             if self.created:
                 py.create_venv(recreate, venv_path)
                 if not skip_deps:
-                    install_dev_pkg(venv_path)
+                    install_dev_pkg(venv_path, self.install_options)
 
             pkg_str = self.pkg_str
             assert pkg_str is not None
@@ -556,7 +560,7 @@ class VenvInstance:
             try:
                 Session.run_cmd_venv(
                     venv_path,
-                    f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location {pkg_str}",
+                    f"pip --disable-pip-version-check install {self.install_options} --prefix '{self.prefix}' --no-warn-script-location {pkg_str}",
                     env=env,
                 )
             except CmdFailure as e:
@@ -904,7 +908,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path)
+                install_dev_pkg(py.venv_path, "")
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1096,7 +1100,7 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
     )
 
 
-def install_dev_pkg(venv_path):
+def install_dev_pkg(venv_path, install_options):
     for setup_file in {"setup.py", "pyproject.toml"}:
         if os.path.exists(setup_file):
             break
@@ -1107,7 +1111,7 @@ def install_dev_pkg(venv_path):
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
         Session.run_cmd_venv(
-            venv_path, "pip --disable-pip-version-check install -e .", env=os.environ
+            venv_path, f"pip install -e {install_options} .", env=os.environ
         )
     except CmdFailure as e:
         logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)

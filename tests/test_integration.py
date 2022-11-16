@@ -871,3 +871,22 @@ setup(
         r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_install_options(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test_install_options",
+    install_options="--dry-run",
+    pys=["3"],
+    pkgs={"gevent": latest},
+    command="echo dry run complete",
+)
+""",
+    )
+    result = tmp_run("riot -v run -s test_install_options")
+    assert "dry run complete" in result.stdout
+    assert result.returncode == 0, result.stderr

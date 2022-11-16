@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    adds `install_options` field to `riot.Venv`. This field can be used to pass options to `pip install` commands.
