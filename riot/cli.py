@@ -99,14 +99,22 @@ def main(ctx, riotfile, log_level, pipe_mode):
 @PATTERN_ARG
 @VENV_PATTERN_ARG
 @INTERPRETERS_ARG
+@click.option(
+    "--hash-only",
+    "hash_only",
+    is_flag=True,
+    default=False,
+    help="Only print the hashes of matched venvs",
+)
 @click.pass_context
-def list_venvs(ctx, pythons, pattern, venv_pattern, interpreters):
+def list_venvs(ctx, pythons, pattern, venv_pattern, interpreters, hash_only):
     ctx.obj["session"].list_venvs(
         re.compile(pattern),
         re.compile(venv_pattern),
         pythons=pythons,
         pipe_mode=ctx.obj["pipe"],
         interpreters=interpreters,
+        hash_only=hash_only,
     )
 
 
