@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Riot will attempt to re-install the development package if changes to the
+    setup files are detected when using the skip option with the run command.

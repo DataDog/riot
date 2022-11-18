@@ -485,7 +485,6 @@ test_success.py .*
         result.stdout,
         re.MULTILINE,
     )
-    assert result.stderr == ""
     assert result.returncode == 1
 
 
@@ -545,7 +544,6 @@ venv = Venv(
     )
     result = tmp_run("riot run -s test_cmdargs -- -k filter")
     assert "cmdargs=-k filter" in result.stdout
-    assert result.stderr == ""
     assert result.returncode == 0
 
 
@@ -870,4 +868,74 @@ setup(
     assert re.search(
         r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
     )
+    assert result.returncode == 0, result.stderr
+
+
+def test_setup_hash_changed(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test",
+    pys=["3"],
+    pkgs={"requests": latest},
+    command="python -c 'import requests'",
+)
+""",
+    )
+
+    setup_path = tmp_path / "setup.py"
+    setup_path.write_text(
+        """
+from setuptools import setup, find_packages
+
+setup(
+    name='foo',
+    version='1.0.0',
+    url='https://github.com/bar/foo.git',
+    author='Me',
+    author_email='author@email.com',
+    description='Noop',
+    packages=find_packages(),
+    install_requires=[],
+)
+""",
+    )
+    result = tmp_run("riot -vd --pipe run -s test")
+    assert "Installing dev package (edit mode)" in result.stderr
+    assert result.returncode == 0, result.stderr
+
+    # Check that we skip re-installing the dev packege if no changes to setup.py
+    result = tmp_run("riot -vd --pipe run -s test")
+    assert "Skipping global deps install." in result.stderr
+    assert result.returncode == 0, result.stderr
+
+    # Modify setup.py and re-run to check that we are re-installing the dev package
+    setup_path.write_text(
+        """
+from setuptools import setup, find_packages
+
+setup(
+    name='foo',
+    version='2.0.0',
+    url='https://github.com/bar/foo.git',
+    author='Me',
+    author_email='author@email.com',
+    description='Noop',
+    packages=find_packages(),
+    install_requires=[],
+)
+""",
+    )
+    result = tmp_run("riot -vd --pipe run -s test")
+    assert (
+        "Re-installing development package because of setup hash mismatch."
+        in result.stderr
+    )
+    assert result.returncode == 0, result.stderr
+
+    # Check that we skip re-installing the dev packege if no changes to setup.py
+    result = tmp_run("riot -vd --pipe run -s test")
+    assert "Skipping global deps install." in result.stderr
     assert result.returncode == 0, result.stderr
