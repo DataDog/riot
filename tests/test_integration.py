@@ -871,3 +871,28 @@ setup(
         r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_long_path(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    wd = tmp_path / ("a" * (230 - len(str(tmp_path))))
+    wd.mkdir()
+
+    rf_path = wd / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv, latest
+venv = Venv(
+    name="test",
+    pys=["3"],
+    pkgs={"requests": latest},
+    command="python -c 'import requests;print(\\\"TEST OK\\\")'",
+)
+""",
+    )
+
+    result = tmp_run("riot -vd --pipe run test", cwd=wd)
+
+    assert result.returncode == 0, result.stderr
+
+    assert re.search(r"venv_py[0-9]+_requests", result.stderr) is None
+    assert "TEST OK" in result.stdout

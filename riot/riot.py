@@ -388,7 +388,12 @@ class VenvInstance:
 
         ident = self.ident
         assert ident is not None, self
-        return "_".join((venv_path, ident))
+        prefix_path = "_".join((venv_path, ident))
+        return (
+            "_".join((venv_path, self.long_hash))[:255]
+            if len(prefix_path) > 255
+            else prefix_path
+        )
 
     @property
     def venv_path(self) -> t.Optional[str]:
@@ -438,8 +443,12 @@ class VenvInstance:
         return pip_deps(pkgs)
 
     @property
+    def long_hash(self) -> str:
+        return hex(hash(self))[2:]
+
+    @property
     def short_hash(self) -> str:
-        return hex(hash(self))[2:9]
+        return self.long_hash[:7]
 
     def __hash__(self):
         """Compute a hash for the venv instance."""
@@ -853,7 +862,7 @@ class Session:
             else:
                 table.add_row(
                     f"[cyan]#{n}[/cyan]",
-                    f"[bold cyan]{hex(hash(inst))[2:9]}[/bold cyan]",
+                    f"[bold cyan]{inst.short_hash}[/bold cyan]",
                     f"[bold]{inst.name}[/bold]",
                     Pretty(inst.py),
                     env_str or "--",
@@ -920,7 +929,7 @@ class Session:
 
     def shell(self, ident, pass_env):
         for n, inst in enumerate(self.venv.instances()):
-            if ident != f"#{n}" and not hex(hash(inst))[2:].startswith(ident):
+            if ident != f"#{n}" and not inst.long_hash.startswith(ident):
                 continue
 
             assert inst.py is not None, inst
