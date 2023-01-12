@@ -43,3 +43,6 @@ target/
 
 # Riot
 .riot/
+
+# Pycharm
+.idea

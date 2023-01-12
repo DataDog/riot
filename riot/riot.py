@@ -15,6 +15,7 @@ import traceback
 import typing as t
 
 import click
+from packaging.version import Version
 import pexpect
 from rich import print as rich_print
 from rich.pretty import Pretty
@@ -22,6 +23,9 @@ from rich.status import Status
 from rich.table import Table
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_RIOT_PATH = ".riot"
+DEFAULT_RIOT_ENV_PREFIX = "venv_py"
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
@@ -148,7 +152,16 @@ class Interpreter:
             py_ex = shutil.which(f"python{self._hint}")
 
         if py_ex:
-            return os.path.abspath(py_ex)
+            # Ensure that we are getting the path of the actual executable,
+            # rather than some wrapping shell script.
+
+            return os.path.abspath(
+                subprocess.check_output(
+                    [py_ex, "-c", "import sys;print(sys.executable)"]
+                )
+                .decode()
+                .strip()
+            )
 
         raise FileNotFoundError(f"Python interpreter {self._hint} not found")
 
@@ -156,22 +169,38 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        return os.path.abspath(f".riot/venv_py{version}")
+        env_base_path = os.environ.get("RIOT_ENV_BASE_PATH", DEFAULT_RIOT_PATH)
+        return os.path.abspath(
+            os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
+        )
 
-    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> str:
-        """Attempt to create a virtual environment for this intepreter."""
+    def exists(self) -> bool:
+        """Return whether the virtual environment for this interpreter exists."""
+        return os.path.isdir(self.venv_path)
+
+    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> bool:
+        """Attempt to create a virtual environment for this intepreter.
+
+        Returns ``True`` if the virtual environment was created or ``False`` if
+        it already existed.
+        """
         venv_path: str = path or self.venv_path
 
-        if os.path.isdir(venv_path) and not recreate:
-            logger.info(
-                "Skipping creation of virtualenv '%s' as it already exists.", venv_path
-            )
-            return venv_path
+        if os.path.isdir(venv_path):
+            if not recreate:
+                logger.info(
+                    "Skipping creation of virtualenv '%s' as it already exists.",
+                    venv_path,
+                )
+                return False
+            logger.info("Deleting virtualenv '%s'", venv_path)
+            shutil.rmtree(venv_path)
 
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
         run_cmd(["virtualenv", f"--python={py_ex}", venv_path], stdout=subprocess.PIPE)
-        return venv_path
+
+        return True
 
 
 class Venv:
@@ -239,16 +268,16 @@ class Venv:
         parent_inst: t.Optional["VenvInstance"] = None,
     ) -> t.Generator["VenvInstance", None, None]:
         # Expand out the instances for the venv.
-        for env_spec in expand_specs(self.env):
+        for env_spec in expand_specs(self.env):  # type: ignore[attr-defined]
             # Bubble up env
             env = parent_inst.env.copy() if parent_inst else {}
             env.update(dict(env_spec))
 
             # Bubble up pys
-            pys = self.pys or [parent_inst.py if parent_inst is not None else None]
+            pys = self.pys or [parent_inst.py if parent_inst is not None else None]  # type: ignore[attr-defined]
 
             for py in pys:
-                for pkgs in expand_specs(self.pkgs):
+                for pkgs in expand_specs(self.pkgs):  # type: ignore[attr-defined]
                     inst = VenvInstance(
                         # Bubble up name and command if not overridden
                         name=self.name or (parent_inst.name if parent_inst else None),
@@ -512,7 +541,7 @@ class VenvInstance:
             py is not None
             and self.pkgs
             and self.prefix is not None
-            and not os.path.isdir(self.prefix)
+            and (not os.path.isdir(self.prefix) or recreate)
         ):
             venv_path = self.venv_path
             assert venv_path is not None, py
@@ -783,10 +812,19 @@ class Session:
             sys.exit(1)
 
     def list_venvs(
-        self, pattern, venv_pattern, pythons=None, out=sys.stdout, pipe_mode=False
+        self,
+        pattern,
+        venv_pattern,
+        pythons=None,
+        out=sys.stdout,
+        pipe_mode=False,
+        interpreters=False,
+        hash_only=False,
     ):
+        python_interpreters = set()
+        venv_hashes = set()
         table = None
-        if not pipe_mode:
+        if not (pipe_mode or interpreters or hash_only):
             table = Table(
                 "No.",
                 "Hash",
@@ -808,6 +846,11 @@ class Session:
                 continue
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
+            if interpreters or hash_only:
+                python_interpreters.add(inst.py._hint)
+                venv_hashes.add(inst.short_hash)
+                continue
+
             if pipe_mode:
                 print(
                     f"[#{n}]  {inst.short_hash}  {inst.name:12} {env_str} {inst.py} Packages({pkgs_str})"
@@ -824,6 +867,12 @@ class Session:
 
         if table:
             rich_print(table)
+
+        elif hash_only and venv_hashes:
+            print("\n".join(sorted(venv_hashes)))
+
+        elif interpreters and python_interpreters:
+            print("\n".join(sorted(python_interpreters, key=Version)))
 
     def generate_base_venvs(
         self,
@@ -853,18 +902,21 @@ class Session:
 
         for py in required_pys:
             try:
-                venv_path = py.create_venv(recreate)
+                # We check if the venv existed already. If it didn't, we know we
+                # have to install the dev package. Otherwise we assume that it
+                # already has the dev package installed.
+                install_deps = py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
                 logger.error("Python version '%s' not found.", py)
             else:
-                if skip_deps:
+                if not install_deps and skip_deps:
                     logger.info("Skipping global deps install.")
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(venv_path)
+                install_dev_pkg(py.venv_path)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1057,6 +1109,13 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
 
 
 def install_dev_pkg(venv_path):
+    for setup_file in {"setup.py", "pyproject.toml"}:
+        if os.path.exists(setup_file):
+            break
+    else:
+        logger.warning("No Python setup file found. Skipping dev package installation.")
+        return
+
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
         Session.run_cmd_venv(

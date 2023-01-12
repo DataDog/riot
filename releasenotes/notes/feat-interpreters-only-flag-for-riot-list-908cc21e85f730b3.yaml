@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    A ``--interpreters`` flag has been added to the riot list command, which will output a list containing 
+    the unique python versions corresponding to each matching riot venv.

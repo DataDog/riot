@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add ``RIOT_ENV_BASE_PATH`` environment variable to change the default path of ``.riot`` directory instead of current
+    path.
