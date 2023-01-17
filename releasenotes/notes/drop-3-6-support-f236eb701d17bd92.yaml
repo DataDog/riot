@@ -1,0 +1,4 @@
+---
+deprecations:
+  - |
+    Drop support for python 3.6

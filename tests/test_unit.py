@@ -97,12 +97,12 @@ def _run_pip_install(package: str, venv: Dict[str, str]) -> None:
 @pytest.mark.parametrize(
     "v1,v2,equal",
     [
-        (3.6, 3.6, True),
-        (3.6, "3.6", True),
-        ("3.6", "3.6", True),
-        ("3.6", 3.6, True),
-        (3.6, 3.7, False),
-        (3.6, "3.7", False),
+        (3.7, 3.7, True),
+        (3.7, "3.7", True),
+        ("3.7", "3.7", True),
+        ("3.7", 3.7, True),
+        (3.8, 3.7, False),
+        (3.8, "3.7", False),
         (3.7, 3.7, True),
         (3, 3, True),
         (3, "3", True),
