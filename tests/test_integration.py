@@ -74,10 +74,11 @@ Options:
   --help           Show this message and exit.
 
 Commands:
-  generate  Generate base virtual environments.
-  list      List all virtual env instances matching a pattern.
-  run       Run virtualenv instances with names matching a pattern.
-  shell     Launch a shell inside a venv.
+  generate      Generate base virtual environments.
+  list          List all virtual env instances matching a pattern.
+  requirements  Cache requirements for a venv.
+  run           Run virtualenv instances with names matching a pattern.
+  shell         Launch a shell inside a venv.
 """.lstrip()
     )
     assert result.stderr == ""
@@ -167,10 +168,11 @@ Options:
   --help           Show this message and exit.
 
 Commands:
-  generate  Generate base virtual environments.
-  list      List all virtual env instances matching a pattern.
-  run       Run virtualenv instances with names matching a pattern.
-  shell     Launch a shell inside a venv.
+  generate      Generate base virtual environments.
+  list          List all virtual env instances matching a pattern.
+  requirements  Cache requirements for a venv.
+  run           Run virtualenv instances with names matching a pattern.
+  shell         Launch a shell inside a venv.
 """.lstrip()
     )
     assert result.stderr == ""
@@ -896,3 +898,69 @@ venv = Venv(
 
     assert re.search(r"venv_py[0-9]+_requests", result.stderr) is None
     assert "TEST OK" in result.stdout
+
+
+def test_requirements_lockfile_created(
+    tmp_path: pathlib.Path, tmp_run: _T_TmpRun
+) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={"requests": ""},
+    name="test",
+    command="env",
+    venvs=[Venv(pkgs={"pytest": ""})]
+)
+""",
+    )
+    _hash = tmp_run("riot list --hash-only").stdout.strip("\n")
+    result = tmp_run("riot requirements {}".format(_hash))
+    assert result.returncode == 0, result.stderr
+
+    lockfile_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            "requirements",
+            "{}.txt".format(_hash),
+        )
+    )
+    assert os.path.exists(lockfile_path)
+    with open(lockfile_path, "r") as f:
+        lines = f.readlines()
+        assert "==" in lines[-1]
+        assert "#" in lines[0]
+
+
+def test_recompile_flag(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={"requests": ""},
+    name="test",
+    command="env",
+    venvs=[Venv(pkgs={"pytest": ""})]
+)
+""",
+    )
+    _hash = tmp_run("riot list --hash-only").stdout.strip("\n")
+    lockfile_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            "requirements",
+            "{}.txt".format(_hash),
+        )
+    )
+    assert not os.path.exists(lockfile_path)
+
+    result = tmp_run("riot run -c test")
+    assert result.returncode == 0, result.stderr
+
+    assert os.path.exists(lockfile_path)

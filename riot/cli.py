@@ -50,6 +50,13 @@ INTERPRETERS_ARG = click.option(
     is_flag=True,
     default=False,
 )
+RECOMPILE_REQS_ARG = click.option(
+    "-c",
+    "--recompile-requirements",
+    "recompile_reqs",
+    is_flag=True,
+    default=False,
+)
 
 
 @click.group()
@@ -156,6 +163,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @click.option("--exitfirst", "-x", "exit_first", is_flag=True, default=False)
 @PATTERN_ARG
 @VENV_PATTERN_ARG
+@RECOMPILE_REQS_ARG
 @click.pass_context
 def run(
     ctx,
@@ -167,6 +175,7 @@ def run(
     exit_first,
     pattern,
     venv_pattern,
+    recompile_reqs,
 ):
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
@@ -178,6 +187,7 @@ def run(
         pythons=pythons,
         skip_missing=skip_missing,
         exit_first=exit_first,
+        recompile_reqs=recompile_reqs,
     )
 
 
@@ -189,4 +199,13 @@ def shell(ctx, ident, pass_env):
     ctx.obj["session"].shell(
         ident=ident,
         pass_env=pass_env,
+    )
+
+
+@main.command("requirements", help="""Cache requirements for a venv.""")
+@click.argument("ident", type=str)
+@click.pass_context
+def requirements(ctx, ident):
+    ctx.obj["session"].requirements(
+        ident=ident,
     )

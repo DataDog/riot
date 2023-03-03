@@ -198,7 +198,10 @@ class Interpreter:
 
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
-        run_cmd(["virtualenv", f"--python={py_ex}", venv_path], stdout=subprocess.PIPE)
+        run_cmd(
+            ["virtualenv", f"--python={py_ex}", venv_path],
+            stdout=subprocess.PIPE,
+        )
 
         return True
 
@@ -458,6 +461,41 @@ class VenvInstance:
         return int(h.hexdigest(), 16)
 
     @property
+    def requirements(self) -> str:
+        """Requirements for dependencies with pinned versions."""
+        # Transform full_pkg_str into requirements.in format
+        pkgs = "\n".join(self.full_pkg_str.replace("'", "").split(" "))
+        _dir = os.path.join(DEFAULT_RIOT_PATH, "requirements")
+        os.makedirs(_dir, exist_ok=True)
+        in_path = os.path.join(_dir, "{}.in".format(self.short_hash))
+        subprocess.check_output(
+            [self.py.path(), "-m", "pip", "install", "pip-tools"],
+        )
+        cmd = [
+            self.py.path(),
+            "-m",
+            "piptools",
+            "compile",
+            "-q",
+            "--no-annotate",
+            in_path,
+        ]
+        if tuple([int(v) for v in self.py.version().strip("()").split(".")]) >= (3, 7):
+            cmd.append("--resolver=backtracking")
+        logger.info(
+            "Compiling requirements file %s at %s.",
+            in_path,
+            self.prefix,
+        )
+        with open(in_path, "w+b") as f:
+            f.write(pkgs.encode("utf-8"))
+            f.flush()
+
+            out = subprocess.check_output(cmd)
+
+            return out.decode("utf-8")
+
+    @property
     def bin_path(self) -> t.Optional[str]:
         prefix = self.prefix
         if prefix is None:
@@ -535,9 +573,12 @@ class VenvInstance:
         py: t.Optional[Interpreter] = None,
         recreate: bool = False,
         skip_deps: bool = False,
+        recompile_reqs: bool = False,
     ) -> None:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
+        if recompile_reqs:
+            recreate = True
 
         # We only install dependencies if the prefix directory does not
         # exist already. If it does exist, we assume it is in a good state.
@@ -545,7 +586,7 @@ class VenvInstance:
             py is not None
             and self.pkgs
             and self.prefix is not None
-            and (not os.path.isdir(self.prefix) or recreate)
+            and (not os.path.isdir(self.prefix) or recreate or recompile_reqs)
         ):
             venv_path = self.venv_path
             assert venv_path is not None, py
@@ -557,15 +598,24 @@ class VenvInstance:
 
             pkg_str = self.pkg_str
             assert pkg_str is not None
+            compiled_requirements_file = (
+                f"{DEFAULT_RIOT_PATH}/requirements/{self.short_hash}.txt"
+            )
+            if recompile_reqs or not os.path.exists(compiled_requirements_file):
+                _ = self.requirements
+            cmd = (
+                f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location "
+                f"-r {compiled_requirements_file}"
+            )
             logger.info(
                 "Installing venv dependencies %s at %s.",
-                pkg_str,
+                compiled_requirements_file,
                 self.prefix,
             )
             try:
                 Session.run_cmd_venv(
                     venv_path,
-                    f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location {pkg_str}",
+                    cmd,
                     env=env,
                 )
             except CmdFailure as e:
@@ -656,6 +706,7 @@ class Session:
         pythons: t.Optional[t.Set[Interpreter]] = None,
         skip_missing: bool = False,
         exit_first: bool = False,
+        recompile_reqs: bool = False,
     ) -> None:
         results = []
 
@@ -726,7 +777,12 @@ class Session:
                 }
             )
 
-            inst.prepare(env, recreate=recreate_venvs, skip_deps=skip_base_install)
+            inst.prepare(
+                env,
+                recreate=recreate_venvs,
+                skip_deps=skip_base_install,
+                recompile_reqs=recompile_reqs,
+            )
 
             pythonpath = inst.pythonpath
             if pythonpath:
@@ -927,9 +983,9 @@ class Session:
             rcfile.write()
             rcfile.flush()
 
-    def shell(self, ident, pass_env):
+    def _venvs_matching_identifier(self, identifier):
         for n, inst in enumerate(self.venv.instances()):
-            if ident != f"#{n}" and not inst.long_hash.startswith(ident):
+            if identifier != f"#{n}" and not inst.long_hash.startswith(identifier):
                 continue
 
             assert inst.py is not None, inst
@@ -937,7 +993,15 @@ class Session:
                 venv_path = inst.venv_path
             except FileNotFoundError:
                 raise RuntimeError("%s not available" % inst.py)
+            yield inst, venv_path
 
+    def requirements(self, ident):
+        for inst, _ in self._venvs_matching_identifier(ident):
+            with Status("Producing requirements.txt"):
+                _ = inst.requirements
+
+    def shell(self, ident, pass_env):
+        for inst, venv_path in self._venvs_matching_identifier(ident):
             logger.info("Launching shell inside venv instance %s", inst)
             logger.debug("Setting venv path to %s", venv_path)
 

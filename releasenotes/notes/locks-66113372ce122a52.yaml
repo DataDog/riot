@@ -1,0 +1,6 @@
+---
+features:
+  - Adds the ``riot requirements <hash>`` command, which uses pip-compile to generate a requirements lockfile for venv identified by the hash
+  - |
+    Adds the ``-c/--recompile-requirements`` flag to ``riot run``. When set, this flag causes the requirements.txt lockfile and the venv itself
+    to be regenerated. When omitted, the requirements lockfile is only built if it does not already exist.
