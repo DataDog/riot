@@ -329,7 +329,7 @@ def test_session_run_check_environment_modifications_and_recreate_true(
 ) -> None:
     """Validate session run method.
 
-    Create nested environments, edit the packages installed with pip isntall
+    Create nested environments, edit the packages installed with pip install
     and validate the nested packages are restored after execute again session.run
     with recreate_venvs equal to True.
     """
