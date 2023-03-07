@@ -585,11 +585,12 @@ class VenvInstance:
         installed = False
         # We only install dependencies if the prefix directory does not
         # exist already. If it does exist, we assume it is in a good state.
+        already_exists = os.path.isdir(self.prefix)
         if (
             py is not None
             and self.pkgs
             and self.prefix is not None
-            and (not os.path.isdir(self.prefix) or recreate or recompile_reqs)
+            and (not already_exists or recreate or recompile_reqs)
             and (has_own_py or not traversing)
         ):
             venv_path = self.venv_path
@@ -631,7 +632,7 @@ class VenvInstance:
                 installed = True
 
         if not self.created and self.parent is not None:
-            self.parent.prepare(env, py, traversing=installed)
+            self.parent.prepare(env, py, traversing=installed or already_exists)
 
 
 @dataclasses.dataclass
