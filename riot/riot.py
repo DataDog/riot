@@ -582,6 +582,7 @@ class VenvInstance:
         if recompile_reqs:
             recreate = True
 
+        installed = False
         # We only install dependencies if the prefix directory does not
         # exist already. If it does exist, we assume it is in a good state.
         if (
@@ -626,9 +627,11 @@ class VenvInstance:
                     f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
                     e.proc,
                 )
+            else:
+                installed = True
 
         if not self.created and self.parent is not None:
-            self.parent.prepare(env, py, traversing=True)
+            self.parent.prepare(env, py, traversing=installed)
 
 
 @dataclasses.dataclass
