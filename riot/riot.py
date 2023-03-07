@@ -585,7 +585,7 @@ class VenvInstance:
         installed = False
         # We only install dependencies if the prefix directory does not
         # exist already. If it does exist, we assume it is in a good state.
-        already_exists = self.prefix is None or os.path.isdir(self.prefix)
+        already_exists = self.prefix is not None and os.path.isdir(self.prefix)
         if (
             py is not None
             and self.pkgs
