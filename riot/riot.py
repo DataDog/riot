@@ -574,24 +574,22 @@ class VenvInstance:
         recreate: bool = False,
         skip_deps: bool = False,
         recompile_reqs: bool = False,
-        traversing: bool = False,
+        child_was_installed: bool = False,
     ) -> None:
-        has_own_py = self.py is not None
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
         if recompile_reqs:
             recreate = True
 
         installed = False
-        # We only install dependencies if the prefix directory does not
-        # exist already. If it does exist, we assume it is in a good state.
-        already_exists = self.prefix is not None and os.path.isdir(self.prefix)
         if (
             py is not None
             and self.pkgs
             and self.prefix is not None
-            and (not already_exists or recreate or recompile_reqs)
-            and (has_own_py or not traversing)
+            # We only install dependencies if the prefix directory does not
+            # exist already. If it does exist, we assume it is in a good state.
+            and (not os.path.isdir(self.prefix) or recreate or recompile_reqs)
+            and not child_was_installed
         ):
             venv_path = self.venv_path
             assert venv_path is not None, py
@@ -632,7 +630,9 @@ class VenvInstance:
                 installed = True
 
         if not self.created and self.parent is not None:
-            self.parent.prepare(env, py, traversing=installed or already_exists)
+            self.parent.prepare(
+                env, py, child_was_installed=installed or child_was_installed
+            )
 
 
 @dataclasses.dataclass
