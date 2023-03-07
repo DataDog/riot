@@ -581,6 +581,8 @@ class VenvInstance:
         if recompile_reqs:
             recreate = True
 
+        exists = self.prefix is not None and os.path.isdir(self.prefix)
+
         installed = False
         if (
             py is not None
@@ -631,7 +633,7 @@ class VenvInstance:
 
         if not self.created and self.parent is not None:
             self.parent.prepare(
-                env, py, child_was_installed=installed or child_was_installed
+                env, py, child_was_installed=installed or exists or child_was_installed
             )
 
 
