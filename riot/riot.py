@@ -574,7 +574,9 @@ class VenvInstance:
         recreate: bool = False,
         skip_deps: bool = False,
         recompile_reqs: bool = False,
+        traversing: bool = False,
     ) -> None:
+        has_own_py = self.py is not None
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
         if recompile_reqs:
@@ -587,6 +589,7 @@ class VenvInstance:
             and self.pkgs
             and self.prefix is not None
             and (not os.path.isdir(self.prefix) or recreate or recompile_reqs)
+            and (has_own_py or not traversing)
         ):
             venv_path = self.venv_path
             assert venv_path is not None, py
@@ -625,7 +628,7 @@ class VenvInstance:
                 )
 
         if not self.created and self.parent is not None:
-            self.parent.prepare(env, py)
+            self.parent.prepare(env, py, traversing=True)
 
 
 @dataclasses.dataclass
