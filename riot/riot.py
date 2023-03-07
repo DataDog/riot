@@ -1,7 +1,5 @@
-from contextlib import contextmanager
 import dataclasses
 import functools
-from hashlib import sha256
 import importlib.abc
 import importlib.util
 import itertools
@@ -13,10 +11,12 @@ import sys
 import tempfile
 import traceback
 import typing as t
+from contextlib import contextmanager
+from hashlib import sha256
 
 import click
-from packaging.version import Version
 import pexpect
+from packaging.version import Version
 from rich import print as rich_print
 from rich.pretty import Pretty
 from rich.status import Status
@@ -585,7 +585,7 @@ class VenvInstance:
         installed = False
         # We only install dependencies if the prefix directory does not
         # exist already. If it does exist, we assume it is in a good state.
-        already_exists = os.path.isdir(self.prefix)
+        already_exists = self.prefix is None or os.path.isdir(self.prefix)
         if (
             py is not None
             and self.pkgs
