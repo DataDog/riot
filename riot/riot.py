@@ -1,5 +1,7 @@
+from contextlib import contextmanager
 import dataclasses
 import functools
+from hashlib import sha256
 import importlib.abc
 import importlib.util
 import itertools
@@ -11,12 +13,10 @@ import sys
 import tempfile
 import traceback
 import typing as t
-from contextlib import contextmanager
-from hashlib import sha256
 
 import click
-import pexpect
 from packaging.version import Version
+import pexpect
 from rich import print as rich_print
 from rich.pretty import Pretty
 from rich.status import Status
