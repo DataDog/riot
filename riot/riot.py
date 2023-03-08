@@ -420,8 +420,8 @@ class VenvInstance:
             return None
         return "_".join(
             (
-                f"{rmchars('<=>.,:+@/', n)}{rmchars('<=>.,:+@/', v)}"
-                for n, v in self.pkgs.items()
+                f"{rmchars('<=>.,:+@/', n)}"
+                for n in self.full_pkg_str.replace("'", "").split()
             )
         )
 
