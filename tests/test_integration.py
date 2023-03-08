@@ -649,7 +649,7 @@ venv = Venv(
 
     version = "".join((str(_) for _ in sys.version_info[:3]))
 
-    venv_name = f"venv_py{version}_pytest"
+    venv_name = f"venv_py{version}_pip_pytest"
     parent_venv_name = f"venv_py{version}_pip"
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
 
@@ -708,7 +708,7 @@ venv = Venv(
     env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0, result.stderr
 
-    venv_name = "venv_py{}_pytest".format(
+    venv_name = "venv_py{}_pip_pytest".format(
         "".join((str(_) for _ in sys.version_info[:3]))
     )
     parent_venv_name = "venv_py{}_pip".format(
@@ -783,7 +783,7 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot -Pv run -s child")
-    venv_path = tmp_path / ".riot/venv_py{}_pytest_pip".format(
+    venv_path = tmp_path / ".riot/venv_py{}_pip_pytest".format(
         "".join((str(_) for _ in sys.version_info[:3]))
     )
     assert f"Creating virtualenv '{venv_path}'" in result.stderr, result.stderr

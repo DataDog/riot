@@ -272,7 +272,7 @@ def test_session_run(session_virtualenv: Session) -> None:
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
     command_env = _get_env(env_name)
     # Check exists and is empty of packages
     result = _get_pip_freeze(command_env)
@@ -291,7 +291,7 @@ def test_session_run_check_environment_modifications(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
     # Check exists and is empty of packages
@@ -312,7 +312,7 @@ def test_session_run_check_environment_modifications_and_recreate_false(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
 
@@ -335,7 +335,7 @@ def test_session_run_check_environment_modifications_and_recreate_true(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_six1150_isort5101_itsdangerous110" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
 

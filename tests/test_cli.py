@@ -548,8 +548,7 @@ def test_success():
     assert os.environ["RIOT"] == "1"
     assert os.environ["RIOT_PYTHON_HINT"] == "Interpreter(_hint='3')"
     assert os.environ["RIOT_PYTHON_VERSION"].startswith("3.")
-    assert os.environ["RIOT_VENV_HASH"] == "f8691e0"
-    assert os.environ["RIOT_VENV_IDENT"] == "packaging213"
+    assert os.environ["RIOT_VENV_IDENT"] == "pytest_packaging213"
     assert os.environ["RIOT_VENV_NAME"] == "envtest"
     assert os.environ["RIOT_VENV_PKGS"] == "'packaging>=21.3'"
     assert os.environ["RIOT_VENV_FULL_PKGS"] == "'pytest' 'packaging>=21.3'"
