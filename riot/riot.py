@@ -420,8 +420,8 @@ class VenvInstance:
             return None
         return "_".join(
             (
-                f"{rmchars('<=>.,:+@/', n)}{rmchars('<=>.,:+@/', v)}"
-                for n, v in self.pkgs.items()
+                f"{rmchars('<=>.,:+@/', n)}"
+                for n in self.full_pkg_str.replace("'", "").split()
             )
         )
 
@@ -574,19 +574,24 @@ class VenvInstance:
         recreate: bool = False,
         skip_deps: bool = False,
         recompile_reqs: bool = False,
+        child_was_installed: bool = False,
     ) -> None:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
         if recompile_reqs:
             recreate = True
 
-        # We only install dependencies if the prefix directory does not
-        # exist already. If it does exist, we assume it is in a good state.
+        exists = self.prefix is not None and os.path.isdir(self.prefix)
+
+        installed = False
         if (
             py is not None
             and self.pkgs
             and self.prefix is not None
+            # We only install dependencies if the prefix directory does not
+            # exist already. If it does exist, we assume it is in a good state.
             and (not os.path.isdir(self.prefix) or recreate or recompile_reqs)
+            and not child_was_installed
         ):
             venv_path = self.venv_path
             assert venv_path is not None, py
@@ -623,9 +628,13 @@ class VenvInstance:
                     f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
                     e.proc,
                 )
+            else:
+                installed = True
 
         if not self.created and self.parent is not None:
-            self.parent.prepare(env, py)
+            self.parent.prepare(
+                env, py, child_was_installed=installed or exists or child_was_installed
+            )
 
 
 @dataclasses.dataclass
