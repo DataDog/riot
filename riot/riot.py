@@ -447,7 +447,7 @@ class VenvInstance:
 
     @property
     def long_hash(self) -> str:
-        return hex(hash(self))[2:]
+        return hex(hash(self.full_pkg_str))[2:]
 
     @property
     def short_hash(self) -> str:
