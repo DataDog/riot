@@ -447,7 +447,7 @@ class VenvInstance:
 
     @property
     def long_hash(self) -> str:
-        return hex(hash(self.full_pkg_str))[2:]
+        return hex(hash(self))[2:]
 
     @property
     def short_hash(self) -> str:
@@ -456,7 +456,6 @@ class VenvInstance:
     def __hash__(self):
         """Compute a hash for the venv instance."""
         h = sha256()
-        h.update(repr(self).encode())
         h.update(self.full_pkg_str.encode())
         return int(h.hexdigest(), 16)
 
