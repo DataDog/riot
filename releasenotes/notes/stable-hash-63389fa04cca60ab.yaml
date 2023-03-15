@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixes a bug causing virtualenv hashes to change during command execution, leading to installed
+    dependencies not being found
