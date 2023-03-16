@@ -456,6 +456,7 @@ class VenvInstance:
     def __hash__(self):
         """Compute a hash for the venv instance."""
         h = sha256()
+        h.update(repr(self.name).encode())
         h.update(repr(self.py).encode())
         h.update(self.full_pkg_str.encode())
         return int(h.hexdigest(), 16)
