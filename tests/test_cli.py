@@ -75,7 +75,7 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
         assert result.exit_code == 0, result.stdout
         assert (
             result.stdout
-            == "[#0]  1dacd4b  test          Interpreter(_hint='3') Packages('pytest==5.4.3')\n"
+            == "[#0]  1be43f6  test          Interpreter(_hint='3') Packages('pytest==5.4.3')\n"
         )
 
 
@@ -140,14 +140,14 @@ def test_list_with_hash_only(cli: click.testing.CliRunner) -> None:
     with with_riotfile(cli, "simple_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list", "--hash-only"])
         assert result.exit_code == 0, result.stdout
-        assert result.stdout == "1299ca6\n1dacd4b\n"
+        assert result.stdout == "1be43f6\n3f0bd68\n"
 
     with with_riotfile(cli, "diff_pys_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list", "--hash-only"])
         assert result.exit_code == 0, result.stdout
         assert (
             result.stdout
-            == "190e001\n1a01036\n1bbc7ba\n1fedf51\n2c180ee\n693842d\n699434a\n6f0bed0\na31c49f\na385c7e\nc928c36\nf23c6ff\n"
+            == "156e0a3\n175f9ae\n1a1f742\n1f0f227\n524376c\n60d413e\n61b42ab\n83b22e0\n89d1e7a\n982a4b5\nb1c318a\nbdc1729\n"
         )
 
 

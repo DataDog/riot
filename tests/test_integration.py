@@ -227,7 +227,7 @@ venv = Venv(
     assert result.stderr == ""
     assert (
         result.stdout
-        == "[#0]  1f92574  test          Interpreter(_hint='3') Packages()\n"
+        == "[#0]  702abfd  test          Interpreter(_hint='3') Packages()\n"
     )
     assert result.returncode == 0
 
@@ -410,11 +410,11 @@ venv = Venv(
     assert result.returncode == 0
 
     # Listing by hash works
-    result = tmp_run("riot -P list 175d38a")
+    result = tmp_run("riot -P list 61ec44a")
     assert result.stderr == ""
     assert re.search(
         r"""
-\[\#7\]  175d38a  test2  .* Packages\('pkg1==2.0' 'pkg2==4.0'\)
+\[\#3\]  61ec44a  test1  .* Packages\('pkg1==2.0' 'pkg2==4.0'\)
 """.lstrip(),
         result.stdout,
     )
