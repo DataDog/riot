@@ -28,7 +28,7 @@ setup(
     install_requires=[
         "dataclasses; python_version<'3.7'",
         "click>=7",
-        "virtualenv==20.20.0",
+        "virtualenv<=20.20.0",
         "rich",
         "pexpect",
         "packaging",
