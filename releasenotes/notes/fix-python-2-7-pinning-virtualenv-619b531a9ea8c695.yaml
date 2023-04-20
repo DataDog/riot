@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Avoid using latests versions of ``virtualenv`` since it has dropped support for Python 2.7.
