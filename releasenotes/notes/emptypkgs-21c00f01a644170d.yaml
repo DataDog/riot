@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fixes an issue in which riot generated a requirements lockfile for a Venv instance other than the one it was running tests for.
+    This behavior was happening due to logic that skipped Venv instances with pkgs == None while preparing the environment,
+    but not while running tests. The fix is to stop riot from ignoring pkgs-less Venvs in all cases.

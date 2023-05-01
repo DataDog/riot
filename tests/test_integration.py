@@ -935,6 +935,39 @@ venv = Venv(
         assert "#" in lines[0]
 
 
+def test_consistent_hashes_between_prepare_and_run_when_child_has_no_pkgs(
+    tmp_path: pathlib.Path, tmp_run: _T_TmpRun
+) -> None:
+    version = "{}.{}".format(sys.version_info[0], sys.version_info[1])
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pkgs={{"requests": ""}},
+    name="parent",
+    command="env",
+    venvs=[Venv(pys=["{}"], name="child")]
+)
+""".format(
+            version
+        ),
+    )
+    _hash = tmp_run("riot list --hash-only child").stdout.strip("\n")
+    result = tmp_run("riot run -p {} {}".format(version, _hash))
+    assert result.returncode == 0, result.stderr
+
+    lockfile_path = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            "requirements",
+            "{}.txt".format(_hash),
+        )
+    )
+    assert os.path.exists(lockfile_path)
+
+
 def test_recompile_flag(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     rf_path = tmp_path / "riotfile.py"
     rf_path.write_text(
