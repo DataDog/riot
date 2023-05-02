@@ -383,7 +383,7 @@ class VenvInstance:
         This will return a python version + package specific path name.
         If no packages are defined it will return ``None``.
         """
-        if self.py is None or not self.pkgs:
+        if self.py is None:
             return None
 
         venv_path = self.py.venv_path
@@ -416,8 +416,6 @@ class VenvInstance:
     @property
     def ident(self) -> t.Optional[str]:
         """Return prefix identifier string based on packages."""
-        if not self.pkgs:
-            return None
         return "_".join(
             (
                 f"{rmchars('<=>.,:+@/', n)}"
@@ -587,7 +585,6 @@ class VenvInstance:
         installed = False
         if (
             py is not None
-            and self.pkgs
             and self.prefix is not None
             # We only install dependencies if the prefix directory does not
             # exist already. If it does exist, we assume it is in a good state.
