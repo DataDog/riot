@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixed a problem that caused dependency layers to uninstall some dev package
+    dependencies from the base virtual environment.
