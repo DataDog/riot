@@ -10,7 +10,7 @@ venv = Venv(
     },
     venvs=[
         Venv(
-            pys=["3"],
+            pys=["2", "3"],
             name="lvl_2",
             create=True,
             pkgs={
