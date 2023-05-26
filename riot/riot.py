@@ -522,7 +522,11 @@ class VenvInstance:
             if self.py.bin_path is not None:
                 paths.append(self.py.bin_path)
 
-        return ":".join(paths)
+        dev_pkg_path = "_".join((self.py.venv_path, "dev_pkg"))
+        if os.path.exists(dev_pkg_path):
+            paths.append(os.path.join(dev_pkg_path, "bin"))
+
+        return os.pathsep.join(paths)
 
     @property
     def site_packages_path(self) -> t.Optional[str]:
@@ -611,7 +615,7 @@ class VenvInstance:
             if self.created:
                 py.create_venv(recreate, venv_path)
                 if not skip_deps:
-                    install_dev_pkg(venv_path, self.py.version_info())
+                    install_dev_pkg(venv_path, self.py.version_info(), in_prefix=False)
 
             pkg_str = self.pkg_str
             assert pkg_str is not None
@@ -814,7 +818,7 @@ class Session:
                 )
             script_path = inst.scriptpath
             if script_path:
-                env["PATH"] = ":".join(
+                env["PATH"] = os.pathsep.join(
                     (script_path, env.get("PATH", os.environ["PATH"]))
                 )
 
@@ -997,7 +1001,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path, py.version_info())
+                install_dev_pkg(py.venv_path, py.version_info(), in_prefix=True)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1047,7 +1051,7 @@ class Session:
                 )
             script_path = inst.scriptpath
             if script_path:
-                env["PATH"] = ":".join(
+                env["PATH"] = os.pathsep.join(
                     (script_path, env.get("PATH", os.environ["PATH"]))
                 )
 
@@ -1197,7 +1201,9 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
     )
 
 
-def install_dev_pkg(venv_path, version_info):
+def install_dev_pkg(
+    venv_path: str, version_info: t.Tuple[int, ...], in_prefix: bool
+) -> None:
     for setup_file in {"setup.py", "pyproject.toml"}:
         if os.path.exists(setup_file):
             break
@@ -1207,33 +1213,38 @@ def install_dev_pkg(venv_path, version_info):
 
     dev_pkg_path = "_".join((venv_path, "dev_pkg"))
 
+    env = os.environ.copy()
+
+    if in_prefix:
+        pythonpath = os.environ.get("PYTHONPATH")
+        if pythonpath is not None:
+            env["PYTHONPATH"] = os.pathsep.join(
+                (sitepkg(dev_pkg_path, version_info), pythonpath)
+            )
+        else:
+            env["PYTHONPATH"] = sitepkg(dev_pkg_path, version_info)
+
+        if version_info < (3,):
+            # pip does not support edit install with prefix in Python 2
+            # https://github.com/pypa/pip/issues/7627
+            hotfix_path = Path(__file__).parent / "_hotfix"
+            env["PYTHONPATH"] = os.pathsep.join((str(hotfix_path), env["PYTHONPATH"]))
+
+        command = f"pip --disable-pip-version-check install --prefix {dev_pkg_path} ."
+        mode = ""
+    else:
+        command = "pip --disable-pip-version-check install -e ."
+        mode = " (edit mode)"
+
     logger.info(
-        "Installing dev package (edit mode) in %s using the virtual environment in %s.",
+        "Installing dev package%s in %s using the virtual environment in %s.",
+        mode,
         dev_pkg_path,
         venv_path,
     )
 
-    env = os.environ.copy()
-    pythonpath = os.environ.get("PYTHONPATH")
-    if pythonpath is not None:
-        env["PYTHONPATH"] = os.pathsep.join(
-            (sitepkg(dev_pkg_path, version_info), pythonpath)
-        )
-    else:
-        env["PYTHONPATH"] = sitepkg(dev_pkg_path, version_info)
-
-    if version_info < (3,):
-        # pip does not support edit install with prefix in Python 2
-        # https://github.com/pypa/pip/issues/7627
-        hotfix_path = Path(__file__).parent / "_hotfix"
-        env["PYTHONPATH"] = os.pathsep.join((str(hotfix_path), env["PYTHONPATH"]))
-
     try:
-        Session.run_cmd_venv(
-            venv_path,
-            f"pip --disable-pip-version-check install --prefix {dev_pkg_path} -e .",
-            env=env,
-        )
+        Session.run_cmd_venv(venv_path, command, env=env)
     except CmdFailure as e:
         logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
         sys.exit(1)
