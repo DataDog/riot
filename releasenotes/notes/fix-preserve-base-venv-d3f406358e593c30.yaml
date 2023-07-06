@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixed an issue that caused base virtual environments to get modified when
+    common dependencies were installed in child virtual environments.

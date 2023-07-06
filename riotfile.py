@@ -53,6 +53,7 @@ venv = Venv(
                 "pytest": latest,
             },
             create=True,
+            skip_dev_install=True,
         ),
         Venv(
             pys=[3],
