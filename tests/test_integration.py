@@ -9,6 +9,7 @@ import pytest
 from riot.riot import _T_CompletedProcess
 from typing_extensions import Protocol
 
+
 _T_Path = Union[str, "os.PathLike[Any]"]
 
 
@@ -619,7 +620,7 @@ venv = Venv(
                 tmp_path
                 / os.path.join(
                     ".riot",
-                    f"venv_py{version}",
+                    f"venv_py{version}_dev_pkg",
                     "lib",
                     f"python{py_dot_version}",
                     "site-packages",
@@ -657,7 +658,7 @@ venv = Venv(
         tmp_path
         / os.path.join(
             ".riot",
-            f"venv_py{version}",
+            f"venv_py{version}_dev_pkg",
             "lib",
             "python{}".format(py_dot_version),
             "site-packages",

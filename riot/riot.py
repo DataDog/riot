@@ -134,9 +134,15 @@ class Interpreter:
         return os.path.join(self.venv_path, "bin")
 
     @property
+    def dev_pkg_bin_path(self) -> t.Optional[str]:
+        return os.path.join(self.dev_pkg_venv_path, "bin")
+
+    @property
     def site_packages_path(self) -> str:
         version = ".".join((str(_) for _ in self.version_info()[:2]))
-        return os.path.join(self.venv_path, "lib", f"python{version}", "site-packages")
+        return os.path.join(
+            self.dev_pkg_venv_path, "lib", f"python{version}", "site-packages"
+        )
 
     @functools.lru_cache()
     def path(self) -> str:
@@ -174,6 +180,10 @@ class Interpreter:
             os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
         )
 
+    @property
+    def dev_pkg_venv_path(self) -> str:
+        return "_".join((self.venv_path, "dev_pkg"))
+
     def exists(self) -> bool:
         """Return whether the virtual environment for this interpreter exists."""
         return os.path.isdir(self.venv_path)
@@ -204,6 +214,9 @@ class Interpreter:
         )
 
         return True
+
+    def create_dev_pkg_venv(self) -> bool:
+        return self.create_venv(recreate=True, path=self.dev_pkg_venv_path)
 
 
 @dataclasses.dataclass
@@ -414,6 +427,23 @@ class VenvInstance:
         return None
 
     @property
+    def dev_pkg_venv_path(self) -> t.Optional[str]:
+        # Try to take the closest created ancestor
+        current: t.Optional[VenvInstance] = self
+        while current:
+            if current.created:
+                # Return the prefix of the created ancestor because the dev
+                # package is installed there
+                return current.prefix
+            current = current.parent
+
+        # If no created ancestors, return the dev package base venv path
+        if self.py is not None:
+            return self.py.dev_pkg_venv_path
+
+        return None
+
+    @property
     def ident(self) -> t.Optional[str]:
         """Return prefix identifier string based on packages."""
         return "_".join(
@@ -503,6 +533,23 @@ class VenvInstance:
 
     @property
     def scriptpath(self):
+        paths = []
+
+        current: t.Optional[VenvInstance] = self
+        while current is not None and not current.created:
+            if current.pkgs:
+                assert current.bin_path is not None, current
+                paths.append(current.bin_path)
+            current = current.parent
+
+        if not self.created and self.py:
+            if self.py.bin_path is not None:
+                paths.append(self.py.bin_path)
+
+        return ":".join(paths)
+
+    @property
+    def dev_pkg_scriptpath(self):
         paths = []
 
         current: t.Optional[VenvInstance] = self
@@ -743,7 +790,7 @@ class Session:
                 continue
 
             try:
-                venv_path = inst.venv_path
+                venv_path = inst.dev_pkg_venv_path
                 assert venv_path is not None, inst
             except FileNotFoundError:
                 if skip_missing:
@@ -798,7 +845,7 @@ class Session:
                     if "PYTHONPATH" in env
                     else pythonpath
                 )
-            script_path = inst.scriptpath
+            script_path = inst.dev_pkg_scriptpath
             if script_path:
                 env["PATH"] = ":".join(
                     (script_path, env.get("PATH", os.environ["PATH"]))
@@ -982,8 +1029,9 @@ class Session:
                     logger.info("Skipping global deps install.")
                     continue
 
-                # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path)
+                # Install the dev package into its own base venv.
+                py.create_dev_pkg_venv()
+                install_dev_pkg(py.dev_pkg_venv_path)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1041,7 +1089,7 @@ class Session:
                 with tempfile.NamedTemporaryFile() as rcfile:
                     rcfile.write(
                         SHELL_RCFILE.format(
-                            venv_path=venv_path, name=inst.name
+                            venv_path=inst.dev_pkg_venv_path, name=inst.name
                         ).encode()
                     )
                     rcfile.flush()
