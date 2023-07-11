@@ -129,9 +129,8 @@ def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
 
 def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     venv = VenvInstance(
-        command="echo test",
+        venv=Venv(name="test", command="echo test"),
         env={"env": "test"},
-        name="test",
         pkgs={"pip": ""},
         py=current_interpreter,
     )
@@ -153,11 +152,11 @@ def test_interpreter_version_info(current_interpreter: Interpreter) -> None:
 
 def test_venv_matching(current_interpreter: Interpreter) -> None:
     venv = VenvInstance(
-        command="echo test",
+        venv=Venv(command="echo test", name="test"),
         env={"env": "test"},
-        name="test",
         pkgs={"pip": ""},
         parent=VenvInstance(
+            venv=Venv(),
             py=current_interpreter,
             env={},
             pkgs={"pytest": "==5.4.3"},
@@ -195,9 +194,11 @@ def test_venv_matching(current_interpreter: Interpreter) -> None:
 )
 def test_venv_name_matching(pattern: str) -> None:
     venv = VenvInstance(
-        command="echo test",
+        venv=Venv(
+            command="echo test",
+            name="test",
+        ),
         env={"env": "test"},
-        name="test",
         pkgs={"pip": ""},
         py=Interpreter("3"),
     )

@@ -7,6 +7,7 @@ import importlib.util
 import itertools
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -255,6 +256,7 @@ class Venv:
     command: t.Optional[str] = None
     venvs: t.List["Venv"] = dataclasses.field(default_factory=list)
     create: bool = False
+    skip_dev_install: bool = False
 
     def __post_init__(self, pys, pkgs, env):
         """Normalize the data."""
@@ -279,14 +281,11 @@ class Venv:
                 for pkgs in expand_specs(self.pkgs):  # type: ignore[attr-defined]
                     inst = VenvInstance(
                         # Bubble up name and command if not overridden
-                        name=self.name or (parent_inst.name if parent_inst else None),
-                        command=self.command
-                        or (parent_inst.command if parent_inst else None),
+                        venv=self,
                         py=py,
                         env=env,
                         pkgs=dict(pkgs),
                         parent=parent_inst,
-                        created=self.create,
                     )
                     if not self.venvs:
                         yield inst
@@ -347,16 +346,22 @@ def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
 
 @dataclasses.dataclass
 class VenvInstance:
+    venv: Venv
     pkgs: t.Dict[str, str]
     py: Interpreter
     env: t.Dict[str, str]
-    name: t.Optional[str] = None
-    command: t.Optional[str] = None
     parent: t.Optional["VenvInstance"] = None
-    created: bool = False
 
     def __post_init__(self) -> None:
         """Venv instance post-initialization."""
+        self.name: t.Optional[str] = self.venv.name or (
+            self.parent.name if self.parent is not None else None
+        )
+        self.command: t.Optional[str] = self.venv.command or (
+            self.parent.command if self.parent is not None else None
+        )
+
+        self.created = self.venv.create
         if self.created:
             ancestor = self.parent
             while ancestor:
@@ -596,7 +601,7 @@ class VenvInstance:
 
             if self.created:
                 py.create_venv(recreate, venv_path)
-                if not skip_deps:
+                if not self.venv.skip_dev_install:
                     install_dev_pkg(venv_path)
 
             pkg_str = self.pkg_str
@@ -616,11 +621,19 @@ class VenvInstance:
                 self.prefix,
             )
             try:
-                Session.run_cmd_venv(
-                    venv_path,
-                    cmd,
-                    env=env,
-                )
+                if self.created:
+                    deps_venv_path = venv_path
+                else:
+                    deps_venv_path = venv_path + "_deps"
+                    if py.create_venv(
+                        recreate=False, path=deps_venv_path
+                    ) and py.version_info() < (3,):
+                        # Use the same binary. This is necessary for Python 2.7
+                        deps_bin = (Path(deps_venv_path) / "bin" / "python").resolve()
+                        venv_bin = (Path(venv_path) / "bin" / "python").resolve()
+                        deps_bin.unlink()
+                        deps_bin.symlink_to(venv_bin)
+                Session.run_cmd_venv(deps_venv_path, cmd, env=env)
             except CmdFailure as e:
                 raise CmdFailure(
                     f"Failed to install venv dependencies {pkg_str}\n{e.proc.stdout}",
@@ -786,8 +799,8 @@ class Session:
 
             inst.prepare(
                 env,
+                skip_deps=skip_base_install or inst.venv.skip_dev_install,
                 recreate=recreate_venvs,
-                skip_deps=skip_base_install,
                 recompile_reqs=recompile_reqs,
             )
 
@@ -1080,6 +1093,21 @@ class Session:
         abs_venv = os.path.abspath(venv)
         env["VIRTUAL_ENV"] = abs_venv
         env["PATH"] = f"{abs_venv}/bin:" + env.get("PATH", "")
+
+        try:
+            # Ensure that we have the venv site-packages in the PYTHONPATH so
+            # that the installed dev package depdendencies are available.
+            sitepkgs_path = (
+                next((Path(abs_venv) / "lib").glob("python*")) / "site-packages"
+            )
+            pythonpath = env.get("PYTHONPATH", None)
+            env["PYTHONPATH"] = (
+                os.pathsep.join((pythonpath, str(sitepkgs_path)))
+                if pythonpath is not None
+                else str(sitepkgs_path)
+            )
+        except StopIteration:
+            pass
 
         for k in cls.ALWAYS_PASS_ENV:
             if k in os.environ and k not in env:

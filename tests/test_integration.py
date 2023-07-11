@@ -611,22 +611,17 @@ venv = Venv(
 
     version = "".join((str(_) for _ in sys.version_info[:3]))
     py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
-    assert env["PYTHONPATH"] == ":".join(
-        (
-            "",
-            str(tmp_path),
-            str(
-                tmp_path
-                / os.path.join(
-                    ".riot",
-                    f"venv_py{version}",
-                    "lib",
-                    f"python{py_dot_version}",
-                    "site-packages",
-                )
-            ),
+    sitepkgs = str(
+        tmp_path
+        / os.path.join(
+            ".riot",
+            f"venv_py{version}",
+            "lib",
+            f"python{py_dot_version}",
+            "site-packages",
         )
     )
+    assert env["PYTHONPATH"] == ":".join(("", str(tmp_path), sitepkgs, sitepkgs))
 
 
 def test_venv_instance_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
@@ -687,7 +682,14 @@ venv = Venv(
     )
 
     paths = env["PYTHONPATH"].split(":")
-    assert paths == ["", str(tmp_path), venv_path, parent_venv_path, py_venv_path]
+    assert paths == [
+        "",
+        str(tmp_path),
+        venv_path,
+        parent_venv_path,
+        py_venv_path,
+        py_venv_path,
+    ]
 
 
 def test_venv_instance_path(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
