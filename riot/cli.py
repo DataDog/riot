@@ -1,22 +1,25 @@
 __all__ = ["main"]
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version
 import logging
 import re
 import sys
 
 import click
-import pkg_resources
 from rich.console import Console
 from rich.logging import RichHandler
 
-from .riot import Interpreter, Session
+from .riot import Interpreter
+from .riot import Session
+
 
 FORMAT = "%(message)s"
 
 
 try:
-    __version__ = pkg_resources.get_distribution("riot").version
-except pkg_resources.DistributionNotFound:
+    __version__ = version("riot")
+except PackageNotFoundError:
     # package is not installed
     __version__ = "dev"
 

@@ -1,5 +1,6 @@
 import contextlib
 import os
+from pathlib import Path
 import re
 import shutil
 import typing
@@ -8,12 +9,14 @@ import _pytest.monkeypatch
 import click.testing
 import mock
 import pytest
+
 import riot.cli
 import riot.riot
 from riot.riot import Interpreter
 
-HERE = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.join(HERE, "data")
+
+HERE = Path(__file__).parent.resolve()
+DATA_DIR = HERE / "data"
 
 
 @pytest.fixture
@@ -232,7 +235,7 @@ def test_run_no_venv_pattern(cli: click.testing.CliRunner) -> None:
                 "--skip-base-install",
             ],
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.stdout
         assert re.search(
             r"✓ test: \[[0-9a-f]{7}\]  pythonInterpreter\(_hint='3'\) 'pytest==5.4.3'",
             result.stdout,
@@ -427,7 +430,8 @@ def test_failure():
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
         )
-        assert result.exit_code == 0
+
+        assert result.exit_code == 0, result.stdout
         assert re.search(r"✓ success: \[[0-9a-f]{7}\]", result.stdout)
         assert "1 passed with 0 warnings, 0 failed" in result.stdout
 

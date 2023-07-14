@@ -3,11 +3,18 @@ import pathlib
 import re
 import subprocess
 import sys
-from typing import Any, Dict, Generator, Optional, Sequence, Union
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import Optional
+from typing import Sequence
+from typing import Union
 
 import pytest
-from riot.riot import _T_CompletedProcess
 from typing_extensions import Protocol
+
+from riot.utils import _T_CompletedProcess
+
 
 _T_Path = Union[str, "os.PathLike[Any]"]
 
@@ -479,7 +486,7 @@ test_success.py .*
     assert (
         "No Python setup file found. Skipping dev package installation."
         in result.stderr
-    )
+    ), result.stdout
 
     result = tmp_run("riot run -s fail")
     assert re.search(
@@ -621,7 +628,9 @@ venv = Venv(
             "site-packages",
         )
     )
-    assert env["PYTHONPATH"] == ":".join(("", str(tmp_path), sitepkgs, sitepkgs))
+    assert env["PYTHONPATH"] == ":".join(
+        (str(pathlib.Path("")), str(tmp_path), sitepkgs, sitepkgs)
+    )
 
 
 def test_venv_instance_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
@@ -683,7 +692,7 @@ venv = Venv(
 
     paths = env["PYTHONPATH"].split(":")
     assert paths == [
-        "",
+        str(pathlib.Path("")),
         str(tmp_path),
         venv_path,
         parent_venv_path,
@@ -755,7 +764,6 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot -v run -s test")
-    print(result.stdout)
     env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0, (result.stdout, result.stderr)
 
@@ -792,7 +800,7 @@ venv = Venv(
     assert (
         f"Running command 'echo $PYTHONPATH' in venv '{venv_path}'" in result.stderr
     ), result.stderr
-    assert result.stdout.startswith(":".join(("", str(tmp_path))))
+    assert result.stdout.startswith(":".join((str(pathlib.Path("")), str(tmp_path))))
     assert result.returncode == 0
 
 
