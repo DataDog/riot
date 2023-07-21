@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    pin ``pip<23.2`` to avoid breaking change impacting pip-tools for Python 3.7
