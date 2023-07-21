@@ -607,7 +607,7 @@ class VenvInstance:
 
             if self.created:
                 py.create_venv(recreate, venv_path)
-                if not self.venv.skip_dev_install:
+                if not skip_deps:
                     install_dev_pkg(venv_path)
 
             pkg_str = self.pkg_str
