@@ -475,6 +475,12 @@ class VenvInstance:
         subprocess.check_output(
             [self.py.path(), "-m", "pip", "install", "pip-tools"],
         )
+        # pip==23.2 included a breaking change for pip-tools but not available
+        # pip-tools==7.0 fixes this but also dropped support for 3.7
+        if self.py.version_info()[:2] == (3, 7):
+            subprocess.check_output(
+                [self.py.path(), "-m", "pip", "install", "-U", "pip<23.2"],
+            )
         cmd = [
             self.py.path(),
             "-m",
