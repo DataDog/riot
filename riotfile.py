@@ -1,4 +1,6 @@
-from riot import latest, Venv
+from riot import Venv
+from riot import latest
+
 
 venv = Venv(
     pys=3,
@@ -6,7 +8,7 @@ venv = Venv(
         Venv(
             name="test",
             command="pytest -n auto --dist loadscope {cmdargs}",
-            pys=["3.7", "3.8", "3.9", "3.10", "3.11"],
+            pys=["3.8", "3.9", "3.10", "3.11"],
             pkgs={
                 "pytest": latest,
                 "pytest-cov": latest,
@@ -38,9 +40,9 @@ venv = Venv(
                 "flake8-blind-except": latest,
                 "flake8-builtins": latest,
                 "flake8-docstrings": latest,
-                "flake8-import-order": latest,
                 "flake8-logging-format": latest,
                 "flake8-rst-docstrings": latest,
+                "flake8-isort": latest,
                 # needed for some features from flake8-rst-docstrings
                 "pygments": latest,
             },
@@ -51,6 +53,7 @@ venv = Venv(
             pkgs={
                 "mypy": latest,
                 "pytest": latest,
+                "envier": latest,
             },
             create=True,
             skip_dev_install=True,

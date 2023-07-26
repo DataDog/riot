@@ -1,4 +1,6 @@
-from setuptools import find_packages, setup
+from setuptools import find_packages
+from setuptools import setup
+
 
 with open("README.md", "r") as f:
     long_description = f.read()
@@ -24,14 +26,14 @@ setup(
     license="Apache 2",
     packages=find_packages(exclude=["tests*"]),
     package_data={"riot": ["py.typed"]},
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
-        "dataclasses; python_version<'3.7'",
         "click>=7",
         "virtualenv<=20.20.0",
         "rich",
         "pexpect",
         "packaging",
+        "envier",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,

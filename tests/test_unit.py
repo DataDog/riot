@@ -1,16 +1,24 @@
-import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-from typing import Dict, Generator
+from typing import Dict
+from typing import Generator
 
 import pytest
-from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
+
+from riot.interpreter import Interpreter
+from riot.riot import Session
+from riot.utils import join_paths
+from riot.utils import run_cmd
+from riot.venv import Venv
+from riot.venv import VenvInstance
+from riot.venv import VirtualEnv
 from tests.test_cli import DATA_DIR
 
 
-RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
+RIOT_TESTS_PATH = Path(__file__).parent.resolve() / ".riot"
 default_venv_pattern = re.compile(r".*")
 current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
 
@@ -34,47 +42,54 @@ def interpreter_virtualenv(
         env_name = "test_interpreter_venv_creation"
         command_env = _get_env(env_name)
 
+        venv_path = Path(command_env["VENV_PATH"])
+
         # Create the virtualenv
-        current_interpreter.create_venv(recreate=True, path=command_env["VENV_PATH"])
+        virtualenv = VirtualEnv(current_interpreter, venv_path)
+        virtualenv.create(force=True)
 
         # Check folder exists and is empty of packages
         result = _get_pip_freeze(command_env)
-        assert os.path.isdir(command_env["VENV_PATH"])
+        assert virtualenv.exists()
         assert result == ""
 
         # return the command environment to reuse in other commands
         yield command_env
 
-        assert os.path.isdir(command_env["VENV_PATH"])
+        assert virtualenv.exists()
     finally:
         shutil.rmtree(RIOT_TESTS_PATH, ignore_errors=True)
 
 
 @pytest.fixture
 def session_virtualenv() -> Generator[Session, None, None]:
+    from riot.config import config
+
+    current_riot_folder = config.riot_folder
     try:
-        session = Session.from_config_file(os.path.join(DATA_DIR, "nested_riotfile.py"))
-        os.environ["RIOT_ENV_BASE_PATH"] = RIOT_TESTS_PATH
+        session = Session.from_config_file(DATA_DIR / "nested_riotfile.py")
+        config.riot_folder = RIOT_TESTS_PATH
 
         session.generate_base_venvs(re.compile(""), True, False, set())
         yield session
     finally:
         shutil.rmtree(RIOT_TESTS_PATH, ignore_errors=True)
+        config.riot_folder = current_riot_folder
 
 
 def _get_env(env_name: str) -> Dict[str, str]:
     """Return a dictionary with riot venv paths to add to the environment."""
-    venv_path = os.path.join(RIOT_TESTS_PATH, env_name)
-    venv_site_packages_path = os.path.join(
-        venv_path, "lib", f"python{current_py_hint}", "site-packages"
+    venv_path = RIOT_TESTS_PATH / env_name
+    venv_site_packages_path = (
+        venv_path / "lib" / f"python{current_py_hint}" / "site-packages"
     )
 
-    venv_python_path = os.path.join(venv_path, "bin")
+    venv_python_path = venv_path / "bin"
     command_env = {
-        "RIOT_ENV_BASE_PATH": RIOT_TESTS_PATH,
-        "PYTHONPATH": venv_python_path,
-        "PATH": venv_python_path + ":" + venv_site_packages_path,
-        "VENV_PATH": venv_path,
+        "RIOT_ENV_BASE_PATH": str(RIOT_TESTS_PATH),
+        "PYTHONPATH": str(venv_python_path),
+        "PATH": join_paths(venv_python_path, venv_site_packages_path),
+        "VENV_PATH": str(venv_path),
     }
     return command_env
 
@@ -97,13 +112,13 @@ def _run_pip_install(package: str, venv: Dict[str, str]) -> None:
 @pytest.mark.parametrize(
     "v1,v2,equal",
     [
-        (3.7, 3.7, True),
-        (3.7, "3.7", True),
-        ("3.7", "3.7", True),
-        ("3.7", 3.7, True),
-        (3.8, 3.7, False),
-        (3.8, "3.7", False),
-        (3.7, 3.7, True),
+        (3.9, 3.9, True),
+        (3.9, "3.9", True),
+        ("3.9", "3.9", True),
+        ("3.9", 3.9, True),
+        (3.8, 3.9, False),
+        (3.8, "3.9", False),
+        (3.9, 3.9, True),
         (3, 3, True),
         (3, "3", True),
         ("3", 3, True),
@@ -122,8 +137,9 @@ def test_interpreter(v1, v2, equal):
 
 def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert current_interpreter.venv_path == os.path.abspath(
-        os.path.join(".riot", "venv_py{}".format(py_version))
+    assert (
+        current_interpreter.base_venv_path
+        == (Path(".riot") / "venv_py{}".format(py_version)).resolve()
     )
 
 
@@ -136,9 +152,7 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     )
 
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
-    assert venv.prefix == os.path.abspath(
-        os.path.join(".riot", "venv_py{}_pip".format(py_version))
-    )
+    assert venv.prefix == (Path(".riot") / f"venv_py{py_version}_pip").resolve()
 
 
 def test_interpreter_version(current_interpreter: Interpreter) -> None:
@@ -219,7 +233,9 @@ def test_interpreter_venv_creation(
     python_package = "itsdangerous==1.1.0"
     _run_pip_install(python_package, venv)
 
-    current_interpreter.create_venv(recreate=False, path=str(venv["VENV_PATH"]))
+    venv_path = Path(venv["VENV_PATH"])
+    virtualenv = VirtualEnv(current_interpreter, venv_path)
+    virtualenv.create(force=False)
 
     result = _get_pip_freeze(venv)
     assert result == "{}\n".format(python_package)
@@ -238,23 +254,15 @@ def test_interpreter_venv_recreation(
     python_package = "itsdangerous==1.1.0"
     _run_pip_install(python_package, venv)
 
-    current_interpreter.create_venv(recreate=True, path=str(venv["VENV_PATH"]))
+    virtualenv = VirtualEnv(current_interpreter, Path(venv["VENV_PATH"]))
+    virtualenv.create(force=True)
 
     result = _get_pip_freeze(venv)
     assert result == ""
 
 
-def _get_base_env_path() -> str:
-    return os.path.abspath(
-        os.path.join(
-            RIOT_TESTS_PATH,
-            "venv_py{}{}{}".format(
-                sys.version_info.major,
-                sys.version_info.minor,
-                sys.version_info.micro,
-            ),
-        )
-    )
+def _get_base_env_path() -> Path:
+    return RIOT_TESTS_PATH / "venv_py{}{}{}".format(*sys.version_info[:3])
 
 
 def test_session_generate(session_virtualenv: Session) -> None:
@@ -262,8 +270,7 @@ def test_session_generate(session_virtualenv: Session) -> None:
 
     Generate new base venv and validate the virtualenv exists
     """
-    venv_path = _get_base_env_path()
-    assert os.path.isdir(venv_path)
+    assert _get_base_env_path().exists()
 
 
 def test_session_run(session_virtualenv: Session) -> None:
