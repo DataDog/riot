@@ -179,7 +179,7 @@ class Interpreter:
         """Return whether the virtual environment for this interpreter exists."""
         return os.path.isdir(self.venv_path)
 
-    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> bool:
+    def create_venv(self, recreate: bool, path: t.Optional[str] = None) -> None:
         """Attempt to create a virtual environment for this intepreter.
 
         Returns ``True`` if the virtual environment was created or ``False`` if
@@ -193,7 +193,7 @@ class Interpreter:
                     "Skipping creation of virtualenv '%s' as it already exists.",
                     venv_path,
                 )
-                return False
+                return
             logger.info("Deleting virtualenv '%s'", venv_path)
             shutil.rmtree(venv_path)
 
@@ -203,8 +203,6 @@ class Interpreter:
             ["virtualenv", f"--python={py_ex}", venv_path],
             stdout=subprocess.PIPE,
         )
-
-        return True
 
 
 @dataclasses.dataclass
@@ -607,8 +605,8 @@ class VenvInstance:
 
             if self.created:
                 py.create_venv(recreate, venv_path)
-                if not self.venv.skip_dev_install:
-                    install_dev_pkg(venv_path)
+                if not self.venv.skip_dev_install or not skip_deps:
+                    install_dev_pkg(venv_path, force=True)
 
             pkg_str = self.pkg_str
             assert pkg_str is not None
@@ -631,14 +629,16 @@ class VenvInstance:
                     deps_venv_path = venv_path
                 else:
                     deps_venv_path = venv_path + "_deps"
-                    if py.create_venv(
-                        recreate=False, path=deps_venv_path
-                    ) and py.version_info() < (3,):
-                        # Use the same binary. This is necessary for Python 2.7
-                        deps_bin = (Path(deps_venv_path) / "bin" / "python").resolve()
-                        venv_bin = (Path(venv_path) / "bin" / "python").resolve()
-                        deps_bin.unlink()
-                        deps_bin.symlink_to(venv_bin)
+                    if not Path(deps_venv_path).exists():
+                        py.create_venv(recreate=False, path=deps_venv_path)
+                        if py.version_info() < (3,):
+                            # Use the same binary. This is necessary for Python 2.7
+                            deps_bin = (
+                                Path(deps_venv_path) / "bin" / "python"
+                            ).resolve()
+                            venv_bin = (Path(venv_path) / "bin" / "python").resolve()
+                            deps_bin.unlink()
+                            deps_bin.symlink_to(venv_bin)
                 Session.run_cmd_venv(deps_venv_path, cmd, env=env)
             except CmdFailure as e:
                 raise CmdFailure(
@@ -991,18 +991,18 @@ class Session:
                 # We check if the venv existed already. If it didn't, we know we
                 # have to install the dev package. Otherwise we assume that it
                 # already has the dev package installed.
-                install_deps = py.create_venv(recreate)
+                py.create_venv(recreate)
             except CmdFailure as e:
                 logger.error("Failed to create virtual environment.\n%s", e.proc.stdout)
             except FileNotFoundError:
                 logger.error("Python version '%s' not found.", py)
             else:
-                if not install_deps or skip_deps:
+                if skip_deps:
                     logger.info("Skipping global deps install.")
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path)
+                install_dev_pkg(py.venv_path, force=True)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1217,9 +1217,14 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
     )
 
 
-def install_dev_pkg(venv_path):
+def install_dev_pkg(venv_path: str, force: bool = False) -> None:
+    dev_pkg_lockfile = Path(venv_path) / ".riot-dev-pkg-installed"
+    if dev_pkg_lockfile.exists() and not force:
+        logger.info("Dev package already installed. Skipping.")
+        return
+
     for setup_file in {"setup.py", "pyproject.toml"}:
-        if os.path.exists(setup_file):
+        if Path(setup_file).exists():
             break
     else:
         logger.warning("No Python setup file found. Skipping dev package installation.")
@@ -1228,8 +1233,11 @@ def install_dev_pkg(venv_path):
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
         Session.run_cmd_venv(
-            venv_path, "pip --disable-pip-version-check install -e .", env=os.environ
+            venv_path,
+            "pip --disable-pip-version-check install -e .",
+            env=dict(os.environ),
         )
+        dev_pkg_lockfile.touch()
     except CmdFailure as e:
         logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
         sys.exit(1)
