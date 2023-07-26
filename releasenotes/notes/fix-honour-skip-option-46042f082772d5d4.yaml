@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixed a regression that prevented the skip option from being honored when
+    the base venv did not yet exist.

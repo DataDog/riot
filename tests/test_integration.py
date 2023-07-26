@@ -476,10 +476,6 @@ test_success.py .*
 1 passed with 0 warnings, 0 failed\n""".lstrip(),
         result.stdout,
     ), result.stdout
-    assert (
-        "No Python setup file found. Skipping dev package installation."
-        in result.stderr
-    )
 
     result = tmp_run("riot run -s fail")
     assert re.search(
@@ -529,10 +525,6 @@ venv = Venv(
     )
     result = tmp_run("riot --pipe run -s test_cmdargs -- -k filter")
     assert "cmdargs=-k filter" not in result.stdout
-    assert (
-        "No Python setup file found. Skipping dev package installation."
-        in result.stderr
-    )
     assert result.returncode == 0
 
     rf_path.write_text(

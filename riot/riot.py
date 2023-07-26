@@ -997,7 +997,7 @@ class Session:
             except FileNotFoundError:
                 logger.error("Python version '%s' not found.", py)
             else:
-                if not install_deps and skip_deps:
+                if not install_deps or skip_deps:
                     logger.info("Skipping global deps install.")
                     continue
 
