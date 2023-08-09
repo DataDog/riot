@@ -631,14 +631,6 @@ class VenvInstance:
                     deps_venv_path = venv_path + "_deps"
                     if not Path(deps_venv_path).exists():
                         py.create_venv(recreate=False, path=deps_venv_path)
-                        if py.version_info() < (3,):
-                            # Use the same binary. This is necessary for Python 2.7
-                            deps_bin = (
-                                Path(deps_venv_path) / "bin" / "python"
-                            ).resolve()
-                            venv_bin = (Path(venv_path) / "bin" / "python").resolve()
-                            deps_bin.unlink()
-                            deps_bin.symlink_to(venv_bin)
                 Session.run_cmd_venv(deps_venv_path, cmd, env=env)
             except CmdFailure as e:
                 raise CmdFailure(
