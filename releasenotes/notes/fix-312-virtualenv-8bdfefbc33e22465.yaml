@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Install latest ``virtualenv`` to fix support for Python 3.12

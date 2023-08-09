@@ -29,11 +29,12 @@ setup(
     install_requires=[
         "dataclasses; python_version<'3.7'",
         "click>=7",
-        "virtualenv<=20.20.0",
+        "virtualenv<=20.20.0; python<3.12",
         "rich",
         "pexpect",
         "packaging",
         "setuptools; python_version>='3.12'",
+        "virtualenv; python>=3.12",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,
