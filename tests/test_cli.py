@@ -96,7 +96,7 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
                 riot.cli.main,
-                ["list", "--python", "3.6", "-p", "3.8", "--python", "2.7"],
+                ["list", "--python", "3.6", "-p", "3.8"],
             )
             # Success, but no output because we don't have a matching pattern
             assert result.exit_code == 0
@@ -106,7 +106,6 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
             assert list_venvs.call_args.kwargs["pythons"] == (
                 Interpreter("3.6"),
                 Interpreter("3.8"),
-                Interpreter("2.7"),
             )
 
 
@@ -126,7 +125,7 @@ def test_list_with_interpreters_only(cli: click.testing.CliRunner) -> None:
     with with_riotfile(cli, "diff_pys_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list", "--interpreters"])
         assert result.exit_code == 0, result.stdout
-        assert result.stdout == "2.7\n3.5\n3.6\n3.7\n3.8\n3.9\n"
+        assert result.stdout == "3.5\n3.6\n3.7\n3.8\n3.9\n"
 
 
 def test_list_with_hash_only(cli: click.testing.CliRunner) -> None:
@@ -147,7 +146,7 @@ def test_list_with_hash_only(cli: click.testing.CliRunner) -> None:
         assert result.exit_code == 0, result.stdout
         assert (
             result.stdout
-            == "156e0a3\n175f9ae\n1a1f742\n1f0f227\n524376c\n60d413e\n61b42ab\n83b22e0\n89d1e7a\n982a4b5\nb1c318a\nbdc1729\n"
+            == "156e0a3\n175f9ae\n1a1f742\n1f0f227\n524376c\n61b42ab\n83b22e0\n89d1e7a\n982a4b5\nb1c318a\n"
         )
 
 

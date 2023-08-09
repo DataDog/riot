@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    In order to support Python 3.12, we are bumping the ``virtualenv`` dependency and thus dropping support for Python 2.7.
