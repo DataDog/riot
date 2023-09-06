@@ -1228,7 +1228,7 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
             venv_path,
             "pip --disable-pip-version-check install -e .",
             env=dict(os.environ),
-            stdout=subprocess.STDOUT,
+            stdout=None,
         )
         dev_pkg_lockfile.touch()
     except CmdFailure as e:
