@@ -886,7 +886,7 @@ class Session:
         s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
         click.echo(click.style(s_num, fg="blue", bold=True))
 
-        if any(True for r in results if r.code != 0):
+        if not results or any(r.code for r in results):
             sys.exit(1)
 
     def list_venvs(

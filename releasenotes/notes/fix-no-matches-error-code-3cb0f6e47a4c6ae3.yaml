@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Return a non-zero exit code when no matches to run are found.

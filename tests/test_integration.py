@@ -508,7 +508,7 @@ venv = Venv(
     )
     # DEV: The hash is consistent as long as no settings change
     result = tmp_run("riot run -s 163716e")
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 1, result.stderr
 
 
 def test_run_cmdargs(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
