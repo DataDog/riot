@@ -825,10 +825,13 @@ class Session:
                     ).strip()
                 env_str = "\n".join(f"{k}={v}" for k, v in env.items())
                 logger.info(
-                    "Running command '%s' in venv '%s' with environment:\n%s.",
+                    "Running command '%s' in venv '%s'.",
                     command,
-                    venv_path,
-                    env_str,
+                    venv_path
+                )
+                logger.debug(
+                    "Environment variables:\n%s",
+                    env_str
                 )
                 with nspkgs(inst):
                     try:
