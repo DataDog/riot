@@ -1,0 +1,4 @@
+---
+other:
+  - |
+    Move environment variable logging to debug log level.

@@ -824,15 +824,8 @@ class Session:
                         cmdargs=(" ".join(f"'{arg}'" for arg in cmdargs))
                     ).strip()
                 env_str = "\n".join(f"{k}={v}" for k, v in env.items())
-                logger.info(
-                    "Running command '%s' in venv '%s'.",
-                    command,
-                    venv_path
-                )
-                logger.debug(
-                    "Environment variables:\n%s",
-                    env_str
-                )
+                logger.info("Running command '%s' in venv '%s'.", command, venv_path)
+                logger.debug("Environment variables:\n%s", env_str)
                 with nspkgs(inst):
                     try:
                         output = self.run_cmd_venv(
