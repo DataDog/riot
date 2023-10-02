@@ -859,7 +859,6 @@ class Session:
             finally:
                 results.append(result)
 
-
         if instances_ran_count == 0:
             logger.info("No instances were run.")
             sys.exit(1)
