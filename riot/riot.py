@@ -735,6 +735,7 @@ class Session:
             pythons=pythons,
         )
 
+        instances_ran_count = 0
         for inst in self.venv.instances():
             if inst.command is None:
                 logger.debug("Skipping venv instance %s due to missing command", inst)
@@ -768,6 +769,8 @@ class Session:
                     "Skipping venv instance '%s' due to pattern mismatch", venv_path
                 )
                 continue
+
+            instances_ran_count += 1
 
             logger.info("Running with %s", inst.py)
 
@@ -856,6 +859,11 @@ class Session:
             finally:
                 results.append(result)
 
+
+        if instances_ran_count == 0:
+            logger.info("No instances were run.")
+            sys.exit(1)
+
         click.echo(
             click.style("\n-------------------summary-------------------", bold=True)
         )
@@ -886,7 +894,7 @@ class Session:
         s_num = f"{num_passed} passed with {num_warnings} warnings, {num_failed} failed"
         click.echo(click.style(s_num, fg="blue", bold=True))
 
-        if not results or any(r.code for r in results):
+        if any(True for r in results if r.code != 0):
             sys.exit(1)
 
     def list_venvs(
@@ -951,6 +959,10 @@ class Session:
 
         elif interpreters and python_interpreters:
             print("\n".join(sorted(python_interpreters, key=Version)))
+
+        else:
+            logger.verbose("No matches found.")
+            sys.exit(1)
 
     def generate_base_venvs(
         self,

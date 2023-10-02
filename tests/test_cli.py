@@ -85,7 +85,7 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["list", "--python", "3.6"])
             # Success, but no output because we don't have a matching pattern
-            assert result.exit_code == 0
+            assert result.exit_code == 1
             assert result.stdout == ""
 
             list_venvs.assert_called_once()
@@ -99,7 +99,7 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
                 ["list", "--python", "3.6", "-p", "3.8"],
             )
             # Success, but no output because we don't have a matching pattern
-            assert result.exit_code == 0
+            assert result.exit_code == 1
             assert result.stdout == ""
 
             list_venvs.assert_called_once()
