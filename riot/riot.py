@@ -906,6 +906,7 @@ class Session:
         interpreters=False,
         hash_only=False,
     ):
+        instances_found_count = 0
         python_interpreters = set()
         venv_hashes = set()
         table = None
@@ -929,6 +930,7 @@ class Session:
 
             if not inst.match_venv_pattern(venv_pattern):
                 continue
+            instances_found_count += 1
             pkgs_str = inst.full_pkg_str
             env_str = env_to_str(inst.env)
             if interpreters or hash_only:
@@ -950,6 +952,10 @@ class Session:
                     f"[italic]{pkgs_str}[/italic]",
                 )
 
+        if instances_found_count == 0:
+            logger.info("No matches found.")
+            sys.exit(1)
+
         if table:
             rich_print(table)
 
@@ -958,10 +964,6 @@ class Session:
 
         elif interpreters and python_interpreters:
             print("\n".join(sorted(python_interpreters, key=Version)))
-
-        else:
-            logger.verbose("No matches found.")
-            sys.exit(1)
 
     def generate_base_venvs(
         self,

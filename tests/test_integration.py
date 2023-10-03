@@ -208,7 +208,7 @@ from riot import Venv
     result = tmp_run("riot -P list")
     assert result.stderr == ""
     assert result.stdout == ""
-    assert result.returncode == 0
+    assert result.returncode == 1
 
 
 def test_list_configurations(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:

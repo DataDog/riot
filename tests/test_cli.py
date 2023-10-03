@@ -81,7 +81,10 @@ def test_list_with_venv_pattern(cli: click.testing.CliRunner) -> None:
 
 def test_list_with_python(cli: click.testing.CliRunner) -> None:
     """Running list with a python passes through the python."""
-    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
+    def exit1():
+        import sys
+        sys.exit(1)
+    with mock.patch("riot.cli.Session.list_venvs", side_effect=exit1) as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(riot.cli.main, ["list", "--python", "3.6"])
             # Success, but no output because we don't have a matching pattern
@@ -92,7 +95,7 @@ def test_list_with_python(cli: click.testing.CliRunner) -> None:
             assert list_venvs.call_args.kwargs["pythons"] == (Interpreter("3.6"),)
 
     # multiple pythons
-    with mock.patch("riot.cli.Session.list_venvs") as list_venvs:
+    with mock.patch("riot.cli.Session.list_venvs", side_effect=exit1) as list_venvs:
         with with_riotfile(cli, "empty_riotfile.py"):
             result = cli.invoke(
                 riot.cli.main,
@@ -114,7 +117,7 @@ def test_list_with_interpreters_only(cli: click.testing.CliRunner) -> None:
     with with_riotfile(cli, "empty_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list", "--interpreters"])
         # Success, but no output because no venvs to list
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert result.stdout == ""
 
     with with_riotfile(cli, "simple_riotfile.py"):
@@ -133,7 +136,7 @@ def test_list_with_hash_only(cli: click.testing.CliRunner) -> None:
     with with_riotfile(cli, "empty_riotfile.py"):
         result = cli.invoke(riot.cli.main, ["list", "--hash-only"])
         # Success, but no output because no venvs to list
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert result.stdout == ""
 
     with with_riotfile(cli, "simple_riotfile.py"):
