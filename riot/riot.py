@@ -616,7 +616,8 @@ class VenvInstance:
             if recompile_reqs or not os.path.exists(compiled_requirements_file):
                 _ = self.requirements
             cmd = (
-                f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location "
+                f"pip --disable-pip-version-check install --no-cache-dir --prefix '{self.prefix}' "
+                "--no-warn-script-location ",
                 f"-r {compiled_requirements_file}"
             )
             logger.info(
