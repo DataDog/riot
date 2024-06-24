@@ -11,9 +11,9 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - name: Install Riot
-        run: pip install .
+        run: pip install riot
       - run: riot -v run -s black -- --check .
   mypy:
     runs-on: ubuntu-latest
@@ -21,9 +21,9 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - name: Install Riot
-        run: pip install .
+        run: pip install riot
       - run: riot -v run -s mypy
   docs:
     runs-on: ubuntu-latest
@@ -33,9 +33,9 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - name: Install Riot
-        run: pip install .
+        run: pip install riot
       - run: riot -v run docs
       - uses: actions/upload-artifact@v2
         with:
@@ -47,9 +47,9 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - name: Install Riot
-        run: pip install .
+        run: pip install riot
       - run: riot -v run -s flake8
   test:
     strategy:
@@ -65,7 +65,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: Install Riot
-        run: pip install .
+        run: pip install riot
       - name: Run tests
         run: riot -v run --python=${{ matrix.python-version }} test
       - name: Coverage

@@ -42,7 +42,7 @@ pip-delete-this-directory.txt
 target/
 
 # Riot
-.riot/
+.riot/venv*
 
 # Pycharm
 .idea
