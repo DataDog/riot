@@ -617,8 +617,8 @@ class VenvInstance:
                 _ = self.requirements
             cmd = (
                 f"pip --disable-pip-version-check install --prefix '{self.prefix}' "
-                "--no-warn-script-location --no-cache-dir ",
-                f"-r {compiled_requirements_file}"
+                "--no-warn-script-location ",
+                f"-r {compiled_requirements_file} --no-cache-dir"
             )
             logger.info(
                 "Installing venv dependencies %s at %s.",
