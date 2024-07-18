@@ -34,6 +34,7 @@ setup(
         "pexpect",
         "packaging",
         "setuptools; python_version>='3.12'",
+        "uv~=0.2.0; python_version>='3.8'",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,

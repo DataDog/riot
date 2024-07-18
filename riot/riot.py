@@ -28,9 +28,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_RIOT_PATH = ".riot"
 DEFAULT_RIOT_ENV_PREFIX = "venv_py"
 
+USE_UV = os.getenv("RIOT_USE_UV", "0").lower() in ("1", "true")
+
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
-SHELL_RCFILE = """
+SHELL_RCFILE = r"""
 source {venv_path}/bin/activate
 echo -e "\e[31;1m"
 echo "                 )  "
@@ -57,6 +59,17 @@ else:
 
 _K = t.TypeVar("_K")
 _V = t.TypeVar("_V")
+
+
+def _pip_cmd(args: str) -> str:
+    if USE_UV:
+        import uv
+
+        # Argument not supported by `uv pip install`
+        if "--no-warn-script-location" in args:
+            args = args.replace("--no-warn-script-location", "")
+        return f"{uv.find_uv_bin()} pip {args}"
+    return f"pip --disable-pip-version-check {args}"
 
 
 def rm_singletons(d: t.Dict[_K, t.Union[_V, t.List[_V]]]) -> t.Dict[_K, t.List[_V]]:
@@ -615,8 +628,8 @@ class VenvInstance:
             )
             if recompile_reqs or not os.path.exists(compiled_requirements_file):
                 _ = self.requirements
-            cmd = (
-                f"pip --disable-pip-version-check install --prefix '{self.prefix}' --no-warn-script-location "
+            cmd = _pip_cmd(
+                f"install --prefix '{self.prefix}' --no-warn-script-location "
                 f"-r {compiled_requirements_file}"
             )
             logger.info(
@@ -1226,7 +1239,7 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
     try:
         Session.run_cmd_venv(
             venv_path,
-            "pip --disable-pip-version-check install -e .",
+            _pip_cmd("install -e ."),
             env=dict(os.environ),
         )
         dev_pkg_lockfile.touch()
