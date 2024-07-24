@@ -486,6 +486,7 @@ class VenvInstance:
             "compile",
             "-q",
             "--no-annotate",
+            "--allow-unsafe",
             in_path,
         ]
         if tuple([int(v) for v in self.py.version().strip("()").split(".")]) >= (3, 7):
