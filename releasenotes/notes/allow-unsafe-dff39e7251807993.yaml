@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Ensure ``setuptools`` is included in riot generated lock files. This ensures consistent behavior
+    for packages and ``riot.Venv``s which depend on ``setuptools``.
