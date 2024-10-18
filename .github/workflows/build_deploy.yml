@@ -72,6 +72,13 @@ jobs:
         with:
           name: artifact-wheel
           path: dist
+      - name: Check for Secret
+        run: |
+          if [ -z "${{ secrets.PYPI_TOKEN }}" ]; then
+            echo "PYPI_TOKEN is not set"
+          else
+            echo "PYPI_TOKEN exists"
+          fi
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
