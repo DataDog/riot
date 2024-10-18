@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Pin ``virtualenv`` to the version that has support for Python 3.7
+
