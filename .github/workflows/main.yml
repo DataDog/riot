@@ -37,7 +37,7 @@ jobs:
       - name: Install Riot
         run: pip install .
       - run: riot -v run docs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.6
         with:
           name: docs
           path: docs/_build
