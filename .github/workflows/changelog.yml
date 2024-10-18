@@ -42,7 +42,7 @@ jobs:
           rst2html.py CHANGELOG.rst CHANGELOG.html
 
       - name: Upload CHANGELOG.rst
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: changelog
           path: |
