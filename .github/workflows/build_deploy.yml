@@ -1,6 +1,11 @@
 name: Build
 
 on:
+  workflow_call:
+    secrets:
+      PYPI_TOKEN:
+        description: 'A token for accessing PyPI'
+        required: true
   pull_request:
   release:
     types:
@@ -62,11 +67,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          name: artifact-*
+          name: artifact-sdist
           path: dist
-
-      - uses: pypa/gh-action-pypi-publish@master
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          name: artifact-wheel
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
-          # To test: repository_url: https://test.pypi.org/legacy/
+          # To test: repository-url: https://test.pypi.org/legacy/
