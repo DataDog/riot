@@ -834,10 +834,9 @@ class Session:
                     )
                 else:
                     logger.info(
-                        "Running command '%s' in venv '%s' with environment:\n%s.",
+                        "Running command '%s' in venv '%s'.",
                         command,
                         venv_path,
-                        env_str,
                     )
                 with nspkgs(inst):
                     try:
