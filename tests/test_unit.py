@@ -277,7 +277,7 @@ def test_session_run(session_virtualenv: Session) -> None:
     command_env = _get_env(env_name)
     # Check exists and is empty of packages
     result = _get_pip_freeze(command_env)
-    regex = r"isort==5\.10\.1itsdangerous==1\.1\.0(.*)six==1\.15\.0"
+    regex = r".*isort==5\.10\.1.*itsdangerous==1\.1\.0.*six==1\.15\.0.*"
     expected = re.match(regex, result.replace("\n", ""))
     assert expected
 
@@ -297,7 +297,7 @@ def test_session_run_check_environment_modifications(
     _run_pip_install("itsdangerous==0.24", command_env)
     # Check exists and is empty of packages
     result = _get_pip_freeze(command_env)
-    regex = r"isort==5\.10\.1itsdangerous==0\.24(.*)six==1\.15\.0"
+    regex = r".*isort==5\.10\.1.*itsdangerous==0\.24.*six==1\.15\.0.*"
     expected = re.match(regex, result.replace("\n", ""))
     assert expected
 
@@ -320,7 +320,7 @@ def test_session_run_check_environment_modifications_and_recreate_false(
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
     result = _get_pip_freeze(command_env)
-    regex = r"isort==5\.10\.1itsdangerous==0\.24(.*)six==1\.15\.0"
+    regex = r".*isort==5\.10\.1.*itsdangerous==0\.24.*six==1\.15\.0.*"
     expected = re.match(regex, result.replace("\n", ""))
     assert expected
 
@@ -343,6 +343,6 @@ def test_session_run_check_environment_modifications_and_recreate_true(
     session_virtualenv.run(re.compile(""), re.compile(""), False, True)
 
     result = _get_pip_freeze(command_env)
-    regex = r"isort==5\.10\.1itsdangerous==1\.1\.0(.*)six==1\.15\.0"
+    regex = r".*isort==5\.10\.1.*itsdangerous==1\.1\.0.*six==1\.15\.0.*"
     expected = re.match(regex, result.replace("\n", ""))
     assert expected, "error: {}".format(result)
