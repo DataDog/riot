@@ -5,7 +5,7 @@ import re
 import sys
 
 import click
-import pkg_resources
+import importlib.metadata
 from rich.console import Console
 from rich.logging import RichHandler
 
@@ -15,8 +15,8 @@ FORMAT = "%(message)s"
 
 
 try:
-    __version__ = pkg_resources.get_distribution("riot").version
-except pkg_resources.DistributionNotFound:
+    __version__ = importlib.metadata.version("riot")
+except importlib.metadata.PackageNotFoundError:
     # package is not installed
     __version__ = "dev"
 
