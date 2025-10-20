@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest:*)",
+      "Bash(python -m pytest tests/test_integration.py::test_shell -xvs)",
+      "Bash(python3:*)",
+      "Bash(pip install:*)",
+      "Bash(pyenv:*)",
+      "Bash(/dev/null)",
+      "Bash(pip uninstall:*)",
+      "Bash(riot:*)"
+    ],
+    "deny": []
+  }
+}

@@ -39,7 +39,6 @@ venv = Venv(
                 "flake8-builtins": latest,
                 "flake8-docstrings": latest,
                 "flake8-import-order": latest,
-                "flake8-logging-format": latest,
                 "flake8-rst-docstrings": latest,
                 # needed for some features from flake8-rst-docstrings
                 "pygments": latest,
