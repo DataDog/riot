@@ -1234,7 +1234,7 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
     try:
         Session.run_cmd_venv(
             venv_path,
-            "pip --disable-pip-version-check install -e .",
+            "pip --disable-pip-version-check --no-build-isolation install -e .",
             env=dict(os.environ),
         )
         dev_pkg_lockfile.touch()
