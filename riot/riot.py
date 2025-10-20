@@ -1066,9 +1066,10 @@ class Session:
                     c = pexpect.spawn(SHELL, ["-i"], dimensions=(h, w), env=env)
                     c.setecho(False)
                     c.sendline(f"source {rcfile.name}")
-                    
+
                     # Check if stdin has data (indicates non-interactive mode like tests)
                     import select
+
                     if sys.stdin.isatty():
                         # Interactive mode - use normal interact()
                         try:
@@ -1076,7 +1077,9 @@ class Session:
                             c.close()
                             sys.exit(c.exitstatus)
                         except Exception as e:
-                            logger.debug(f"Shell interact() failed: {e}, but shell setup was successful")
+                            logger.debug(
+                                f"Shell interact() failed: {e}, but shell setup was successful"
+                            )
                             c.close()
                             sys.exit(0)
                     else:
@@ -1090,7 +1093,9 @@ class Session:
                             c.close()
                             sys.exit(0)
                         except Exception as e:
-                            logger.debug(f"Shell non-interactive processing failed: {e}")
+                            logger.debug(
+                                f"Shell non-interactive processing failed: {e}"
+                            )
                             c.close()
                             sys.exit(0)
 
