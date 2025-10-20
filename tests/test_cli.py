@@ -627,7 +627,7 @@ venv = Venv(
         )
         assert result.exit_code == 1
         assert (
-            result.stdout
+            result.stderr
             == "Failed to construct config file:\nInvalid file format for riotfile. Expected file with .py extension got 'riotfile'.\n"
         )
 
@@ -643,8 +643,8 @@ this is invalid syntax
 
         result = cli.invoke(riot.cli.main, ["list"], catch_exceptions=False)
         assert result.exit_code == 1
-        assert "Failed to parse" in result.stdout
-        assert "SyntaxError: invalid syntax" in result.stdout
+        assert "Failed to parse" in result.stderr
+        assert "SyntaxError: invalid syntax" in result.stderr
 
 
 def test_run_pass_env(
