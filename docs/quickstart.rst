@@ -30,7 +30,7 @@ with ``pytest``::
                 ),
                 Venv(
                     name="test",
-                    pys=["3.7", "3.8", "3.9"],
+                    pys=["3.8", "3.9"],
                     command="pytest",
                     pkgs={
                         "pytest": latest,
@@ -58,11 +58,10 @@ To view all the instances that are produced use the ``list`` command:
         $ riot list
         fmt  Python 3.9 'black==20.8b1'
         mypy  Python 3.9 'mypy'
-        test  Python 3.7 'pytest'
         test  Python 3.8 'pytest'
         test  Python 3.9 'pytest'
 
 
 The ``black`` and ``mypy`` instances will be run with Python 3.9 and the
-``pytest`` instance will be run in Python 3.7, 3.8 and 3.9.
+``pytest`` instance will be run in Python 3.8 and 3.9.
 

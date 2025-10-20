@@ -21,7 +21,7 @@ be used to test large test matrices with ease.
 System Requirements
 -------------------
 
-riot supports Python 3.7+ and can be run with CPython or PyPy.
+riot supports Python 3.8+ and can be run with CPython.
 
 
 Installation
