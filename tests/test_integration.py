@@ -37,8 +37,7 @@ class _T_TmpRun(Protocol):
         cwd: Optional[_T_Path] = None,
         env: Optional[Dict[str, str]] = None,
         input: Optional[str] = None,  # noqa
-    ) -> _T_CompletedProcess:
-        ...
+    ) -> _T_CompletedProcess: ...
 
 
 @pytest.fixture
