@@ -1,11 +1,11 @@
 __all__ = ["main"]
 
+import importlib.metadata
 import logging
 import re
 import sys
 
 import click
-import importlib.metadata
 from rich.console import Console
 from rich.logging import RichHandler
 

@@ -1068,17 +1068,16 @@ class Session:
                     c.sendline(f"source {rcfile.name}")
 
                     # Check if stdin has data (indicates non-interactive mode like tests)
-                    import select
-
                     if sys.stdin.isatty():
                         # Interactive mode - use normal interact()
                         try:
                             c.interact()
                             c.close()
                             sys.exit(c.exitstatus)
-                        except Exception as e:
+                        except Exception:
                             logger.debug(
-                                f"Shell interact() failed: {e}, but shell setup was successful"
+                                "Shell interact() failed, but shell setup was successful",
+                                exc_info=True,
                             )
                             c.close()
                             sys.exit(0)
@@ -1092,9 +1091,9 @@ class Session:
                             c.expect(pexpect.EOF, timeout=10)
                             c.close()
                             sys.exit(0)
-                        except Exception as e:
+                        except Exception:
                             logger.debug(
-                                f"Shell non-interactive processing failed: {e}"
+                                "Shell non-interactive processing failed", exc_info=True
                             )
                             c.close()
                             sys.exit(0)
