@@ -59,14 +59,14 @@ RECOMPILE_REQS_ARG = click.option(
 )
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option(
     "-f",
     "--file",
     "riotfile",
     default="riotfile.py",
     show_default=True,
-    type=click.Path(exists=True),
+    type=click.Path(),
 )
 @click.option("-v", "--verbose", "log_level", flag_value=logging.INFO)
 @click.option("-d", "--debug", "log_level", flag_value=logging.DEBUG)
@@ -94,6 +94,27 @@ def main(ctx, riotfile, log_level, pipe_mode):
 
     ctx.ensure_object(dict)
     ctx.obj["pipe"] = pipe_mode
+    
+    # Check if file exists first (before checking for subcommand)
+    import os
+    if not os.path.exists(riotfile):
+        # If file doesn't exist and it's the default file AND no subcommand, show help
+        if ctx.invoked_subcommand is None and riotfile == "riotfile.py":
+            click.echo(ctx.get_help(), err=True)
+            ctx.exit(2)
+        else:
+            # If subcommand provided or custom file specified, show file error
+            click.echo(ctx.get_usage(), err=True)
+            click.echo("Try 'riot --help' for help.", err=True)
+            click.echo("", err=True)
+            click.echo(f"Error: Invalid value for '-f' / '--file': Path '{riotfile}' does not exist.", err=True)
+            sys.exit(2)
+    
+    # If no subcommand is provided (but file exists), show help and exit with error code
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help(), err=True)
+        ctx.exit(2)
+    
     try:
         ctx.obj["session"] = Session.from_config_file(riotfile)
     except Exception as e:

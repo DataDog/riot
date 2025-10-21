@@ -18,7 +18,11 @@ DATA_DIR = os.path.join(HERE, "data")
 
 @pytest.fixture
 def cli() -> click.testing.CliRunner:
-    return click.testing.CliRunner()
+    try:
+        return click.testing.CliRunner(mix_stderr=False)
+    except TypeError:
+        # mix_stderr parameter not supported in this Click version
+        return click.testing.CliRunner()
 
 
 @contextlib.contextmanager
