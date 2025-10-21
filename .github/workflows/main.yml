@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.4'
+          python-version: '3.14'
       - name: Install Riot
         run: pip install .
       - run: riot -v run -s mypy
