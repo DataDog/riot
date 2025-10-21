@@ -4,6 +4,7 @@ exclude = '''
     /(
       \.venv.*
       | \.riot
+      | \.eggs
     )/
   )
 '''
