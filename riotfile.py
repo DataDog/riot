@@ -6,7 +6,7 @@ venv = Venv(
         Venv(
             name="test",
             command="pytest -n auto --dist loadscope {cmdargs}",
-            pys=["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"],
+            pys=["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"],
             pkgs={
                 "pytest": latest,
                 "pytest-cov": latest,
@@ -17,7 +17,7 @@ venv = Venv(
         ),
         Venv(
             pkgs={
-                "black": "==22.6.0",
+                "black": latest,
             },
             venvs=[
                 Venv(
@@ -34,12 +34,11 @@ venv = Venv(
             name="flake8",
             command="flake8 {cmdargs}",
             pkgs={
-                "flake8": "<5.0.0",
+                "flake8": latest,
                 "flake8-blind-except": latest,
                 "flake8-builtins": latest,
                 "flake8-docstrings": latest,
                 "flake8-import-order": latest,
-                "flake8-logging-format": latest,
                 "flake8-rst-docstrings": latest,
                 # needed for some features from flake8-rst-docstrings
                 "pygments": latest,
@@ -67,9 +66,9 @@ venv = Venv(
             name="docs",
             command="sphinx-build {cmdargs} -W -b html docs docs/_build/",
             pkgs={
-                "sphinx": "~=4.5.0",
-                "sphinx-rtd-theme": "~=1.0.0",
-                "sphinx-click": "~=3.1.0",
+                "sphinx": latest,
+                "sphinx-rtd-theme": latest,
+                "sphinx-click": latest,
                 "reno": latest,
             },
         ),

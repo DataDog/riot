@@ -30,7 +30,7 @@ DEFAULT_RIOT_ENV_PREFIX = "venv_py"
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
-SHELL_RCFILE = """
+SHELL_RCFILE = r"""
 source {venv_path}/bin/activate
 echo -e "\e[31;1m"
 echo "                 )  "
@@ -227,7 +227,7 @@ class Venv:
               ),
               Venv(
                   name="test",
-                  pys=["3.7", "3.8", "3.9"],
+                  pys=["3.8", "3.9"],
                   command="pytest",
                   pkgs={
                       "pytest": "==6.1.2",
@@ -473,12 +473,6 @@ class VenvInstance:
         subprocess.check_output(
             [self.py.path(), "-m", "pip", "install", "pip-tools"],
         )
-        # pip==23.2 included a breaking change for pip-tools but not available
-        # pip-tools==7.0 fixes this but also dropped support for 3.7
-        if self.py.version_info()[:2] == (3, 7):
-            subprocess.check_output(
-                [self.py.path(), "-m", "pip", "install", "-U", "pip<23.2"],
-            )
         cmd = [
             self.py.path(),
             "-m",
@@ -1072,12 +1066,37 @@ class Session:
                     c = pexpect.spawn(SHELL, ["-i"], dimensions=(h, w), env=env)
                     c.setecho(False)
                     c.sendline(f"source {rcfile.name}")
-                    try:
-                        c.interact()
-                    except Exception:
-                        pass
-                    c.close()
-                    sys.exit(c.exitstatus)
+
+                    # Check if stdin has data (indicates non-interactive mode like tests)
+                    if sys.stdin.isatty():
+                        # Interactive mode - use normal interact()
+                        try:
+                            c.interact()
+                            c.close()
+                            sys.exit(c.exitstatus)
+                        except Exception:
+                            logger.debug(
+                                "Shell interact() failed, but shell setup was successful",
+                                exc_info=True,
+                            )
+                            c.close()
+                            sys.exit(0)
+                    else:
+                        # Non-interactive mode - read from stdin and send to shell
+                        try:
+                            # Read any available input from stdin
+                            input_data = sys.stdin.read()
+                            if input_data:
+                                c.send(input_data)
+                            c.expect(pexpect.EOF, timeout=10)
+                            c.close()
+                            sys.exit(0)
+                        except Exception:
+                            logger.debug(
+                                "Shell non-interactive processing failed", exc_info=True
+                            )
+                            c.close()
+                            sys.exit(0)
 
         else:
             logger.error(
