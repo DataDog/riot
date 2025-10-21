@@ -37,8 +37,7 @@ class _T_TmpRun(Protocol):
         cwd: Optional[_T_Path] = None,
         env: Optional[Dict[str, str]] = None,
         input: Optional[str] = None,  # noqa
-    ) -> _T_CompletedProcess:
-        ...
+    ) -> _T_CompletedProcess: ...
 
 
 @pytest.fixture
@@ -61,9 +60,8 @@ def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
 def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot")
     assert (
-        result.stdout
-        == """
-Usage: riot [OPTIONS] COMMAND [ARGS]...
+        result.stderr
+        == """Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
   -f, --file PATH  [default: riotfile.py]
@@ -79,10 +77,10 @@ Commands:
   requirements  Cache requirements for a venv.
   run           Run virtualenv instances with names matching a pattern.
   shell         Launch a shell inside a venv.
-""".lstrip()
+"""
     )
-    assert result.stderr == ""
-    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.returncode == 2
 
     result = tmp_run("riot -P list")
     assert (
