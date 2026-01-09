@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Add support for installing from pre-built wheels instead of editable mode via the
+    ``--wheel-source`` global option and ``RIOT_WHEEL_SOURCE`` environment variable.
+    See https://ddriot.readthedocs.io/en/latest/wheel_sources.html for details.

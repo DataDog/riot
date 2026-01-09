@@ -78,9 +78,17 @@ RECOMPILE_REQS_ARG = click.option(
     default=False,
     help="Pipe mode. Makes riot emit plain output.",
 )
+@click.option(
+    "--wheel-source",
+    "wheel_source",
+    type=str,
+    default=None,
+    envvar="RIOT_WHEEL_SOURCE",
+    help="Path or URL to wheel files. When set, installs from wheels instead of editable mode.",
+)
 @click.version_option(__version__)
 @click.pass_context
-def main(ctx, riotfile, log_level, pipe_mode):
+def main(ctx, riotfile, log_level, pipe_mode, wheel_source):
     if pipe_mode:
         if log_level:
             logging.basicConfig(level=log_level)
@@ -94,6 +102,7 @@ def main(ctx, riotfile, log_level, pipe_mode):
 
     ctx.ensure_object(dict)
     ctx.obj["pipe"] = pipe_mode
+    ctx.obj["wheel_source"] = wheel_source
 
     # Check if file exists first (before checking for subcommand)
     import os
@@ -168,11 +177,13 @@ can be used for the run command to avoid having to install the local package."""
 @PATTERN_ARG
 @click.pass_context
 def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
+    wheel_source = ctx.obj.get("wheel_source")
     ctx.obj["session"].generate_base_venvs(
         pattern=re.compile(pattern),
         recreate=recreate_venvs,
         skip_deps=skip_base_install,
         pythons=pythons,
+        wheel_source=wheel_source,
     )
 
 
@@ -202,6 +213,7 @@ def run(
     venv_pattern,
     recompile_reqs,
 ):
+    wheel_source = ctx.obj.get("wheel_source")
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
         venv_pattern=re.compile(venv_pattern),
@@ -213,6 +225,7 @@ def run(
         skip_missing=skip_missing,
         exit_first=exit_first,
         recompile_reqs=recompile_reqs,
+        wheel_source=wheel_source,
     )
 
 
@@ -221,9 +234,11 @@ def run(
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
 @click.pass_context
 def shell(ctx, ident, pass_env):
+    wheel_source = ctx.obj.get("wheel_source")
     ctx.obj["session"].shell(
         ident=ident,
         pass_env=pass_env,
+        wheel_source=wheel_source,
     )
 
 
