@@ -64,14 +64,14 @@ def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
         == """Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
-  -f, --file PATH      [default: riotfile.py]
+  -f, --file PATH    [default: riotfile.py]
   -v, --verbose
   -d, --debug
-  -P, --pipe           Pipe mode. Makes riot emit plain output.
-  --wheel-source TEXT  Path or URL to wheel files. When set, installs from
-                       wheels instead of editable mode.
-  --version            Show the version and exit.
-  --help               Show this message and exit.
+  -P, --pipe         Pipe mode. Makes riot emit plain output.
+  --wheel-path TEXT  Path or URL to wheel files. When set, installs from
+                     wheels instead of editable mode.
+  --version          Show the version and exit.
+  --help             Show this message and exit.
 
 Commands:
   generate      Generate base virtual environments.
@@ -160,14 +160,14 @@ def test_help(tmp_run: _T_TmpRun) -> None:
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
-  -f, --file PATH      [default: riotfile.py]
+  -f, --file PATH    [default: riotfile.py]
   -v, --verbose
   -d, --debug
-  -P, --pipe           Pipe mode. Makes riot emit plain output.
-  --wheel-source TEXT  Path or URL to wheel files. When set, installs from
-                       wheels instead of editable mode.
-  --version            Show the version and exit.
-  --help               Show this message and exit.
+  -P, --pipe         Pipe mode. Makes riot emit plain output.
+  --wheel-path TEXT  Path or URL to wheel files. When set, installs from
+                     wheels instead of editable mode.
+  --version          Show the version and exit.
+  --help             Show this message and exit.
 
 Commands:
   generate      Generate base virtual environments.

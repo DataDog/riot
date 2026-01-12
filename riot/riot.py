@@ -578,7 +578,7 @@ class VenvInstance:
         skip_deps: bool = False,
         recompile_reqs: bool = False,
         child_was_installed: bool = False,
-        wheel_source: t.Optional[str] = None,
+        wheel_path: t.Optional[str] = None,
     ) -> None:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
@@ -602,7 +602,7 @@ class VenvInstance:
             if self.created:
                 py.create_venv(recreate, venv_path)
                 if not self.venv.skip_dev_install or not skip_deps:
-                    install_dev_pkg(venv_path, force=True, wheel_source=wheel_source)
+                    install_dev_pkg(venv_path, force=True, wheel_path=wheel_path)
 
             pkg_str = self.pkg_str
             assert pkg_str is not None
@@ -641,7 +641,7 @@ class VenvInstance:
                 env,
                 py,
                 child_was_installed=installed or exists or child_was_installed,
-                wheel_source=wheel_source,
+                wheel_path=wheel_path,
             )
 
 
@@ -724,7 +724,7 @@ class Session:
         skip_missing: bool = False,
         exit_first: bool = False,
         recompile_reqs: bool = False,
-        wheel_source: t.Optional[str] = None,
+        wheel_path: t.Optional[str] = None,
     ) -> None:
         results = []
 
@@ -733,7 +733,7 @@ class Session:
             recreate=recreate_venvs,
             skip_deps=skip_base_install,
             pythons=pythons,
-            wheel_source=wheel_source,
+            wheel_path=wheel_path,
         )
 
         for inst in self.venv.instances():
@@ -801,7 +801,7 @@ class Session:
                 skip_deps=skip_base_install or inst.venv.skip_dev_install,
                 recreate=recreate_venvs,
                 recompile_reqs=recompile_reqs,
-                wheel_source=wheel_source,
+                wheel_path=wheel_path,
             )
 
             pythonpath = inst.pythonpath
@@ -967,7 +967,7 @@ class Session:
         recreate: bool,
         skip_deps: bool,
         pythons: t.Optional[t.Set[Interpreter]],
-        wheel_source: t.Optional[str] = None,
+        wheel_path: t.Optional[str] = None,
     ) -> None:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
@@ -1004,7 +1004,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path, force=True, wheel_source=wheel_source)
+                install_dev_pkg(py.venv_path, force=True, wheel_path=wheel_path)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1028,7 +1028,9 @@ class Session:
             with Status("Producing requirements.txt"):
                 _ = inst.requirements
 
-    def shell(self, ident: str, pass_env: bool, wheel_source: t.Optional[str] = None) -> None:
+    def shell(
+        self, ident: str, pass_env: bool, wheel_path: t.Optional[str] = None
+    ) -> None:
         for inst, venv_path in self._venvs_matching_identifier(ident):
             logger.info("Launching shell inside venv instance %s", inst)
             logger.debug("Setting venv path to %s", venv_path)
@@ -1043,7 +1045,7 @@ class Session:
             # Should we expect the venv to be ready?
             with Status("Preparing shell virtual environment"):
                 inst.py.create_venv(False)
-                inst.prepare(env, wheel_source=wheel_source)
+                inst.prepare(env, wheel_path=wheel_path)
 
             pythonpath = inst.pythonpath
             if pythonpath:
@@ -1285,7 +1287,7 @@ def get_package_name() -> str:
 
 
 def install_dev_pkg(
-    venv_path: str, force: bool = False, wheel_source: t.Optional[str] = None
+    venv_path: str, force: bool = False, wheel_path: t.Optional[str] = None
 ) -> None:
     dev_pkg_lockfile = Path(venv_path) / ".riot-dev-pkg-installed"
     if dev_pkg_lockfile.exists() and not force:
@@ -1300,20 +1302,20 @@ def install_dev_pkg(
         return
 
     # Determine installation method
-    if wheel_source:
+    if wheel_path:
         # Install from wheels (two-step process to ensure we use only wheels from source)
         package_name = get_package_name()
         logger.info(
             "Installing dev package from wheels: %s (source: %s)",
             package_name,
-            wheel_source,
+            wheel_path,
         )
 
         # Step 1: Download wheel to temp directory using --no-index to avoid PyPI
         with tempfile.TemporaryDirectory() as tmp_dir:
             download_cmd = (
                 f"pip --disable-pip-version-check download "
-                f"--no-index --no-deps --find-links '{wheel_source}' "
+                f"--no-index --no-deps --find-links '{wheel_path}' "
                 f"--pre --dest '{tmp_dir}' '{package_name}'"
             )
             try:
@@ -1321,7 +1323,7 @@ def install_dev_pkg(
             except CmdFailure as e:
                 logger.error(
                     "Wheel download failed. Ensure wheel exists at %s\n%s",
-                    wheel_source,
+                    wheel_path,
                     e.proc.stdout,
                 )
                 sys.exit(1)

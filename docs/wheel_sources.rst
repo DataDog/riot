@@ -11,47 +11,47 @@ pre-built wheels instead. This is useful for:
 - **Reproducibility**: Testing with exact wheel artifacts
 
 
-Specifying a Wheel Source
---------------------------
+Specifying a Wheel Path
+------------------------
 
-There are two ways to specify a wheel source:
+There are two ways to specify a wheel path:
 
 
 Command-line Option
 ~~~~~~~~~~~~~~~~~~~
 
-Use the global ``--wheel-source`` option before any subcommand:
+Use the global ``--wheel-path`` option before any subcommand:
 
 .. code-block:: bash
 
     # With a local directory containing wheels
-    riot --wheel-source /path/to/wheels run test
+    riot --wheel-path /path/to/wheels run test
 
     # With a remote URL (e.g., index.html)
-    riot --wheel-source https://example.com/wheels/ generate
+    riot --wheel-path https://example.com/wheels/ generate
 
     # Works with all commands
-    riot --wheel-source /tmp/wheels shell mypy
+    riot --wheel-path /tmp/wheels shell mypy
 
 
 Environment Variable
 ~~~~~~~~~~~~~~~~~~~~
 
-Set the ``RIOT_WHEEL_SOURCE`` environment variable:
+Set the ``RIOT_WHEEL_PATH`` environment variable:
 
 .. code-block:: bash
 
-    export RIOT_WHEEL_SOURCE=/path/to/wheels
+    export RIOT_WHEEL_PATH=/path/to/wheels
     riot run test
 
 This is particularly useful in CI/CD environments where you want to configure
-wheel sources without modifying commands.
+wheel paths without modifying commands.
 
 
 Package Name Resolution
 -----------------------
 
-When using wheel sources, riot needs to know the package name to install. It
+When using wheel paths, riot needs to know the package name to install. It
 determines this automatically by:
 
 1. **Checking the ``RIOT_PACKAGE_NAME`` environment variable** (highest priority)
@@ -72,14 +72,14 @@ For projects not using ``pyproject.toml`` or with custom naming, set the
 .. code-block:: bash
 
     export RIOT_PACKAGE_NAME=my-package
-    export RIOT_WHEEL_SOURCE=/tmp/wheels
+    export RIOT_WHEEL_PATH=/tmp/wheels
     riot run test
 
 
 How It Works
 ------------
 
-When a wheel source is specified:
+When a wheel path is specified:
 
 1. **Download**: riot downloads the wheel using ``pip download --no-index --find-links``
    to ensure only wheels from the specified source are used (not PyPI)
@@ -93,7 +93,7 @@ This ensures reproducibility and prevents accidental use of incorrect package ve
 Example: CI/CD Workflow
 -----------------------
 
-A typical CI/CD workflow using wheel sources:
+A typical CI/CD workflow using wheel paths:
 
 .. code-block:: bash
 
@@ -101,10 +101,10 @@ A typical CI/CD workflow using wheel sources:
     pip wheel --no-deps -w dist/ .
 
     # Step 2: Run tests with built wheels
-    riot --wheel-source dist/ run test
+    riot --wheel-path dist/ run test
 
     # Step 3: Verify wheels work in clean environments
-    riot --wheel-source dist/ generate --recreate-venvs
+    riot --wheel-path dist/ generate --recreate-venvs
 
 
 Example: Testing with Remote Wheels
@@ -115,9 +115,9 @@ Test against wheels published to a remote location:
 .. code-block:: bash
 
     # Test against wheels on an S3 bucket or web server
-    riot --wheel-source https://artifacts.example.com/wheels/v1.2.3/ run test
+    riot --wheel-path https://artifacts.example.com/wheels/v1.2.3/ run test
 
-The wheel source can be any location supported by pip's ``--find-links`` option,
+The wheel path can be any location supported by pip's ``--find-links`` option,
 including:
 
 - Local directories (``/path/to/wheels``)
@@ -133,13 +133,13 @@ Wheel sources work with all existing riot options:
 .. code-block:: bash
 
     # Recreate environments with wheels
-    riot --wheel-source /tmp/wheels run --recreate-venvs test
+    riot --wheel-path /tmp/wheels run --recreate-venvs test
 
     # Skip base install (wheels already installed)
-    riot --wheel-source /tmp/wheels run --skip-base-install test
+    riot --wheel-path /tmp/wheels run --skip-base-install test
 
     # Generate base environments with wheels
-    riot --wheel-source /tmp/wheels generate
+    riot --wheel-path /tmp/wheels generate
 
 
 Troubleshooting
@@ -170,7 +170,7 @@ Environment Variables Reference
 
    * - Variable
      - Description
-   * - ``RIOT_WHEEL_SOURCE``
+   * - ``RIOT_WHEEL_PATH``
      - Path or URL to wheel files. When set, installs from wheels instead of editable mode.
    * - ``RIOT_PACKAGE_NAME``
      - Package name to use when installing from wheels. Overrides automatic detection from ``pyproject.toml``.

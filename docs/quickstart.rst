@@ -70,12 +70,12 @@ Using Pre-built Wheels
 ----------------------
 
 By default, riot installs your project in editable mode (``pip install -e .``).
-If you want to test with pre-built wheels instead, use the ``--wheel-source`` option:
+If you want to test with pre-built wheels instead, use the ``--wheel-path`` option:
 
 .. code-block:: bash
 
         $ pip wheel --no-deps -w dist/ .
-        $ riot --wheel-source dist/ run test
+        $ riot --wheel-path dist/ run test
 
 See :doc:`wheel_sources` for more details on using pre-built wheels.
 

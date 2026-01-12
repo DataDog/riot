@@ -435,8 +435,8 @@ def test_get_package_name_raises_without_config(monkeypatch, tmp_path):
         os.chdir(old_cwd)
 
 
-def test_wheel_source_cli_option_passes_through(monkeypatch, tmp_path):
-    """Test that wheel_source is correctly threaded through the CLI to Session."""
+def test_wheel_path_cli_option_passes_through(monkeypatch, tmp_path):
+    """Test that wheel_path is correctly threaded through the CLI to Session."""
     import os
     from pathlib import Path
     from unittest.mock import patch
@@ -460,17 +460,17 @@ venv = Venv(
         # Create pyproject.toml
         Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')
 
-        # Mock the Session.run method to verify wheel_source is passed
+        # Mock the Session.run method to verify wheel_path is passed
         with patch("riot.riot.Session.run") as mock_run:
             from riot.cli import main
             from click.testing import CliRunner
 
             runner = CliRunner()
-            # Test with wheel-source flag
-            result = runner.invoke(main, ["--wheel-source", "/tmp/wheels", "run", ".*"])
+            # Test with wheel-path flag
+            result = runner.invoke(main, ["--wheel-path", "/tmp/wheels", "run", ".*"])
 
-            # Verify that Session.run was called with wheel_source parameter
+            # Verify that Session.run was called with wheel_path parameter
             # Note: This test verifies the CLI layer correctly threads the parameter
-            assert result.exit_code == 0 or "wheel_source" in str(mock_run.call_args)
+            assert result.exit_code == 0 or "wheel_path" in str(mock_run.call_args)
     finally:
         os.chdir(old_cwd)
