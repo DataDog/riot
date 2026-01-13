@@ -960,6 +960,7 @@ class Session:
         recreate: bool,
         skip_deps: bool,
         pythons: t.Optional[t.Set[Interpreter]],
+        pre: bool = False
     ) -> None:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
@@ -996,7 +997,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path, force=True)
+                install_dev_pkg(py.venv_path, force=True, pre=pre)
 
     def _generate_shell_rcfile(self):
         with tempfile.NamedTemporaryFile() as rcfile:
@@ -1236,7 +1237,7 @@ def pip_deps(pkgs: t.Dict[str, str]) -> str:
     )
 
 
-def install_dev_pkg(venv_path: str, force: bool = False) -> None:
+def install_dev_pkg(venv_path: str, force: bool = False, pre: bool = False) -> None:
     dev_pkg_lockfile = Path(venv_path) / ".riot-dev-pkg-installed"
     if dev_pkg_lockfile.exists() and not force:
         logger.info("Dev package already installed. Skipping.")
@@ -1253,7 +1254,7 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
     try:
         Session.run_cmd_venv(
             venv_path,
-            "pip --disable-pip-version-check install -e .",
+            f"pip --disable-pip-version-check install {'--pre ' if pre else ''}-e .",
             env=dict(os.environ),
         )
         dev_pkg_lockfile.touch()

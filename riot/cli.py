@@ -40,6 +40,7 @@ RECREATE_VENVS_ARG = click.option(
 SKIP_BASE_INSTALL_ARG = click.option(
     "-s", "--skip-base-install", "skip_base_install", is_flag=True, default=False
 )
+PRE_ARG = click.option("-e", "--pre", "pre", default=False)
 PYTHON_VERSIONS_ARG = click.option(
     "-p", "--python", "pythons", type=InterpreterParamType(), default=[], multiple=True
 )
@@ -166,13 +167,15 @@ can be used for the run command to avoid having to install the local package."""
 @SKIP_BASE_INSTALL_ARG
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@PRE_ARG
 @click.pass_context
-def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
+def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern, pre):
     ctx.obj["session"].generate_base_venvs(
         pattern=re.compile(pattern),
         recreate=recreate_venvs,
         skip_deps=skip_base_install,
         pythons=pythons,
+        pre=pre,
     )
 
 
