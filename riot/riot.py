@@ -200,7 +200,7 @@ class Interpreter:
         py_ex = self.path()
         logger.info("Creating virtualenv '%s' with interpreter '%s'.", venv_path, py_ex)
         run_cmd(
-            ["virtualenv", f"--python={py_ex}", venv_path],
+            [sys.executable, "-m", "virtualenv", f"--python={py_ex}", venv_path],
             stdout=subprocess.PIPE,
         )
 
