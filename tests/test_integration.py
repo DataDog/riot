@@ -59,9 +59,7 @@ def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
 
 def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot")
-    assert (
-        result.stderr
-        == """Usage: riot [OPTIONS] COMMAND [ARGS]...
+    assert result.stderr == """Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
   -f, --file PATH  [default: riotfile.py]
@@ -78,35 +76,28 @@ Commands:
   run           Run virtualenv instances with names matching a pattern.
   shell         Launch a shell inside a venv.
 """
-    )
     assert result.stdout == ""
     assert result.returncode == 2
 
     result = tmp_run("riot -P list")
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 """.lstrip()
-    )
     assert result.stdout == ""
     assert result.returncode == 2
 
 
 def test_bad_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --file rf.py", tmp_path)
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'rf.py' does not exist.
 """.lstrip()
-    )
     assert result.returncode == 2
 
     rf_path = tmp_path / "rf"
@@ -117,13 +108,10 @@ venv = Venv()
 """,
     )
     result = tmp_run("riot --file rf list")
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Failed to construct config file:
 Invalid file format for riotfile. Expected file with .py extension got 'rf'.
 """.lstrip()
-    )
     assert result.returncode == 1
 
     rf_path = tmp_path / "riotfile.py"
@@ -134,27 +122,19 @@ venv = Venv()typo1234
 """,
     )
     result = tmp_run("riot --file riotfile.py list")
-    assert (
-        """
+    assert """
 Failed to construct config file:
 Failed to parse riotfile 'riotfile.py'.
-""".lstrip()
-        in result.stderr
-    )
-    assert (
-        """
+""".lstrip() in result.stderr
+    assert """
 SyntaxError: invalid syntax
-""".strip()
-        in result.stderr
-    )
+""".strip() in result.stderr
     assert result.returncode == 1
 
 
 def test_help(tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --help")
-    assert (
-        result.stdout
-        == """
+    assert result.stdout == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -172,7 +152,6 @@ Commands:
   run           Run virtualenv instances with names matching a pattern.
   shell         Launch a shell inside a venv.
 """.lstrip()
-    )
     assert result.stderr == ""
     assert result.returncode == 0
 
@@ -186,15 +165,12 @@ def test_version(tmp_run: _T_TmpRun) -> None:
 
 def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot -P list")
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 """.lstrip()
-    )
     assert result.returncode == 2
 
     rf_path = tmp_path / "riotfile.py"
@@ -574,12 +550,9 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run -s -pDNE test")
-    assert (
-        """
+    assert """
 FileNotFoundError: Python interpreter DNE not found
-""".strip()
-        in result.stderr
-    )
+""".strip() in result.stderr
     assert result.returncode == 1
 
 
@@ -941,9 +914,7 @@ venv = Venv(
     command="env",
     venvs=[Venv(pys=["{}"], name="child")]
 )
-""".format(
-            version
-        ),
+""".format(version),
     )
     _hash = tmp_run("riot list --hash-only child").stdout.strip("\n")
     result = tmp_run("riot run -p {} {}".format(version, _hash))
