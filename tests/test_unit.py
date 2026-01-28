@@ -9,7 +9,6 @@ import pytest
 from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
 from tests.test_cli import DATA_DIR
 
-
 RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
 default_venv_pattern = re.compile(r".*")
 current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
