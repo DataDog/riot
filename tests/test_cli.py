@@ -345,8 +345,7 @@ def test_run_suites_cmdargs(
     """Running command with optional infix cmdargs."""
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv
 
 venv = Venv(
@@ -371,8 +370,7 @@ venv = Venv(
         ),
     ]
 )
-            """
-            )
+            """)
         with mock.patch("subprocess.run") as subprocess_run:
             subprocess_run.return_value.returncode = 0
             args = ["run", name] + cmdargs
@@ -388,8 +386,7 @@ venv = Venv(
 def test_nested_venv(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv
 
 venv = Venv(
@@ -408,24 +405,19 @@ venv = Venv(
         ),
     ],
 )
-            """
-            )
+            """)
 
         with open("test_success.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 def test_success():
     assert 1 == 1
-            """
-            )
+            """)
 
         with open("test_failure.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 def test_failure():
     assert 1 == 0
-            """
-            )
+            """)
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
@@ -445,8 +437,7 @@ def test_failure():
 def test_types(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv
 
 venv = Venv(
@@ -463,8 +454,7 @@ venv = Venv(
         ),
     ],
 )
-            """
-            )
+            """)
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "success"], catch_exceptions=False
@@ -482,8 +472,7 @@ venv = Venv(
 def test_env(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv, latest
 
 venv = Venv(
@@ -499,18 +488,15 @@ venv = Venv(
         ),
     ],
 )
-            """
-            )
+            """)
 
         with open("test_success.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 import os
 
 def test_success():
     assert os.environ["foobar"] == "baz"
-            """
-            )
+            """)
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
@@ -522,8 +508,7 @@ def test_success():
 def test_default_env(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv, latest
 
 venv = Venv(
@@ -539,12 +524,10 @@ venv = Venv(
         ),
     ],
 )
-            """
-            )
+            """)
 
         with open("test_success.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 import os
 
 def test_success():
@@ -555,8 +538,7 @@ def test_success():
     assert os.environ["RIOT_VENV_NAME"] == "envtest"
     assert os.environ["RIOT_VENV_PKGS"] == "'packaging>=21.3'"
     assert os.environ["RIOT_VENV_FULL_PKGS"] == "'pytest' 'packaging>=21.3'"
-            """
-            )
+            """)
 
         result = cli.invoke(
             riot.cli.main, ["run", "-s", "envtest"], catch_exceptions=False
@@ -570,8 +552,7 @@ def test_pass_env_always(
 ) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv
 
 venv = Venv(
@@ -586,18 +567,15 @@ venv = Venv(
         ),
     ],
 )
-            """
-            )
+            """)
 
         with open("test_success.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 import os
 
 def test_success():
     assert os.environ["NO_PROXY"] == "baz"
-            """
-            )
+            """)
 
         monkeypatch.setenv("NO_PROXY", "baz")
         result = cli.invoke(
@@ -610,8 +588,7 @@ def test_success():
 def test_bad_riotfile_name(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv
 
 venv = Venv(
@@ -623,8 +600,7 @@ venv = Venv(
         ),
     ],
 )
-            """
-            )
+            """)
 
         result = cli.invoke(
             riot.cli.main, ["-f", "riotfile", "list"], catch_exceptions=False
@@ -639,11 +615,9 @@ venv = Venv(
 def test_riotfile_execute_error(cli: click.testing.CliRunner) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 this is invalid syntax
-            """
-            )
+            """)
 
         result = cli.invoke(riot.cli.main, ["list"], catch_exceptions=False)
         assert result.exit_code == 1
@@ -656,8 +630,7 @@ def test_run_pass_env(
 ) -> None:
     with cli.isolated_filesystem():
         with open("riotfile.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 from riot import Venv
 
 
@@ -677,30 +650,25 @@ venv = Venv(
         ),
     ],
 )
-                """
-            )
+                """)
 
         with open("test_no_env.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 import os
 
 
 def test_no_env():
     assert os.environ.get("TEST_ENV_VAR") is None
-            """
-            )
+            """)
 
         with open("test_env.py", "w") as f:
-            f.write(
-                """
+            f.write("""
 import os
 
 
 def test_env():
     assert os.environ.get("TEST_ENV_VAR") == "1"
-            """
-            )
+            """)
 
         # set environment variables to check in test execution
         monkeypatch.setenv("TEST_ENV_VAR", "1")
