@@ -65,3 +65,17 @@ To view all the instances that are produced use the ``list`` command:
 The ``black`` and ``mypy`` instances will be run with Python 3.9 and the
 ``pytest`` instance will be run in Python 3.8 and 3.9.
 
+
+Using Pre-built Wheels
+----------------------
+
+By default, riot installs your project in editable mode (``pip install -e .``).
+If you want to test with pre-built wheels instead, use the ``--wheel-path`` option:
+
+.. code-block:: bash
+
+        $ pip wheel --no-deps -w dist/ .
+        $ riot --wheel-path dist/ run test
+
+See :doc:`wheel_sources` for more details on using pre-built wheels.
+

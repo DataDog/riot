@@ -57,6 +57,7 @@ def assert_args(args):
             "skip_missing",
             "exit_first",
             "recompile_reqs",
+            "wheel_path",
         ]
     )
 
@@ -283,11 +284,12 @@ def test_generate_suites_with_long_args(cli: click.testing.CliRunner) -> None:
             generate_base_venvs.assert_called_once()
             kwargs = generate_base_venvs.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate", "skip_deps", "pythons"]
+                ["pattern", "recreate", "skip_deps", "pythons", "wheel_path"]
             )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate"] is True
             assert kwargs["skip_deps"] is True
+            assert kwargs["wheel_path"] is None
 
 
 def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner) -> None:
@@ -302,11 +304,12 @@ def test_generate_base_venvs_with_short_args(cli: click.testing.CliRunner) -> No
             generate_base_venvs.assert_called_once()
             kwargs = generate_base_venvs.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate", "skip_deps", "pythons"]
+                ["pattern", "recreate", "skip_deps", "pythons", "wheel_path"]
             )
             assert kwargs["pattern"].pattern == ".*"
             assert kwargs["recreate"] is True
             assert kwargs["skip_deps"] is True
+            assert kwargs["wheel_path"] is None
 
 
 def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
@@ -323,9 +326,10 @@ def test_generate_base_venvs_with_pattern(cli: click.testing.CliRunner) -> None:
             generate_base_venvs.assert_called_once()
             kwargs = generate_base_venvs.call_args.kwargs
             assert set(kwargs.keys()) == set(
-                ["pattern", "recreate", "skip_deps", "pythons"]
+                ["pattern", "recreate", "skip_deps", "pythons", "wheel_path"]
             )
             assert kwargs["pattern"].pattern == "^pattern.*"
+            assert kwargs["wheel_path"] is None
             assert kwargs["recreate"] is False
             assert kwargs["skip_deps"] is False
 
