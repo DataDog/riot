@@ -345,3 +345,40 @@ def test_session_run_check_environment_modifications_and_recreate_true(
     regex = r".*isort==5\.10\.1.*itsdangerous==1\.1\.0.*six==1\.15\.0.*"
     expected = re.match(regex, result.replace("\n", ""))
     assert expected, "error: {}".format(result)
+
+
+def test_requirements_upgrades_compatible_pip_tools(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    calls = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    def _fake_check_output(cmd, *args, **kwargs):
+        calls.append(cmd)
+        if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
+            return b"# compiled output\nrequests==2.31.0\n"
+        return b""
+
+    monkeypatch.setattr("riot.riot.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    _ = venv.requirements
+
+    assert calls[0] == [
+        "/fake/python",
+        "-m",
+        "pip",
+        "install",
+        "--upgrade",
+        "pip-tools>=7.5.0,<8",
+    ]

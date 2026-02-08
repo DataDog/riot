@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Ensure Riot upgrades to a recent ``pip-tools`` (``>=7.5.0,<8``) before
+    compiling lock files, avoiding failures caused by incompatible preinstalled
+    ``pip``/``pip-tools`` combinations in CI.
