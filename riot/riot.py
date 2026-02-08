@@ -477,6 +477,7 @@ class VenvInstance:
                 "pip",
                 "install",
                 "--upgrade",
+                "pip<26",
                 "pip-tools>=7.5.0,<8",
             ],
         )
