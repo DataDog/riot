@@ -29,7 +29,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "click>=7",
-        "virtualenv<=20.26.6",
+        "virtualenv>=20.36.1,<21",
         "rich",
         "pexpect",
         "packaging",
