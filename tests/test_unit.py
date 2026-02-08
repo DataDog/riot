@@ -1,9 +1,10 @@
 import os
+import pathlib
 import re
 import shutil
 import subprocess
 import sys
-from typing import Dict, Generator
+from typing import Any, Dict, Generator, List
 
 import pytest
 from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
@@ -348,16 +349,16 @@ def test_session_run_check_environment_modifications_and_recreate_true(
 
 
 def test_requirements_upgrades_compatible_pip_tools(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    calls = []
+    calls: List[List[str]] = []
 
     interpreter = Interpreter("3")
     monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
     monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
 
-    def _fake_check_output(cmd, *args, **kwargs):
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
         calls.append(cmd)
         if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
             return b"# compiled output\nrequests==2.31.0\n"
