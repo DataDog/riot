@@ -471,7 +471,15 @@ class VenvInstance:
         os.makedirs(_dir, exist_ok=True)
         in_path = os.path.join(_dir, "{}.in".format(self.short_hash))
         subprocess.check_output(
-            [self.py.path(), "-m", "pip", "install", "pip-tools"],
+            [
+                self.py.path(),
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "pip<26",
+                "pip-tools>=7.5.0,<8",
+            ],
         )
         cmd = [
             self.py.path(),

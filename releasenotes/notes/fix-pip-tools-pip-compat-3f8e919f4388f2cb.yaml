@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Ensure Riot installs a compatible ``pip``/``pip-tools`` pair (``pip<26``
+    and ``pip-tools>=7.5.0,<8``) before compiling lock files, avoiding failures
+    caused by incompatible preinstalled tooling combinations in CI.
