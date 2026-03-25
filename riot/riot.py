@@ -632,6 +632,23 @@ class VenvInstance:
         return ["", os.getcwd()]  # mimick 'python -m'
 
     @property
+    def embedded_pythonpath_entries(self) -> t.List[str]:
+        # Embedded interpreters like uwsgi may not execute Riot's bootstrap .pth
+        # files, so only those commands get a plain PYTHONPATH fallback.
+        if not self.command:
+            return []
+
+        try:
+            executable = Path(shlex.split(self.command)[0]).name
+        except (IndexError, ValueError):
+            return []
+
+        if executable != "uwsgi":
+            return []
+
+        return self.site_packages_list[1:]
+
+    @property
     def pythonpath(self) -> str:
         return ":".join(self.pythonpath_entries)
 
@@ -884,7 +901,9 @@ class Session:
                 recompile_reqs=recompile_reqs,
             )
 
-            pythonpath = inst.pythonpath
+            pythonpath = os.pathsep.join(
+                inst.pythonpath_entries + inst.embedded_pythonpath_entries
+            )
             if pythonpath:
                 env["PYTHONPATH"] = (
                     f"{pythonpath}:{env['PYTHONPATH']}"
@@ -1127,7 +1146,9 @@ class Session:
                 inst.py.create_venv(False)
                 inst.prepare(env)
 
-            pythonpath = inst.pythonpath
+            pythonpath = os.pathsep.join(
+                inst.pythonpath_entries + inst.embedded_pythonpath_entries
+            )
             if pythonpath:
                 env["PYTHONPATH"] = (
                     f"{pythonpath}:{env['PYTHONPATH']}"

@@ -214,6 +214,29 @@ def test_venv_name_matching(pattern: str) -> None:
     assert venv.matches_pattern(re.compile(pattern))
 
 
+def test_embedded_pythonpath_entries_for_uwsgi(
+    current_interpreter: Interpreter,
+) -> None:
+    parent = VenvInstance(
+        venv=Venv(command="echo test", pkgs={"pip": ""}),
+        env={"env": "test"},
+        pkgs={"pip": ""},
+        py=current_interpreter,
+    )
+    venv = VenvInstance(
+        venv=Venv(command="uwsgi --version", pkgs={"pytest": ""}),
+        env={"env": "test"},
+        pkgs={"pytest": ""},
+        parent=parent,
+        py=current_interpreter,
+    )
+
+    assert venv.embedded_pythonpath_entries == [
+        parent.site_packages_path,
+        current_interpreter.site_packages_path,
+    ]
+
+
 def test_interpreter_venv_creation(
     current_interpreter: Interpreter, interpreter_virtualenv: Dict[str, str]
 ) -> None:
@@ -283,13 +306,15 @@ build-backend = "mesonpy"
 
     install_dev_pkg(str(venv_path), force=True)
 
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert calls[0][0] == str(venv_path)
     assert calls[0][1].startswith("pip --disable-pip-version-check install setuptools")
-    assert "meson-python" in calls[0][1]
-    assert "ninja>=1.11" in calls[0][1]
+    assert calls[1][0] == str(venv_path)
+    assert calls[1][1].startswith("pip --disable-pip-version-check install ")
+    assert "meson-python" in calls[1][1]
+    assert "ninja>=1.11" in calls[1][1]
     assert (
-        calls[1][1]
+        calls[2][1]
         == "pip --disable-pip-version-check install --no-build-isolation -e ."
     )
     assert (venv_path / ".riot-dev-pkg-installed").exists()
