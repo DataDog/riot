@@ -7,6 +7,7 @@ import sys
 from typing import Any, Dict, Generator, List
 
 import pytest
+import riot.riot as riot_module
 from riot.riot import Interpreter, install_dev_pkg, run_cmd, Session, Venv, VenvInstance
 from tests.test_cli import DATA_DIR
 
@@ -287,6 +288,69 @@ build-backend = "mesonpy"
         == "pip --disable-pip-version-check install --no-build-isolation -e ."
     )
     assert (venv_path / ".riot-dev-pkg-installed").exists()
+
+
+def test_prepare_bootstraps_existing_deps_venv(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    riot_path = tmp_path / ".riot"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_ENV_BASE_PATH", str(riot_path))
+
+    inst = VenvInstance(
+        venv=Venv(command="echo test", pkgs={"pytest": ""}),
+        env={},
+        pkgs={"pytest": ""},
+        py=Interpreter(current_py_hint),
+    )
+
+    requirements_dir = riot_path / "requirements"
+    requirements_dir.mkdir(parents=True)
+    (requirements_dir / f"{inst.short_hash}.txt").write_text("pytest\n")
+
+    deps_venv_path = pathlib.Path(f"{inst.py.venv_path}_deps")
+    deps_venv_path.mkdir(parents=True)
+
+    ensured = []
+    created = []
+    run_cmd_calls = []
+
+    monkeypatch.setattr(
+        riot_module,
+        "ensure_riot_site_packages_bootstrap",
+        lambda venv_path: ensured.append(venv_path),
+    )
+
+    def fake_create_venv(self, recreate, path=None):
+        created.append(path or self.venv_path)
+
+    def fake_run_cmd_venv(
+        cls,
+        venv,
+        args,
+        stdout=subprocess.PIPE,
+        executable=None,
+        env=None,
+    ):
+        run_cmd_calls.append((venv, args))
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="")
+
+    monkeypatch.setattr(Interpreter, "create_venv", fake_create_venv)
+    monkeypatch.setattr(Session, "run_cmd_venv", classmethod(fake_run_cmd_venv))
+
+    inst.prepare({})
+
+    assert created == []
+    assert ensured == [str(deps_venv_path)]
+    assert run_cmd_calls == [
+        (
+            str(deps_venv_path),
+            (
+                f"pip --disable-pip-version-check install --prefix '{inst.prefix}' "
+                f"--no-warn-script-location -r {riot_module.DEFAULT_RIOT_PATH}/requirements/{inst.short_hash}.txt"
+            ),
+        )
+    ]
 
 
 def _get_base_env_path() -> str:
