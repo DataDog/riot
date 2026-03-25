@@ -379,7 +379,7 @@ def test_prepare_bootstraps_existing_deps_venv(
     inst.prepare({})
 
     assert created == []
-    assert ensured == [str(deps_venv_path)]
+    assert ensured == [str(deps_venv_path), str(inst.prefix)]
     assert run_cmd_calls == [
         (
             str(deps_venv_path),
@@ -421,7 +421,7 @@ def test_prepare_bootstraps_existing_deps_venv_when_prefix_is_reused(
 
     inst.prepare({})
 
-    assert ensured == [str(deps_venv_path)]
+    assert ensured == [str(deps_venv_path), str(inst.prefix)]
 
 
 def test_site_packages_bootstrap_is_idempotent(

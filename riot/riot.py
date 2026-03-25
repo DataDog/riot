@@ -754,6 +754,8 @@ class VenvInstance:
             deps_venv_path = venv_path + "_deps"
             if Path(deps_venv_path).exists():
                 ensure_riot_site_packages_bootstrap(deps_venv_path)
+        if self.prefix is not None and Path(self.prefix).exists():
+            ensure_riot_site_packages_bootstrap(self.prefix)
 
         installed = False
         if (
@@ -802,6 +804,7 @@ class VenvInstance:
                     e.proc,
                 )
             else:
+                ensure_riot_site_packages_bootstrap(self.prefix)
                 installed = True
 
         if not self.created and self.parent is not None:
