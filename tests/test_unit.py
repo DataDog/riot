@@ -353,6 +353,39 @@ def test_prepare_bootstraps_existing_deps_venv(
     ]
 
 
+def test_prepare_bootstraps_existing_deps_venv_when_prefix_is_reused(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    riot_path = tmp_path / ".riot"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_ENV_BASE_PATH", str(riot_path))
+
+    inst = VenvInstance(
+        venv=Venv(command="echo test", pkgs={"pytest": ""}),
+        env={},
+        pkgs={"pytest": ""},
+        py=Interpreter(current_py_hint),
+    )
+
+    assert inst.prefix is not None
+    pathlib.Path(inst.prefix).mkdir(parents=True)
+
+    deps_venv_path = pathlib.Path(f"{inst.py.venv_path}_deps")
+    deps_venv_path.mkdir(parents=True)
+
+    ensured = []
+
+    monkeypatch.setattr(
+        riot_module,
+        "ensure_riot_site_packages_bootstrap",
+        lambda venv_path: ensured.append(venv_path),
+    )
+
+    inst.prepare({})
+
+    assert ensured == [str(deps_venv_path)]
+
+
 def _get_base_env_path() -> str:
     return os.path.abspath(
         os.path.join(

@@ -660,6 +660,14 @@ class VenvInstance:
 
         exists = self.prefix is not None and os.path.isdir(self.prefix)
 
+        if py is not None and not self.created:
+            venv_path = self.venv_path
+            assert venv_path is not None, py
+
+            deps_venv_path = venv_path + "_deps"
+            if Path(deps_venv_path).exists():
+                ensure_riot_site_packages_bootstrap(deps_venv_path)
+
         installed = False
         if (
             py is not None
@@ -700,8 +708,6 @@ class VenvInstance:
                     deps_venv_path = venv_path + "_deps"
                     if not Path(deps_venv_path).exists():
                         py.create_venv(recreate=False, path=deps_venv_path)
-                    else:
-                        ensure_riot_site_packages_bootstrap(deps_venv_path)
                 Session.run_cmd_venv(deps_venv_path, cmd, env=env)
             except CmdFailure as e:
                 raise CmdFailure(
