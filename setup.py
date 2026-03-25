@@ -36,7 +36,7 @@ setup(
         "setuptools; python_version>='3.12'",
         "tomli; python_version<'3.11'",
     ],
-    setup_requires=["setuptools_scm"],
+    setup_requires=["setuptools_scm<10"],
     use_scm_version=True,
     # Required for mypy compatibility, see
     # https://mypy.readthedocs.io/en/stable/installed_packages.html#making-pep-561-compatible-packages

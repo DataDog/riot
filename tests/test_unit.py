@@ -8,7 +8,14 @@ from typing import Any, Dict, Generator, List
 
 import pytest
 import riot.riot as riot_module
-from riot.riot import Interpreter, install_dev_pkg, run_cmd, Session, Venv, VenvInstance
+from riot.riot import (
+    install_dev_pkg,
+    Interpreter,
+    run_cmd,
+    Session,
+    Venv,
+    VenvInstance,
+)
 from tests.test_cli import DATA_DIR
 
 RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
@@ -249,13 +256,11 @@ def test_install_dev_pkg_uses_stable_build_requirements(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     pyproject_path = tmp_path / "pyproject.toml"
-    pyproject_path.write_text(
-        """
+    pyproject_path.write_text("""
 [build-system]
 requires = ["meson-python", "ninja>=1.11"]
 build-backend = "mesonpy"
-""".strip()
-    )
+""".strip())
 
     venv_path = tmp_path / "venv"
     venv_path.mkdir()
@@ -280,7 +285,7 @@ build-backend = "mesonpy"
 
     assert len(calls) == 2
     assert calls[0][0] == str(venv_path)
-    assert calls[0][1].startswith("pip --disable-pip-version-check install ")
+    assert calls[0][1].startswith("pip --disable-pip-version-check install setuptools")
     assert "meson-python" in calls[0][1]
     assert "ninja>=1.11" in calls[0][1]
     assert (
@@ -394,7 +399,9 @@ def test_site_packages_bootstrap_is_idempotent(
     inherited_site_packages = tmp_path / "inherited" / "site-packages"
     inherited_site_packages.mkdir(parents=True)
 
-    bootstrap_globals = {"__file__": str(deps_site_packages / "_riot_site_packages.py")}
+    bootstrap_globals: Dict[str, Any] = {
+        "__file__": str(deps_site_packages / "_riot_site_packages.py")
+    }
     exec(riot_module.RIOT_SITE_PACKAGES_BOOTSTRAP, bootstrap_globals)
 
     added = []
@@ -403,14 +410,34 @@ def test_site_packages_bootstrap_is_idempotent(
         added.append(path)
         bootstrap_globals["activate"]()
 
-    monkeypatch.setenv(
-        riot_module.RIOT_SITE_PACKAGES_ENV, str(inherited_site_packages)
-    )
+    monkeypatch.setenv(riot_module.RIOT_SITE_PACKAGES_ENV, str(inherited_site_packages))
     monkeypatch.setattr(bootstrap_globals["site"], "addsitedir", fake_addsitedir)
 
     bootstrap_globals["activate"]()
 
     assert added == [str(inherited_site_packages)]
+
+
+def test_site_packages_bootstrap_discards_imported_modules(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inherited_site_packages = tmp_path / "inherited" / "site-packages"
+    inherited_site_packages.mkdir(parents=True)
+    (inherited_site_packages / "bootstrap_leak.py").write_text("value = 1\n")
+    (inherited_site_packages / "bootstrap_leak.pth").write_text(
+        "import bootstrap_leak\n"
+    )
+
+    bootstrap_globals: Dict[str, Any] = {
+        "__file__": str(inherited_site_packages / "_riot_site_packages.py")
+    }
+    exec(riot_module.RIOT_SITE_PACKAGES_BOOTSTRAP, bootstrap_globals)
+
+    monkeypatch.setenv(riot_module.RIOT_SITE_PACKAGES_ENV, str(inherited_site_packages))
+
+    bootstrap_globals["activate"]()
+
+    assert "bootstrap_leak" not in sys.modules
 
 
 def _get_base_env_path() -> str:

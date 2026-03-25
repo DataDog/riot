@@ -5,6 +5,8 @@ exclude = '''
       \.venv.*
       | \.riot
       | \.eggs
+      | build
+      | dist
     )/
   )
 '''

@@ -38,6 +38,7 @@ RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE = "_riot_site_packages"
 RIOT_SITE_PACKAGES_BOOTSTRAP_PTH = "riot-site-packages-bootstrap.pth"
 RIOT_SITE_PACKAGES_BOOTSTRAP = f"""import os
 import site
+import sys
 from pathlib import Path
 
 _ENV_VAR = {RIOT_SITE_PACKAGES_ENV!r}
@@ -60,8 +61,11 @@ def activate():
         if real_site_packages in _PROCESSED_SITE_PACKAGES or not os.path.isdir(site_packages):
             continue
 
+        loaded_modules = set(sys.modules)
         _PROCESSED_SITE_PACKAGES.add(real_site_packages)
         site.addsitedir(site_packages)
+        for module_name in set(sys.modules) - loaded_modules:
+            sys.modules.pop(module_name, None)
 """
 
 SHELL = os.getenv("SHELL", "/bin/bash")
@@ -1325,6 +1329,11 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
 
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
+        Session.run_cmd_venv(
+            venv_path,
+            "pip --disable-pip-version-check install setuptools",
+            env=dict(os.environ),
+        )
         pyproject_path = Path("pyproject.toml")
         if pyproject_path.exists():
             build_system_requires = get_build_system_requires(pyproject_path)
@@ -1342,7 +1351,9 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
                     ),
                     env=dict(os.environ),
                 )
-            install_cmd = "pip --disable-pip-version-check install --no-build-isolation -e ."
+            install_cmd = (
+                "pip --disable-pip-version-check install --no-build-isolation -e ."
+            )
         else:
             install_cmd = "pip --disable-pip-version-check install -e ."
 
