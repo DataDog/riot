@@ -386,6 +386,33 @@ def test_prepare_bootstraps_existing_deps_venv_when_prefix_is_reused(
     assert ensured == [str(deps_venv_path)]
 
 
+def test_site_packages_bootstrap_is_idempotent(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    deps_site_packages = tmp_path / "deps" / "site-packages"
+    deps_site_packages.mkdir(parents=True)
+    inherited_site_packages = tmp_path / "inherited" / "site-packages"
+    inherited_site_packages.mkdir(parents=True)
+
+    bootstrap_globals = {"__file__": str(deps_site_packages / "_riot_site_packages.py")}
+    exec(riot_module.RIOT_SITE_PACKAGES_BOOTSTRAP, bootstrap_globals)
+
+    added = []
+
+    def fake_addsitedir(path):
+        added.append(path)
+        bootstrap_globals["activate"]()
+
+    monkeypatch.setenv(
+        riot_module.RIOT_SITE_PACKAGES_ENV, str(inherited_site_packages)
+    )
+    monkeypatch.setattr(bootstrap_globals["site"], "addsitedir", fake_addsitedir)
+
+    bootstrap_globals["activate"]()
+
+    assert added == [str(inherited_site_packages)]
+
+
 def _get_base_env_path() -> str:
     return os.path.abspath(
         os.path.join(

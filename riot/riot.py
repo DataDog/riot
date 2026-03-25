@@ -41,6 +41,7 @@ import site
 from pathlib import Path
 
 _ENV_VAR = {RIOT_SITE_PACKAGES_ENV!r}
+_PROCESSED_SITE_PACKAGES = set()
 
 
 def activate():
@@ -48,19 +49,19 @@ def activate():
     if not raw_paths:
         return
 
-    current_site_packages = Path(__file__).resolve().parent
-    seen = {{str(current_site_packages), os.path.realpath(current_site_packages)}}
+    current_site_packages = os.path.realpath(Path(__file__).resolve().parent)
+    _PROCESSED_SITE_PACKAGES.add(current_site_packages)
 
     for site_packages in raw_paths.split(os.pathsep):
         if not site_packages:
             continue
 
         real_site_packages = os.path.realpath(site_packages)
-        if real_site_packages in seen or not os.path.isdir(site_packages):
+        if real_site_packages in _PROCESSED_SITE_PACKAGES or not os.path.isdir(site_packages):
             continue
 
+        _PROCESSED_SITE_PACKAGES.add(real_site_packages)
         site.addsitedir(site_packages)
-        seen.add(real_site_packages)
 """
 
 SHELL = os.getenv("SHELL", "/bin/bash")
