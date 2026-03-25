@@ -433,7 +433,7 @@ def test_site_packages_bootstrap_is_idempotent(
 
     added = []
 
-    def fake_addsitedir(path):
+    def fake_addsitedir(path, known_paths=None):
         added.append(path)
         bootstrap_globals["activate"]()
 
