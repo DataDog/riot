@@ -6,6 +6,7 @@ import sys
 from typing import Any, Dict, Generator, Optional, Sequence, Union
 
 import pytest
+import riot.riot as riot_module
 from riot.riot import _T_CompletedProcess
 from typing_extensions import Protocol
 
@@ -584,7 +585,10 @@ venv = Venv(
             "site-packages",
         )
     )
-    assert env["PYTHONPATH"] == ":".join(("", str(tmp_path)))
+    bootstrap_path = str(
+        riot_module.get_riot_sitecustomize_bootstrap_path(pathlib.Path(sitepkgs))
+    )
+    assert env["PYTHONPATH"] == ":".join((bootstrap_path, "", str(tmp_path)))
     assert env["RIOT_SITE_PACKAGES"] == sitepkgs
 
 
@@ -644,9 +648,18 @@ venv = Venv(
             "site-packages",
         )
     )
+    bootstrap_path = str(
+        riot_module.get_riot_sitecustomize_bootstrap_path(pathlib.Path(venv_path))
+    )
 
     paths = env["PYTHONPATH"].split(":")
-    assert paths == ["", str(tmp_path), parent_venv_path, py_venv_path]
+    assert paths == [
+        bootstrap_path,
+        "",
+        str(tmp_path),
+        parent_venv_path,
+        py_venv_path,
+    ]
     assert env["RIOT_SITE_PACKAGES"].split(":") == [
         venv_path,
         parent_venv_path,
@@ -790,11 +803,15 @@ venv = Venv(
     venv_path = tmp_path / ".riot/venv_py{}_pip_pytest".format(
         "".join((str(_) for _ in sys.version_info[:3]))
     )
+    site_packages_path = next((venv_path / "lib").glob("python*")) / "site-packages"
+    bootstrap_path = riot_module.get_riot_sitecustomize_bootstrap_path(
+        site_packages_path
+    )
     assert f"Creating virtualenv '{venv_path}'" in result.stderr, result.stderr
     assert (
         f"Running command 'echo $PYTHONPATH' in venv '{venv_path}'" in result.stderr
     ), result.stderr
-    assert result.stdout.startswith(":".join(("", str(tmp_path))))
+    assert result.stdout.startswith(f"{bootstrap_path}:")
     assert result.returncode == 0
 
 

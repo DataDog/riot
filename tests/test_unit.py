@@ -231,7 +231,13 @@ def test_pythonpath_entries_include_inherited_site_packages(
         py=current_interpreter,
     )
 
+    assert venv.site_packages_path is not None
     assert venv.pythonpath_entries == [
+        str(
+            riot_module.get_riot_sitecustomize_bootstrap_path(
+                pathlib.Path(venv.site_packages_path)
+            )
+        ),
         "",
         os.getcwd(),
         parent.site_packages_path,

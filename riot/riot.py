@@ -36,6 +36,7 @@ DEFAULT_RIOT_ENV_PREFIX = "venv_py"
 RIOT_SITE_PACKAGES_ENV = "RIOT_SITE_PACKAGES"
 RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE = "_riot_site_packages"
 RIOT_SITE_PACKAGES_BOOTSTRAP_PTH = "riot-site-packages-bootstrap.pth"
+RIOT_SITECUSTOMIZE_BOOTSTRAP_DIR = "riot-bootstrap"
 RIOT_SITE_PACKAGES_BOOTSTRAP = f"""import os
 import site
 import sys
@@ -73,6 +74,36 @@ def activate():
             del sys.path[index]
         for module_name in set(sys.modules) - loaded_modules:
             sys.modules.pop(module_name, None)
+"""
+RIOT_SITECUSTOMIZE_BOOTSTRAP = """import os
+import site
+import sys
+
+_CURRENT_SITE_PACKAGES = {current_site_packages!r}
+_THIS_DIR = os.path.realpath(os.path.dirname(__file__))
+
+# Activate the owning env's site-packages first so its .pth files run even in
+# embedded interpreters that only inherit Riot's PYTHONPATH.
+site.addsitedir(_CURRENT_SITE_PACKAGES, known_paths=set())
+
+_bootstrap_module = sys.modules.get("sitecustomize")
+_original_path = list(sys.path)
+try:
+    sys.modules.pop("sitecustomize", None)
+    sys.path = [
+        path
+        for path in sys.path
+        if os.path.realpath(path or os.getcwd()) != _THIS_DIR
+    ]
+    try:
+        import sitecustomize  # noqa:F401
+    except ModuleNotFoundError as error:
+        if error.name != "sitecustomize":
+            raise
+        if _bootstrap_module is not None:
+            sys.modules["sitecustomize"] = _bootstrap_module
+finally:
+    sys.path = _original_path
 """
 
 SHELL = os.getenv("SHELL", "/bin/bash")
@@ -152,6 +183,16 @@ def get_riot_site_packages_bootstrap_module(site_packages_path: Path) -> str:
     return f"{RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}_{digest}"
 
 
+def get_riot_sitecustomize_bootstrap_path(site_packages_path: Path) -> Path:
+    return site_packages_path.parents[2] / RIOT_SITECUSTOMIZE_BOOTSTRAP_DIR
+
+
+def render_riot_sitecustomize_bootstrap(site_packages_path: Path) -> str:
+    return RIOT_SITECUSTOMIZE_BOOTSTRAP.format(
+        current_site_packages=str(site_packages_path.resolve())
+    )
+
+
 def ensure_riot_site_packages_bootstrap(venv_path: str) -> None:
     try:
         site_packages_path = get_venv_site_packages_path(venv_path)
@@ -164,6 +205,12 @@ def ensure_riot_site_packages_bootstrap(venv_path: str) -> None:
     )
     (site_packages_path / RIOT_SITE_PACKAGES_BOOTSTRAP_PTH).write_text(
         (f"import {bootstrap_module}; " f"{bootstrap_module}.activate()\n")
+    )
+
+    bootstrap_path = get_riot_sitecustomize_bootstrap_path(site_packages_path)
+    bootstrap_path.mkdir(parents=True, exist_ok=True)
+    (bootstrap_path / "sitecustomize.py").write_text(
+        render_riot_sitecustomize_bootstrap(site_packages_path)
     )
 
 
@@ -639,11 +686,32 @@ class VenvInstance:
 
     @property
     def pythonpath_entries(self) -> t.List[str]:
-        # Include inherited site-packages on PYTHONPATH so child processes and
-        # embedded interpreters launched from test commands can import base
-        # environment dependencies even when they do not execute Riot's
-        # site-packages bootstrap .pth files.
-        return ["", os.getcwd(), *self.site_packages_list[1:]]  # mimick 'python -m'
+        site_packages = self.site_packages_list
+        entries = []
+        current_site_packages = self.site_packages_path
+        inherited_site_packages = site_packages
+        if current_site_packages is None and site_packages:
+            current_site_packages = site_packages[0]
+        if current_site_packages is not None and site_packages:
+            current_real_path = os.path.realpath(current_site_packages)
+            inherited_site_packages = [
+                path
+                for path in site_packages
+                if os.path.realpath(path) != current_real_path
+            ]
+        if current_site_packages is not None:
+            entries.append(
+                str(get_riot_sitecustomize_bootstrap_path(Path(current_site_packages)))
+            )
+        # Prepend Riot's sitecustomize bootstrap so subprocesses and embedded
+        # interpreters activate the current env's .pth hooks before relying on
+        # inherited site-packages from parent envs.
+        return [
+            *entries,
+            "",
+            os.getcwd(),
+            *inherited_site_packages,
+        ]  # mimick 'python -m'
 
     @property
     def pythonpath(self) -> str:
