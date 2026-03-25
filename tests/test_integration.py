@@ -646,7 +646,7 @@ venv = Venv(
     )
 
     paths = env["PYTHONPATH"].split(":")
-    assert paths == ["", str(tmp_path)]
+    assert paths == ["", str(tmp_path), parent_venv_path, py_venv_path]
     assert env["RIOT_SITE_PACKAGES"].split(":") == [
         venv_path,
         parent_venv_path,

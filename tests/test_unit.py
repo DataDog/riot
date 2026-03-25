@@ -214,7 +214,7 @@ def test_venv_name_matching(pattern: str) -> None:
     assert venv.matches_pattern(re.compile(pattern))
 
 
-def test_embedded_pythonpath_entries_for_uwsgi(
+def test_pythonpath_entries_include_inherited_site_packages(
     current_interpreter: Interpreter,
 ) -> None:
     parent = VenvInstance(
@@ -231,7 +231,9 @@ def test_embedded_pythonpath_entries_for_uwsgi(
         py=current_interpreter,
     )
 
-    assert venv.embedded_pythonpath_entries == [
+    assert venv.pythonpath_entries == [
+        "",
+        os.getcwd(),
         parent.site_packages_path,
         current_interpreter.site_packages_path,
     ]

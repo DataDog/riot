@@ -63,7 +63,14 @@ def activate():
 
         loaded_modules = set(sys.modules)
         _PROCESSED_SITE_PACKAGES.add(real_site_packages)
-        site.addsitedir(site_packages)
+        site.addsitedir(site_packages, known_paths=set())
+        matching_indexes = [
+            index
+            for index, path in enumerate(sys.path)
+            if os.path.realpath(path or os.getcwd()) == real_site_packages
+        ]
+        for index in reversed(matching_indexes[1:]):
+            del sys.path[index]
         for module_name in set(sys.modules) - loaded_modules:
             sys.modules.pop(module_name, None)
 """
@@ -140,20 +147,23 @@ def get_venv_site_packages_path(venv_path: t.Union[str, Path]) -> Path:
     return next((Path(venv_path) / "lib").glob("python*")) / "site-packages"
 
 
+def get_riot_site_packages_bootstrap_module(site_packages_path: Path) -> str:
+    digest = sha256(str(site_packages_path.resolve()).encode("utf-8")).hexdigest()[:12]
+    return f"{RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}_{digest}"
+
+
 def ensure_riot_site_packages_bootstrap(venv_path: str) -> None:
     try:
         site_packages_path = get_venv_site_packages_path(venv_path)
     except StopIteration:
         return
 
-    (site_packages_path / f"{RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}.py").write_text(
+    bootstrap_module = get_riot_site_packages_bootstrap_module(site_packages_path)
+    (site_packages_path / f"{bootstrap_module}.py").write_text(
         RIOT_SITE_PACKAGES_BOOTSTRAP
     )
     (site_packages_path / RIOT_SITE_PACKAGES_BOOTSTRAP_PTH).write_text(
-        (
-            f"import {RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}; "
-            f"{RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}.activate()\n"
-        )
+        (f"import {bootstrap_module}; " f"{bootstrap_module}.activate()\n")
     )
 
 
@@ -629,24 +639,11 @@ class VenvInstance:
 
     @property
     def pythonpath_entries(self) -> t.List[str]:
-        return ["", os.getcwd()]  # mimick 'python -m'
-
-    @property
-    def embedded_pythonpath_entries(self) -> t.List[str]:
-        # Embedded interpreters like uwsgi may not execute Riot's bootstrap .pth
-        # files, so only those commands get a plain PYTHONPATH fallback.
-        if not self.command:
-            return []
-
-        try:
-            executable = Path(shlex.split(self.command)[0]).name
-        except (IndexError, ValueError):
-            return []
-
-        if executable != "uwsgi":
-            return []
-
-        return self.site_packages_list[1:]
+        # Include inherited site-packages on PYTHONPATH so child processes and
+        # embedded interpreters launched from test commands can import base
+        # environment dependencies even when they do not execute Riot's
+        # site-packages bootstrap .pth files.
+        return ["", os.getcwd(), *self.site_packages_list[1:]]  # mimick 'python -m'
 
     @property
     def pythonpath(self) -> str:
@@ -901,9 +898,7 @@ class Session:
                 recompile_reqs=recompile_reqs,
             )
 
-            pythonpath = os.pathsep.join(
-                inst.pythonpath_entries + inst.embedded_pythonpath_entries
-            )
+            pythonpath = inst.pythonpath
             if pythonpath:
                 env["PYTHONPATH"] = (
                     f"{pythonpath}:{env['PYTHONPATH']}"
@@ -1146,9 +1141,7 @@ class Session:
                 inst.py.create_venv(False)
                 inst.prepare(env)
 
-            pythonpath = os.pathsep.join(
-                inst.pythonpath_entries + inst.embedded_pythonpath_entries
-            )
+            pythonpath = inst.pythonpath
             if pythonpath:
                 env["PYTHONPATH"] = (
                     f"{pythonpath}:{env['PYTHONPATH']}"
