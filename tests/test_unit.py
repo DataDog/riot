@@ -7,7 +7,7 @@ import sys
 from typing import Any, Dict, Generator, List
 
 import pytest
-from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
+from riot.riot import Interpreter, install_dev_pkg, run_cmd, Session, Venv, VenvInstance
 from tests.test_cli import DATA_DIR
 
 RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
@@ -242,6 +242,51 @@ def test_interpreter_venv_recreation(
 
     result = _get_pip_freeze(venv)
     assert result == ""
+
+
+def test_install_dev_pkg_uses_stable_build_requirements(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pyproject_path = tmp_path / "pyproject.toml"
+    pyproject_path.write_text(
+        """
+[build-system]
+requires = ["meson-python", "ninja>=1.11"]
+build-backend = "mesonpy"
+""".strip()
+    )
+
+    venv_path = tmp_path / "venv"
+    venv_path.mkdir()
+
+    calls = []
+
+    def fake_run_cmd_venv(
+        cls,
+        venv,
+        args,
+        stdout=subprocess.PIPE,
+        executable=None,
+        env=None,
+    ):
+        calls.append((venv, args))
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(Session, "run_cmd_venv", classmethod(fake_run_cmd_venv))
+
+    install_dev_pkg(str(venv_path), force=True)
+
+    assert len(calls) == 2
+    assert calls[0][0] == str(venv_path)
+    assert calls[0][1].startswith("pip --disable-pip-version-check install ")
+    assert "meson-python" in calls[0][1]
+    assert "ninja>=1.11" in calls[0][1]
+    assert (
+        calls[1][1]
+        == "pip --disable-pip-version-check install --no-build-isolation -e ."
+    )
+    assert (venv_path / ".riot-dev-pkg-installed").exists()
 
 
 def _get_base_env_path() -> str:

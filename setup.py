@@ -34,6 +34,7 @@ setup(
         "pexpect",
         "packaging",
         "setuptools; python_version>='3.12'",
+        "tomli; python_version<'3.11'",
     ],
     setup_requires=["setuptools_scm"],
     use_scm_version=True,

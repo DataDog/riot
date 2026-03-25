@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -23,10 +24,44 @@ from rich.pretty import Pretty
 from rich.status import Status
 from rich.table import Table
 
+if sys.version_info[:2] >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_RIOT_PATH = ".riot"
 DEFAULT_RIOT_ENV_PREFIX = "venv_py"
+RIOT_SITE_PACKAGES_ENV = "RIOT_SITE_PACKAGES"
+RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE = "_riot_site_packages"
+RIOT_SITE_PACKAGES_BOOTSTRAP_PTH = "riot-site-packages-bootstrap.pth"
+RIOT_SITE_PACKAGES_BOOTSTRAP = f"""import os
+import site
+from pathlib import Path
+
+_ENV_VAR = {RIOT_SITE_PACKAGES_ENV!r}
+
+
+def activate():
+    raw_paths = os.environ.get(_ENV_VAR)
+    if not raw_paths:
+        return
+
+    current_site_packages = Path(__file__).resolve().parent
+    seen = {{str(current_site_packages), os.path.realpath(current_site_packages)}}
+
+    for site_packages in raw_paths.split(os.pathsep):
+        if not site_packages:
+            continue
+
+        real_site_packages = os.path.realpath(site_packages)
+        if real_site_packages in seen or not os.path.isdir(site_packages):
+            continue
+
+        site.addsitedir(site_packages)
+        seen.add(real_site_packages)
+"""
 
 SHELL = os.getenv("SHELL", "/bin/bash")
 ENCODING = sys.getdefaultencoding()
@@ -94,6 +129,35 @@ _T_stdio = t.Union[None, int, t.IO[t.Any]]
 
 class VenvError(Exception):
     pass
+
+
+def get_venv_site_packages_path(venv_path: t.Union[str, Path]) -> Path:
+    return next((Path(venv_path) / "lib").glob("python*")) / "site-packages"
+
+
+def ensure_riot_site_packages_bootstrap(venv_path: str) -> None:
+    try:
+        site_packages_path = get_venv_site_packages_path(venv_path)
+    except StopIteration:
+        return
+
+    (site_packages_path / f"{RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}.py").write_text(
+        RIOT_SITE_PACKAGES_BOOTSTRAP
+    )
+    (site_packages_path / RIOT_SITE_PACKAGES_BOOTSTRAP_PTH).write_text(
+        (
+            f"import {RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}; "
+            f"{RIOT_SITE_PACKAGES_BOOTSTRAP_MODULE}.activate()\n"
+        )
+    )
+
+
+def get_build_system_requires(pyproject_path: Path) -> t.List[str]:
+    with pyproject_path.open("rb") as pyproject:
+        pyproject_data = tomllib.load(pyproject)
+
+    requires = pyproject_data.get("build-system", {}).get("requires", [])
+    return [str(requirement) for requirement in requires]
 
 
 @dataclasses.dataclass(unsafe_hash=True, eq=True)
@@ -193,6 +257,7 @@ class Interpreter:
                     "Skipping creation of virtualenv '%s' as it already exists.",
                     venv_path,
                 )
+                ensure_riot_site_packages_bootstrap(venv_path)
                 return
             logger.info("Deleting virtualenv '%s'", venv_path)
             shutil.rmtree(venv_path)
@@ -203,6 +268,7 @@ class Interpreter:
             [sys.executable, "-m", "virtualenv", f"--python={py_ex}", venv_path],
             stdout=subprocess.PIPE,
         )
+        ensure_riot_site_packages_bootstrap(venv_path)
 
 
 @dataclasses.dataclass
@@ -301,7 +367,7 @@ def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
     venv_sitepkgs = inst.py.site_packages_path
 
     # Collect the namespaces to copy over
-    for sitepkgs in (_ for _ in inst.site_packages_list[2:] if _ != venv_sitepkgs):
+    for sitepkgs in (_ for _ in inst.site_packages_list if _ != venv_sitepkgs):
         try:
             for ns in (_ for _ in os.listdir(sitepkgs) if _.endswith("nspkg.pth")):
                 if ns not in src_ns_files:
@@ -540,12 +606,8 @@ class VenvInstance:
 
     @property
     def site_packages_list(self) -> t.List[str]:
-        """Return a list of all the site-packages paths along the parenting relation.
-
-        The list starts with the empty string and is followed by the site-packages path
-        of the current instance, then the parent site-packages paths follow.
-        """
-        paths = ["", os.getcwd()]  # mimick 'python -m'
+        """Return inherited site-packages paths along the parenting relation."""
+        paths = []
 
         current: t.Optional[VenvInstance] = self
         while current is not None and not current.created:
@@ -561,8 +623,12 @@ class VenvInstance:
         return paths
 
     @property
+    def pythonpath_entries(self) -> t.List[str]:
+        return ["", os.getcwd()]  # mimick 'python -m'
+
+    @property
     def pythonpath(self) -> str:
-        return ":".join(self.site_packages_list)
+        return ":".join(self.pythonpath_entries)
 
     def match_venv_pattern(self, pattern: t.Pattern[str]) -> bool:
         current: t.Optional[VenvInstance] = self
@@ -812,6 +878,9 @@ class Session:
                     if "PYTHONPATH" in env
                     else pythonpath
                 )
+            site_packages = inst.site_packages_list
+            if site_packages:
+                env[RIOT_SITE_PACKAGES_ENV] = os.pathsep.join(site_packages)
             script_path = inst.scriptpath
             if script_path:
                 env["PATH"] = ":".join(
@@ -1052,6 +1121,9 @@ class Session:
                     if "PYTHONPATH" in env
                     else pythonpath
                 )
+            site_packages = inst.site_packages_list
+            if site_packages:
+                env[RIOT_SITE_PACKAGES_ENV] = os.pathsep.join(site_packages)
             script_path = inst.scriptpath
             if script_path:
                 env["PATH"] = ":".join(
@@ -1126,21 +1198,6 @@ class Session:
         abs_venv = os.path.abspath(venv)
         env["VIRTUAL_ENV"] = abs_venv
         env["PATH"] = f"{abs_venv}/bin:" + env.get("PATH", "")
-
-        try:
-            # Ensure that we have the venv site-packages in the PYTHONPATH so
-            # that the installed dev package depdendencies are available.
-            sitepkgs_path = (
-                next((Path(abs_venv) / "lib").glob("python*")) / "site-packages"
-            )
-            pythonpath = env.get("PYTHONPATH", None)
-            env["PYTHONPATH"] = (
-                os.pathsep.join((pythonpath, str(sitepkgs_path)))
-                if pythonpath is not None
-                else str(sitepkgs_path)
-            )
-        except StopIteration:
-            pass
 
         for k in cls.ALWAYS_PASS_ENV:
             if k in os.environ and k not in env:
@@ -1259,9 +1316,30 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
 
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
+        pyproject_path = Path("pyproject.toml")
+        if pyproject_path.exists():
+            build_system_requires = get_build_system_requires(pyproject_path)
+            if build_system_requires:
+                logger.info(
+                    "Installing build-system requirements for editable install in %s.",
+                    venv_path,
+                )
+                Session.run_cmd_venv(
+                    venv_path,
+                    "pip --disable-pip-version-check install "
+                    + " ".join(
+                        shlex.quote(requirement)
+                        for requirement in build_system_requires
+                    ),
+                    env=dict(os.environ),
+                )
+            install_cmd = "pip --disable-pip-version-check install --no-build-isolation -e ."
+        else:
+            install_cmd = "pip --disable-pip-version-check install -e ."
+
         Session.run_cmd_venv(
             venv_path,
-            "pip --disable-pip-version-check install -e .",
+            install_cmd,
             env=dict(os.environ),
         )
         dev_pkg_lockfile.touch()

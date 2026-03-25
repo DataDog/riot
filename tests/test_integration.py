@@ -584,7 +584,8 @@ venv = Venv(
             "site-packages",
         )
     )
-    assert env["PYTHONPATH"] == ":".join(("", str(tmp_path), sitepkgs, sitepkgs))
+    assert env["PYTHONPATH"] == ":".join(("", str(tmp_path)))
+    assert env["RIOT_SITE_PACKAGES"] == sitepkgs
 
 
 def test_venv_instance_pythonpath(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
@@ -645,14 +646,52 @@ venv = Venv(
     )
 
     paths = env["PYTHONPATH"].split(":")
-    assert paths == [
-        "",
-        str(tmp_path),
+    assert paths == ["", str(tmp_path)]
+    assert env["RIOT_SITE_PACKAGES"].split(":") == [
         venv_path,
         parent_venv_path,
         py_venv_path,
-        py_venv_path,
     ]
+
+
+def test_inherited_site_packages_process_pth_files(
+    tmp_path: pathlib.Path, tmp_run: _T_TmpRun
+) -> None:
+    rf_path = tmp_path / "riotfile.py"
+    rf_path.write_text(
+        """
+from riot import Venv
+venv = Venv(
+    pys=[3],
+    pkgs={"pip": ""},
+    name="test",
+    command="pytest --version",
+    venvs=[Venv(pkgs={"pytest": ""})]
+)
+""",
+    )
+
+    result = tmp_run("riot generate")
+    assert result.returncode == 0, result.stderr
+
+    version = "".join((str(_) for _ in sys.version_info[:3]))
+    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
+    base_site_packages = (
+        tmp_path
+        / ".riot"
+        / f"venv_py{version}"
+        / "lib"
+        / f"python{py_dot_version}"
+        / "site-packages"
+    )
+    marker_file = tmp_path / "pth-marker.txt"
+    (base_site_packages / "marker.pth").write_text(
+        f"import pathlib; pathlib.Path({str(marker_file)!r}).write_text('loaded')\n"
+    )
+
+    result = tmp_run("riot run -s test")
+    assert result.returncode == 0, result.stderr
+    assert marker_file.read_text() == "loaded"
 
 
 def test_venv_instance_path(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
