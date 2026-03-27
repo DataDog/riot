@@ -522,6 +522,8 @@ class VenvInstance:
 
         ident = self.ident
         assert ident is not None, self
+        if not ident:
+            return venv_path
         prefix_path = "_".join((venv_path, ident))
         return (
             "_".join((venv_path, self.long_hash))[:255]
