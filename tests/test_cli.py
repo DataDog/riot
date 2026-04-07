@@ -9,8 +9,7 @@ import click.testing
 import mock
 import pytest
 import riot.cli
-import riot.riot
-from riot.riot import Interpreter
+from riot.interpreter import Interpreter
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(HERE, "data")

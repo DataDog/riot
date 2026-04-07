@@ -9,7 +9,8 @@ import click
 from rich.console import Console
 from rich.logging import RichHandler
 
-from .riot import Interpreter, Session
+from .interpreter import Interpreter
+from .session import Session
 
 FORMAT = "%(message)s"
 

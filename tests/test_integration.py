@@ -6,7 +6,7 @@ import sys
 from typing import Any, Dict, Generator, Optional, Sequence, Union
 
 import pytest
-from riot.riot import _T_CompletedProcess
+from riot.constants import _T_CompletedProcess
 from typing_extensions import Protocol
 
 _T_Path = Union[str, "os.PathLike[Any]"]

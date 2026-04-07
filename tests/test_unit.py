@@ -7,7 +7,10 @@ import sys
 from typing import Any, Dict, Generator, List
 
 import pytest
-from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
+from riot.interpreter import Interpreter
+from riot.runner import run_cmd
+from riot.session import Session
+from riot.venv import Venv, VenvInstance
 from tests.test_cli import DATA_DIR
 
 RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
@@ -364,7 +367,7 @@ def test_requirements_upgrades_compatible_pip_tools(
             return b"# compiled output\nrequests==2.31.0\n"
         return b""
 
-    monkeypatch.setattr("riot.riot.subprocess.check_output", _fake_check_output)
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
 
     venv = VenvInstance(
         venv=Venv(name="test", command="echo test"),
