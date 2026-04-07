@@ -35,7 +35,7 @@ setup(
         "packaging",
         "setuptools; python_version>='3.12'",
     ],
-    setup_requires=["setuptools_scm"],
+    setup_requires=["setuptools_scm~=9.2.2"],
     use_scm_version=True,
     # Required for mypy compatibility, see
     # https://mypy.readthedocs.io/en/stable/installed_packages.html#making-pep-561-compatible-packages
