@@ -423,7 +423,6 @@ class VenvInstance:
                     install_dev_pkg(venv_path, force=True)
 
             pkg_str = self.pkg_str
-            assert pkg_str is not None
             compiled_requirements_file = (
                 f"{DEFAULT_RIOT_PATH}/requirements/{self.short_hash}.txt"
             )
