@@ -301,10 +301,9 @@ class VenvInstance:
             "-q",
             "--no-annotate",
             "--allow-unsafe",
+            "--resolver=backtracking",
             in_path,
         ]
-        if tuple([int(v) for v in self.py.version().strip("()").split(".")]) >= (3, 7):
-            cmd.append("--resolver=backtracking")
         logger.info(
             "Compiling requirements file %s at %s.",
             in_path,
@@ -424,7 +423,6 @@ class VenvInstance:
                     install_dev_pkg(venv_path, force=True)
 
             pkg_str = self.pkg_str
-            assert pkg_str is not None
             compiled_requirements_file = (
                 f"{DEFAULT_RIOT_PATH}/requirements/{self.short_hash}.txt"
             )
