@@ -301,10 +301,9 @@ class VenvInstance:
             "-q",
             "--no-annotate",
             "--allow-unsafe",
+            "--resolver=backtracking",
             in_path,
         ]
-        if tuple([int(v) for v in self.py.version().strip("()").split(".")]) >= (3, 7):
-            cmd.append("--resolver=backtracking")
         logger.info(
             "Compiling requirements file %s at %s.",
             in_path,
