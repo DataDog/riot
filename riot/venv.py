@@ -146,12 +146,13 @@ def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
 
     yield
 
-    # Clean up the base venv
-    for ns_file in dst_ns_files:
-        os.remove(ns_file)
-
-    for ns_file in moved_ns_files:
-        shutil.move(ns_file + ".bak", ns_file)
+    # Clean up the base venv, restoring any backups even if removal fails
+    try:
+        for ns_file in dst_ns_files:
+            os.remove(ns_file)
+    finally:
+        for ns_file in moved_ns_files:
+            shutil.move(ns_file + ".bak", ns_file)
 
 
 @dataclasses.dataclass
