@@ -246,14 +246,16 @@ class VenvInstance:
     @property
     def full_pkg_str(self) -> str:
         """Return pip friendly install string from defined packages."""
-        chain: t.List[VenvInstance] = [self]
+        # Build chain from self up to the root (child-first order)
+        chain: t.List[VenvInstance] = []
         current: t.Optional[VenvInstance] = self
         while current is not None:
-            chain.insert(0, current)
+            chain.append(current)
             current = current.parent
 
         pkgs: t.Dict[str, str] = {}
-        for inst in chain:
+        # Iterate root-first so that child packages override parent packages
+        for inst in reversed(chain):
             pkgs.update(dict(inst.pkgs))
 
         return pip_deps(pkgs)
