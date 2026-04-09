@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import dataclasses
+import functools
 from hashlib import sha256
 import logging
 import os
@@ -244,22 +245,24 @@ class VenvInstance:
         """Return pip friendly install string from defined packages."""
         return pip_deps(self.pkgs)
 
-    @property
+    @functools.cached_property
     def full_pkg_str(self) -> str:
         """Return pip friendly install string from defined packages."""
-        chain: t.List[VenvInstance] = [self]
+        # Build chain from self up to the root (child-first order)
+        chain: t.List[VenvInstance] = []
         current: t.Optional[VenvInstance] = self
         while current is not None:
-            chain.insert(0, current)
+            chain.append(current)
             current = current.parent
 
         pkgs: t.Dict[str, str] = {}
-        for inst in chain:
+        # Iterate root-first so that child packages override parent packages
+        for inst in reversed(chain):
             pkgs.update(dict(inst.pkgs))
 
         return pip_deps(pkgs)
 
-    @property
+    @functools.cached_property
     def long_hash(self) -> str:
         return hex(hash(self))[2:]
 
@@ -283,17 +286,26 @@ class VenvInstance:
         _dir = os.path.join(DEFAULT_RIOT_PATH, "requirements")
         os.makedirs(_dir, exist_ok=True)
         in_path = os.path.join(_dir, "{}.in".format(self.short_hash))
-        subprocess.check_output(
-            [
-                self.py.path(),
-                "-m",
-                "pip",
-                "install",
-                "--upgrade",
-                "pip<26",
-                "pip-tools>=7.5.0,<8",
-            ],
+        # Only install pip-tools once per interpreter. A sentinel file keyed on
+        # the interpreter's venv path records that pip-tools is already present,
+        # avoiding a subprocess call on every requirements compilation.
+        sentinel = (
+            Path(DEFAULT_RIOT_PATH)
+            / f"pip-tools-{Path(self.py.venv_path).name}.installed"
         )
+        if not sentinel.exists():
+            subprocess.check_output(
+                [
+                    self.py.path(),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "pip<26",
+                    "pip-tools>=7.5.0,<8",
+                ],
+            )
+            sentinel.touch()
         cmd = [
             self.py.path(),
             "-m",
