@@ -354,6 +354,7 @@ def test_session_run_check_environment_modifications_and_recreate_true(
 def test_requirements_upgrades_compatible_pip_tools(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
+    """When no sentinel exists, pip-tools should be installed and the sentinel created."""
     monkeypatch.chdir(tmp_path)
     calls: List[List[str]] = []
 
@@ -387,3 +388,41 @@ def test_requirements_upgrades_compatible_pip_tools(
         "pip<26",
         "pip-tools>=7.5.0,<8",
     ]
+
+
+def test_requirements_skips_pip_tools_install_when_sentinel_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """When the sentinel file exists, the pip install should be skipped."""
+    monkeypatch.chdir(tmp_path)
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    # Pre-create the sentinel to simulate pip-tools already being installed
+    sentinel_dir = tmp_path / ".riot"
+    sentinel_dir.mkdir()
+    venv_basename = os.path.basename(interpreter.venv_path)
+    (sentinel_dir / f"pip-tools-{venv_basename}.installed").touch()
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
+            return b"# compiled output\nrequests==2.31.0\n"
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    _ = venv.requirements
+
+    # pip install should not appear in calls
+    assert not any(c[2:4] == ["-m", "pip"] for c in calls)

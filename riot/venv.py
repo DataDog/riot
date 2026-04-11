@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import dataclasses
+import functools
 from hashlib import sha256
 import logging
 import os
@@ -146,12 +147,13 @@ def nspkgs(inst: "VenvInstance") -> t.Generator[None, None, None]:
 
     yield
 
-    # Clean up the base venv
-    for ns_file in dst_ns_files:
-        os.remove(ns_file)
-
-    for ns_file in moved_ns_files:
-        shutil.move(ns_file + ".bak", ns_file)
+    # Clean up the base venv, restoring any backups even if removal fails
+    try:
+        for ns_file in dst_ns_files:
+            os.remove(ns_file)
+    finally:
+        for ns_file in moved_ns_files:
+            shutil.move(ns_file + ".bak", ns_file)
 
 
 @dataclasses.dataclass
@@ -243,7 +245,7 @@ class VenvInstance:
         """Return pip friendly install string from defined packages."""
         return pip_deps(self.pkgs)
 
-    @property
+    @functools.cached_property
     def full_pkg_str(self) -> str:
         """Return pip friendly install string from defined packages."""
         # Build chain from self up to the root (child-first order)
@@ -260,7 +262,7 @@ class VenvInstance:
 
         return pip_deps(pkgs)
 
-    @property
+    @functools.cached_property
     def long_hash(self) -> str:
         return hex(hash(self))[2:]
 
@@ -284,17 +286,26 @@ class VenvInstance:
         _dir = os.path.join(DEFAULT_RIOT_PATH, "requirements")
         os.makedirs(_dir, exist_ok=True)
         in_path = os.path.join(_dir, "{}.in".format(self.short_hash))
-        subprocess.check_output(
-            [
-                self.py.path(),
-                "-m",
-                "pip",
-                "install",
-                "--upgrade",
-                "pip<26",
-                "pip-tools>=7.5.0,<8",
-            ],
+        # Only install pip-tools once per interpreter. A sentinel file keyed on
+        # the interpreter's venv path records that pip-tools is already present,
+        # avoiding a subprocess call on every requirements compilation.
+        sentinel = (
+            Path(DEFAULT_RIOT_PATH)
+            / f"pip-tools-{Path(self.py.venv_path).name}.installed"
         )
+        if not sentinel.exists():
+            subprocess.check_output(
+                [
+                    self.py.path(),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "pip<26",
+                    "pip-tools>=7.5.0,<8",
+                ],
+            )
+            sentinel.touch()
         cmd = [
             self.py.path(),
             "-m",
@@ -303,10 +314,9 @@ class VenvInstance:
             "-q",
             "--no-annotate",
             "--allow-unsafe",
+            "--resolver=backtracking",
             in_path,
         ]
-        if tuple([int(v) for v in self.py.version().strip("()").split(".")]) >= (3, 7):
-            cmd.append("--resolver=backtracking")
         logger.info(
             "Compiling requirements file %s at %s.",
             in_path,
@@ -422,11 +432,10 @@ class VenvInstance:
 
             if self.created:
                 py.create_venv(recreate, venv_path)
-                if not self.venv.skip_dev_install or not skip_deps:
+                if not (self.venv.skip_dev_install or skip_deps):
                     install_dev_pkg(venv_path, force=True)
 
             pkg_str = self.pkg_str
-            assert pkg_str is not None
             compiled_requirements_file = (
                 f"{DEFAULT_RIOT_PATH}/requirements/{self.short_hash}.txt"
             )
