@@ -29,6 +29,24 @@ class Interpreter:
         return repr(self)
 
     @functools.lru_cache()
+    def abiflags(self) -> str:
+        """Return the ABI flags for this interpreter (e.g. '' or 't' for free-threaded).
+
+        On POSIX, delegates to sys.abiflags. On Windows (where sys.abiflags does not
+        exist) falls back to sysconfig.get_config_var('Py_GIL_DISABLED') so that
+        free-threaded builds are still distinguished from regular ones.
+        """
+        output = subprocess.check_output(
+            [
+                self.path(),
+                "-c",
+                "import sys, sysconfig; print(getattr(sys, 'abiflags', None) or "
+                "('t' if sysconfig.get_config_var('Py_GIL_DISABLED') == 1 else ''))",
+            ]
+        )
+        return output.decode().strip()
+
+    @functools.lru_cache()
     def version(self) -> str:
         path = self.path()
 
@@ -53,8 +71,13 @@ class Interpreter:
 
     @property
     def site_packages_path(self) -> str:
-        version = ".".join((str(_) for _ in self.version_info()[:2]))
-        return os.path.join(self.venv_path, "lib", f"python{version}", "site-packages")
+        major, minor = self.version_info()[:2]
+        return os.path.join(
+            self.venv_path,
+            "lib",
+            f"python{major}.{minor}{self.abiflags()}",
+            "site-packages",
+        )
 
     @functools.lru_cache()
     def path(self) -> str:
@@ -88,7 +111,9 @@ class Interpreter:
         version = self.version().replace(".", "")
         env_base_path = os.environ.get("RIOT_ENV_BASE_PATH", DEFAULT_RIOT_PATH)
         return os.path.abspath(
-            os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
+            os.path.join(
+                env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}{self.abiflags()}"
+            )
         )
 
     def exists(self) -> bool:

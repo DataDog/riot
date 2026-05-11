@@ -359,8 +359,10 @@ class VenvInstance:
         prefix = self.prefix
         if prefix is None:
             return None
-        version = ".".join((str(_) for _ in self.py.version_info()[:2]))
-        return os.path.join(prefix, "lib", f"python{version}", "site-packages")
+        major, minor = self.py.version_info()[:2]
+        return os.path.join(
+            prefix, "lib", f"python{major}.{minor}{self.py.abiflags()}", "site-packages"
+        )
 
     @property
     def site_packages_list(self) -> t.List[str]:
