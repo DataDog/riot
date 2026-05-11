@@ -3,13 +3,16 @@ import pathlib
 import re
 import subprocess
 import sys
+import sysconfig as _sysconfig
 from typing import Any, Dict, Generator, Optional, Sequence, Union
 
 import pytest
 from riot.constants import _T_CompletedProcess
 from typing_extensions import Protocol
 
-_ft_suffix = "t" if not getattr(sys, "_is_gil_enabled", lambda: True)() else ""
+_ft_suffix = getattr(sys, "abiflags", None) or (
+    "t" if _sysconfig.get_config_var("Py_GIL_DISABLED") == 1 else ""
+)
 
 _T_Path = Union[str, "os.PathLike[Any]"]
 

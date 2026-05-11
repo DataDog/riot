@@ -29,17 +29,22 @@ class Interpreter:
         return repr(self)
 
     @functools.lru_cache()
-    def is_freethreaded(self) -> bool:
-        """Return whether this interpreter is a free-threaded (no-GIL) build."""
-        path = self.path()
+    def abiflags(self) -> str:
+        """Return the ABI flags for this interpreter (e.g. '' or 't' for free-threaded).
+
+        On POSIX, delegates to sys.abiflags. On Windows (where sys.abiflags does not
+        exist) falls back to sysconfig.get_config_var('Py_GIL_DISABLED') so that
+        free-threaded builds are still distinguished from regular ones.
+        """
         output = subprocess.check_output(
             [
-                path,
+                self.path(),
                 "-c",
-                "import sys; print(getattr(sys, '_is_gil_enabled', lambda: True)() is False)",
+                "import sys, sysconfig; print(getattr(sys, 'abiflags', None) or "
+                "('t' if sysconfig.get_config_var('Py_GIL_DISABLED') == 1 else ''))",
             ]
         )
-        return output.decode().strip() == "True"
+        return output.decode().strip()
 
     @functools.lru_cache()
     def version(self) -> str:
@@ -67,9 +72,11 @@ class Interpreter:
     @property
     def site_packages_path(self) -> str:
         major, minor = self.version_info()[:2]
-        suffix = "t" if self.is_freethreaded() else ""
         return os.path.join(
-            self.venv_path, "lib", f"python{major}.{minor}{suffix}", "site-packages"
+            self.venv_path,
+            "lib",
+            f"python{major}.{minor}{self.abiflags()}",
+            "site-packages",
         )
 
     @functools.lru_cache()
@@ -102,10 +109,11 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
-        suffix = "t" if self.is_freethreaded() else ""
         env_base_path = os.environ.get("RIOT_ENV_BASE_PATH", DEFAULT_RIOT_PATH)
         return os.path.abspath(
-            os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}{suffix}")
+            os.path.join(
+                env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}{self.abiflags()}"
+            )
         )
 
     def exists(self) -> bool:

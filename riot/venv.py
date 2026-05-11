@@ -360,9 +360,8 @@ class VenvInstance:
         if prefix is None:
             return None
         major, minor = self.py.version_info()[:2]
-        suffix = "t" if self.py.is_freethreaded() else ""
         return os.path.join(
-            prefix, "lib", f"python{major}.{minor}{suffix}", "site-packages"
+            prefix, "lib", f"python{major}.{minor}{self.py.abiflags()}", "site-packages"
         )
 
     @property
