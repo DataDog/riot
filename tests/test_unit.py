@@ -16,6 +16,7 @@ from tests.test_cli import DATA_DIR
 RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
 default_venv_pattern = re.compile(r".*")
 current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
+_ft_suffix = "t" if not getattr(sys, "_is_gil_enabled", lambda: True)() else ""
 
 
 @pytest.fixture
@@ -68,8 +69,9 @@ def session_virtualenv() -> Generator[Session, None, None]:
 def _get_env(env_name: str) -> Dict[str, str]:
     """Return a dictionary with riot venv paths to add to the environment."""
     venv_path = os.path.join(RIOT_TESTS_PATH, env_name)
+    ft_suffix = "t" if not getattr(sys, "_is_gil_enabled", lambda: True)() else ""
     venv_site_packages_path = os.path.join(
-        venv_path, "lib", f"python{current_py_hint}", "site-packages"
+        venv_path, "lib", f"python{current_py_hint}{ft_suffix}", "site-packages"
     )
 
     venv_python_path = os.path.join(venv_path, "bin")
@@ -123,10 +125,16 @@ def test_interpreter(v1, v2, equal):
         assert repr(Interpreter(v1)) != repr(Interpreter(v2))
 
 
+def test_interpreter_is_freethreaded(current_interpreter: Interpreter) -> None:
+    expected = not getattr(sys, "_is_gil_enabled", lambda: True)()
+    assert current_interpreter.is_freethreaded() == expected
+
+
 def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    suffix = "t" if not getattr(sys, "_is_gil_enabled", lambda: True)() else ""
     assert current_interpreter.venv_path == os.path.abspath(
-        os.path.join(".riot", "venv_py{}".format(py_version))
+        os.path.join(".riot", "venv_py{}{}".format(py_version, suffix))
     )
 
 
@@ -139,8 +147,9 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     )
 
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    suffix = "t" if not getattr(sys, "_is_gil_enabled", lambda: True)() else ""
     assert venv.prefix == os.path.abspath(
-        os.path.join(".riot", "venv_py{}_pip".format(py_version))
+        os.path.join(".riot", "venv_py{}{}_pip".format(py_version, suffix))
     )
 
 
@@ -251,10 +260,11 @@ def _get_base_env_path() -> str:
     return os.path.abspath(
         os.path.join(
             RIOT_TESTS_PATH,
-            "venv_py{}{}{}".format(
+            "venv_py{}{}{}{}".format(
                 sys.version_info.major,
                 sys.version_info.minor,
                 sys.version_info.micro,
+                _ft_suffix,
             ),
         )
     )
@@ -276,7 +286,10 @@ def test_session_run(session_virtualenv: Session) -> None:
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     # Check exists and is empty of packages
     result = _get_pip_freeze(command_env)
@@ -295,7 +308,10 @@ def test_session_run_check_environment_modifications(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
     # Check exists and is empty of packages
@@ -316,7 +332,10 @@ def test_session_run_check_environment_modifications_and_recreate_false(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
 
@@ -339,7 +358,10 @@ def test_session_run_check_environment_modifications_and_recreate_true(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
 

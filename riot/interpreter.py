@@ -29,6 +29,19 @@ class Interpreter:
         return repr(self)
 
     @functools.lru_cache()
+    def is_freethreaded(self) -> bool:
+        """Return whether this interpreter is a free-threaded (no-GIL) build."""
+        path = self.path()
+        output = subprocess.check_output(
+            [
+                path,
+                "-c",
+                "import sys; print(getattr(sys, '_is_gil_enabled', lambda: True)() is False)",
+            ]
+        )
+        return output.decode().strip() == "True"
+
+    @functools.lru_cache()
     def version(self) -> str:
         path = self.path()
 
@@ -53,8 +66,11 @@ class Interpreter:
 
     @property
     def site_packages_path(self) -> str:
-        version = ".".join((str(_) for _ in self.version_info()[:2]))
-        return os.path.join(self.venv_path, "lib", f"python{version}", "site-packages")
+        major, minor = self.version_info()[:2]
+        suffix = "t" if self.is_freethreaded() else ""
+        return os.path.join(
+            self.venv_path, "lib", f"python{major}.{minor}{suffix}", "site-packages"
+        )
 
     @functools.lru_cache()
     def path(self) -> str:
@@ -86,9 +102,10 @@ class Interpreter:
     def venv_path(self) -> str:
         """Return the path to the virtual environment for this interpreter."""
         version = self.version().replace(".", "")
+        suffix = "t" if self.is_freethreaded() else ""
         env_base_path = os.environ.get("RIOT_ENV_BASE_PATH", DEFAULT_RIOT_PATH)
         return os.path.abspath(
-            os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}")
+            os.path.join(env_base_path, f"{DEFAULT_RIOT_ENV_PREFIX}{version}{suffix}")
         )
 
     def exists(self) -> bool:

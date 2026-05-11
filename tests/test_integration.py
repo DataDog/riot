@@ -9,6 +9,8 @@ import pytest
 from riot.constants import _T_CompletedProcess
 from typing_extensions import Protocol
 
+_ft_suffix = "t" if not getattr(sys, "_is_gil_enabled", lambda: True)() else ""
+
 _T_Path = Union[str, "os.PathLike[Any]"]
 
 
@@ -578,9 +580,9 @@ venv = Venv(
         tmp_path
         / os.path.join(
             ".riot",
-            f"venv_py{version}",
+            f"venv_py{version}{_ft_suffix}",
             "lib",
-            f"python{py_dot_version}",
+            f"python{py_dot_version}{_ft_suffix}",
             "site-packages",
         )
     )
@@ -607,15 +609,15 @@ venv = Venv(
 
     version = "".join((str(_) for _ in sys.version_info[:3]))
 
-    venv_name = f"venv_py{version}_pip_pytest"
-    parent_venv_name = f"venv_py{version}_pip"
-    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
+    venv_name = f"venv_py{version}{_ft_suffix}_pip_pytest"
+    parent_venv_name = f"venv_py{version}{_ft_suffix}_pip"
+    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2])) + _ft_suffix
 
     py_venv_path = str(
         tmp_path
         / os.path.join(
             ".riot",
-            f"venv_py{version}",
+            f"venv_py{version}{_ft_suffix}",
             "lib",
             "python{}".format(py_dot_version),
             "site-packages",
@@ -673,11 +675,11 @@ venv = Venv(
     env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0, result.stderr
 
-    venv_name = "venv_py{}_pip_pytest".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
+    venv_name = "venv_py{}{}_pip_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3])), _ft_suffix
     )
-    parent_venv_name = "venv_py{}_pip".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
+    parent_venv_name = "venv_py{}{}_pip".format(
+        "".join((str(_) for _ in sys.version_info[:3])), _ft_suffix
     )
 
     parent_venv_path = str(
@@ -748,8 +750,8 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot -Pv run -s child")
-    venv_path = tmp_path / ".riot/venv_py{}_pip_pytest".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
+    venv_path = tmp_path / ".riot/venv_py{}{}_pip_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3])), _ft_suffix
     )
     assert f"Creating virtualenv '{venv_path}'" in result.stderr, result.stderr
     assert (
@@ -793,11 +795,11 @@ venv = Venv(
     result = tmp_run("riot -vd --pipe shell '#0'", input="exit\n")
     assert (
         re.search(
-            r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
+            r"Setting venv path to .+[.]riot/venv_py[0-9]+t?_requests", result.stderr
         )
         is None
     )
-    assert re.search(r"Setting venv path to .+[.]riot/venv_py[0-9]+", result.stderr)
+    assert re.search(r"Setting venv path to .+[.]riot/venv_py[0-9]+t?", result.stderr)
 
     assert result.returncode == 0, result.stderr
 
@@ -835,7 +837,7 @@ setup(
     )
     result = tmp_run("riot -vd --pipe shell '#0'", input="exit\n")
     assert re.search(
-        r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
+        r"Setting venv path to .+[.]riot/venv_py[0-9]+t?_requests", result.stderr
     )
     assert result.returncode == 0, result.stderr
 
@@ -861,7 +863,7 @@ venv = Venv(
 
     assert result.returncode == 0, result.stderr
 
-    assert re.search(r"venv_py[0-9]+_requests", result.stderr) is None
+    assert re.search(r"venv_py[0-9]+t?_requests", result.stderr) is None
     assert "TEST OK" in result.stdout
 
 
