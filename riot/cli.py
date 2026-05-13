@@ -31,6 +31,7 @@ class InterpreterParamType(click.ParamType):
 
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
 VENV_PATTERN_ARG = click.option("--venv-pattern", "venv_pattern", default=r".*")
+WHEEL_PATH_ARG = click.option("--wheel-path", "wheel_path", default=r"")
 RECREATE_VENVS_ARG = click.option(
     "-r",
     "--recreate-venvs",
@@ -151,7 +152,8 @@ def list_venvs(ctx, pythons, pattern, venv_pattern, interpreters, hash_only):
     )
 
 
-@main.command(help="""Generate base virtual environments.
+@main.command(
+    help="""Generate base virtual environments.
 
 A base virtual environment is a virtual environment with the local package
 installed.
@@ -160,7 +162,8 @@ Generating the base virtual environments is useful for performance to avoid
 having to reinstall the local package repeatedly.
 
 Once the base virtual environments are built, the ``--skip-base-install`` option
-can be used for the run command to avoid having to install the local package.""")
+can be used for the run command to avoid having to install the local package."""
+)
 @RECREATE_VENVS_ARG
 @SKIP_BASE_INSTALL_ARG
 @PYTHON_VERSIONS_ARG
@@ -188,6 +191,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @PATTERN_ARG
 @VENV_PATTERN_ARG
 @RECOMPILE_REQS_ARG
+@WHEEL_PATH_ARG
 @click.pass_context
 def run(
     ctx,
@@ -200,6 +204,7 @@ def run(
     pattern,
     venv_pattern,
     recompile_reqs,
+    wheel_path,
 ):
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
@@ -212,6 +217,7 @@ def run(
         skip_missing=skip_missing,
         exit_first=exit_first,
         recompile_reqs=recompile_reqs,
+        wheel_path=wheel_path,
     )
 
 

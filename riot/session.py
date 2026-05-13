@@ -9,8 +9,8 @@ import traceback
 import typing as t
 
 import click
-from packaging.version import Version
 import pexpect
+from packaging.version import Version
 from rich import print as rich_print
 from rich.pretty import Pretty
 from rich.status import Status
@@ -21,7 +21,7 @@ from .exceptions import CmdFailure
 from .interpreter import Interpreter
 from .runner import install_dev_pkg, run_cmd_venv
 from .utils import env_to_str
-from .venv import nspkgs, Venv, VenvInstanceResult
+from .venv import Venv, VenvInstanceResult, nspkgs
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ class Session:
         skip_missing: bool = False,
         exit_first: bool = False,
         recompile_reqs: bool = False,
+        wheel_path: str = "",
     ) -> None:
         results = []
 
@@ -153,6 +154,7 @@ class Session:
                 skip_deps=skip_base_install or inst.venv.skip_dev_install,
                 recreate=recreate_venvs,
                 recompile_reqs=recompile_reqs,
+                wheel_path=wheel_path,
             )
 
             pythonpath = inst.pythonpath

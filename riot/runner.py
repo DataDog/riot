@@ -1,11 +1,11 @@
 import logging
 import os
-from pathlib import Path
 import subprocess
 import sys
 import typing as t
+from pathlib import Path
 
-from .constants import _T_CompletedProcess, _T_stdio, ENCODING, SHELL
+from .constants import ENCODING, SHELL, _T_CompletedProcess, _T_stdio
 from .exceptions import CmdFailure
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ def run_cmd_venv(
     return run_cmd(args, stdout=stdout, executable=executable, env=env, shell=True)
 
 
-def install_dev_pkg(venv_path: str, force: bool = False) -> None:
+def install_dev_pkg(venv_path: str, wheel_path: str, force: bool = False) -> None:
     dev_pkg_lockfile = Path(venv_path) / ".riot-dev-pkg-installed"
     if dev_pkg_lockfile.exists() and not force:
         logger.info("Dev package already installed. Skipping.")
@@ -99,11 +99,13 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
         logger.warning("No Python setup file found. Skipping dev package installation.")
         return
 
+    find_links_flag = f"--find-links {wheel_path}" if wheel_path else ""
+
     logger.info("Installing dev package (edit mode) in %s.", venv_path)
     try:
         run_cmd_venv(
             venv_path,
-            "pip --disable-pip-version-check install -e .",
+            f"pip --disable-pip-version-check install {find_links_flag} -e .",
             env=dict(os.environ),
         )
         dev_pkg_lockfile.touch()

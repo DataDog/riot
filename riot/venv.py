@@ -1,13 +1,13 @@
-from contextlib import contextmanager
 import dataclasses
 import functools
-from hashlib import sha256
 import logging
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import typing as t
+from contextlib import contextmanager
+from hashlib import sha256
+from pathlib import Path
 
 from .constants import DEFAULT_RIOT_PATH
 from .exceptions import CmdFailure
@@ -412,6 +412,7 @@ class VenvInstance:
         skip_deps: bool = False,
         recompile_reqs: bool = False,
         child_was_installed: bool = False,
+        wheel_path: str = "",
     ) -> None:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
@@ -435,7 +436,7 @@ class VenvInstance:
             if self.created:
                 py.create_venv(recreate, venv_path)
                 if not (self.venv.skip_dev_install or skip_deps):
-                    install_dev_pkg(venv_path, force=True)
+                    install_dev_pkg(venv_path, wheel_path, force=True)
 
             pkg_str = self.pkg_str
             compiled_requirements_file = (
