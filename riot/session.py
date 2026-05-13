@@ -318,6 +318,7 @@ class Session:
         recreate: bool,
         skip_deps: bool,
         pythons: t.Optional[t.Set[Interpreter]],
+        wheel_path: str,
     ) -> None:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
@@ -354,7 +355,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path, force=True)
+                install_dev_pkg(py.venv_path, wheel_path, force=True)
 
     def _venvs_matching_identifier(self, identifier):
         for n, inst in enumerate(self.venv.instances()):

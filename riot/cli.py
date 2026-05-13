@@ -168,6 +168,7 @@ can be used for the run command to avoid having to install the local package."""
 @SKIP_BASE_INSTALL_ARG
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
+@WHEEL_PATH_ARG
 @click.pass_context
 def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
     ctx.obj["session"].generate_base_venvs(
@@ -175,6 +176,7 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
         recreate=recreate_venvs,
         skip_deps=skip_base_install,
         pythons=pythons,
+        wheel_path=wheel_path,
     )
 
 
