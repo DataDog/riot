@@ -87,6 +87,7 @@ class Session:
             recreate=recreate_venvs,
             skip_deps=skip_base_install,
             pythons=pythons,
+            wheel_path=wheel_path,
         )
 
         for inst in self.venv.instances():
