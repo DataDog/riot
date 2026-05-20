@@ -226,7 +226,18 @@ def shell(ctx, ident, pass_env):
     )
 
 
-@main.command("requirements", help="""Cache requirements for a venv.""")
+@main.command(
+    "requirements",
+    help=(
+        "Cache requirements for a venv.\n\n"
+        "The compiler is selectable via the RIOT_PIP_COMPILE_BACKEND env var: "
+        "'piptools' (default) or 'uv' (requires the uv executable on PATH).\n\n"
+        "When RIOT_PIP_COMPILE_BACKEND=uv, the RIOT_PIP_COMPILE_EXCLUDE_NEWER "
+        "env var is forwarded as --exclude-newer=<value> to 'uv pip compile' "
+        "(useful for supply-chain cooldown). Ignored with a warning when the "
+        "backend is pip-tools."
+    ),
+)
 @click.argument("ident", type=str)
 @click.pass_context
 def requirements(ctx, ident):

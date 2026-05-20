@@ -280,47 +280,112 @@ class VenvInstance:
 
     @property
     def requirements(self) -> str:
-        """Requirements for dependencies with pinned versions."""
+        """Requirements for dependencies with pinned versions.
+
+        The compiler used to lock the requirements is selectable via the
+        ``RIOT_PIP_COMPILE_BACKEND`` environment variable. Supported values:
+
+        - ``piptools`` (default): use ``python -m piptools compile``, the
+          historical behaviour. ``pip-tools`` is auto-installed on demand.
+        - ``uv``: use ``uv pip compile``. The ``uv`` executable must already
+          be available on ``PATH``. This backend supports the additional
+          ``RIOT_PIP_COMPILE_EXCLUDE_NEWER`` environment variable, which is
+          forwarded as ``--exclude-newer=<value>`` to ``uv pip compile`` and
+          lets callers enforce a supply-chain "cooldown" on freshly
+          published transitive releases.
+
+        ``RIOT_PIP_COMPILE_EXCLUDE_NEWER`` is silently ignored when the
+        backend is ``piptools`` because ``pip-tools`` has no equivalent
+        option; callers that need the cooldown must opt in to the ``uv``
+        backend.
+        """
         # Transform full_pkg_str into requirements.in format
         pkgs = "\n".join(self.full_pkg_str.replace("'", "").split(" "))
         _dir = os.path.join(DEFAULT_RIOT_PATH, "requirements")
         os.makedirs(_dir, exist_ok=True)
         in_path = os.path.join(_dir, "{}.in".format(self.short_hash))
-        # Only install pip-tools once per interpreter. A sentinel file keyed on
-        # the interpreter's venv path records that pip-tools is already present,
-        # avoiding a subprocess call on every requirements compilation.
-        sentinel = (
-            Path(DEFAULT_RIOT_PATH)
-            / f"pip-tools-{Path(self.py.venv_path).name}.installed"
-        )
-        if not sentinel.exists():
-            subprocess.check_output(
-                [
-                    self.py.path(),
-                    "-m",
-                    "pip",
-                    "install",
-                    "--upgrade",
-                    "pip<26",
-                    "pip-tools>=7.5.0,<8",
-                ],
+        out_path = os.path.join(_dir, "{}.txt".format(self.short_hash))
+
+        backend = os.environ.get("RIOT_PIP_COMPILE_BACKEND", "piptools").lower()
+        exclude_newer = os.environ.get("RIOT_PIP_COMPILE_EXCLUDE_NEWER")
+
+        if backend == "uv":
+            uv_exe = shutil.which("uv")
+            if uv_exe is None:
+                raise RuntimeError(
+                    "RIOT_PIP_COMPILE_BACKEND=uv was requested but no `uv` executable "
+                    "was found on PATH. Install uv (https://docs.astral.sh/uv/) or "
+                    "unset RIOT_PIP_COMPILE_BACKEND to fall back to pip-tools."
+                )
+            cmd = [
+                uv_exe,
+                "pip",
+                "compile",
+                "--quiet",
+                "--no-annotate",
+                "--no-strip-extras",
+                "--python",
+                self.py.path(),
+                "--output-file",
+                out_path,
+            ]
+            if exclude_newer:
+                cmd.extend(["--exclude-newer", exclude_newer])
+            cmd.append(in_path)
+        elif backend in ("piptools", "pip-tools", ""):
+            if exclude_newer:
+                logger.warning(
+                    "RIOT_PIP_COMPILE_EXCLUDE_NEWER is set but has no effect with the "
+                    "pip-tools backend; set RIOT_PIP_COMPILE_BACKEND=uv to enforce it."
+                )
+            # Only install pip-tools once per interpreter. A sentinel file
+            # keyed on the interpreter's venv path records that pip-tools is
+            # already present, avoiding a subprocess call on every
+            # requirements compilation.
+            sentinel = (
+                Path(DEFAULT_RIOT_PATH)
+                / f"pip-tools-{Path(self.py.venv_path).name}.installed"
             )
-            sentinel.touch()
-        cmd = [
-            self.py.path(),
-            "-m",
-            "piptools",
-            "compile",
-            "-q",
-            "--no-annotate",
-            "--allow-unsafe",
-            "--resolver=backtracking",
-            in_path,
-        ]
+            if not sentinel.exists():
+                subprocess.check_output(
+                    [
+                        self.py.path(),
+                        "-m",
+                        "pip",
+                        "install",
+                        "--upgrade",
+                        "pip<26",
+                        "pip-tools>=7.5.0,<8",
+                    ],
+                )
+                sentinel.touch()
+            cmd = [
+                self.py.path(),
+                "-m",
+                "piptools",
+                "compile",
+                "-q",
+                "--no-annotate",
+                "--allow-unsafe",
+                "--resolver=backtracking",
+                in_path,
+            ]
+        else:
+            raise ValueError(
+                f"Unknown RIOT_PIP_COMPILE_BACKEND={backend!r}; expected "
+                "'piptools' or 'uv'."
+            )
+
         logger.info(
-            "Compiling requirements file %s at %s.",
+            "Compiling requirements file %s at %s (backend=%s%s).",
             in_path,
             self.prefix,
+            backend or "piptools",
+            (
+                f", exclude_newer={exclude_newer}"
+                if (backend == "uv" and exclude_newer)
+                else ""
+            ),
         )
         with open(in_path, "w+b") as f:
             f.write(pkgs.encode("utf-8"))
@@ -328,6 +393,12 @@ class VenvInstance:
 
             out = subprocess.check_output(cmd)
 
+            if backend == "uv":
+                # uv writes to --output-file directly and prints nothing on
+                # stdout. Read the file back so the property contract (it
+                # returns the compiled lockfile contents) is preserved.
+                with open(out_path, "r") as out_f:
+                    return out_f.read()
             return out.decode("utf-8")
 
     @property
