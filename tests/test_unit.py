@@ -379,7 +379,7 @@ def test_get_package_name_from_env_var(monkeypatch):
     import os
     import tempfile
 
-    from riot.riot import get_package_name
+    from riot.runner import get_package_name
 
     with tempfile.TemporaryDirectory() as tmpdir:
         old_cwd = os.getcwd()
@@ -398,7 +398,7 @@ def test_get_package_name_from_pyproject_toml(monkeypatch, tmp_path):
     """Test get_package_name() parsing from pyproject.toml [project] table."""
     import os
 
-    from riot.riot import get_package_name
+    from riot.runner import get_package_name
 
     old_cwd = os.getcwd()
     try:
@@ -422,7 +422,7 @@ def test_get_package_name_env_var_takes_precedence(monkeypatch, tmp_path):
     """Test that RIOT_PACKAGE_NAME env var takes precedence over pyproject.toml."""
     import os
 
-    from riot.riot import get_package_name
+    from riot.runner import get_package_name
 
     old_cwd = os.getcwd()
     try:
@@ -450,7 +450,7 @@ def test_get_package_name_raises_without_config(monkeypatch, tmp_path):
 
     import pytest
 
-    from riot.riot import get_package_name
+    from riot.runner import get_package_name
 
     old_cwd = os.getcwd()
     try:
@@ -490,7 +490,7 @@ venv = Venv(
         Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')
 
         # Mock the Session.run method to verify wheel_path is passed
-        with patch("riot.riot.Session.run") as mock_run:
+        with patch("riot.session.Session.run") as mock_run:
             from click.testing import CliRunner
 
             from riot.cli import main
