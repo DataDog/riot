@@ -2,10 +2,11 @@ import logging
 import os
 import subprocess
 import sys
-import typing as t
+import tempfile
 from pathlib import Path
+import typing as t
 
-from .constants import ENCODING, SHELL, _T_CompletedProcess, _T_stdio
+from .constants import _T_CompletedProcess, _T_stdio, ENCODING, SHELL
 from .exceptions import CmdFailure
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,7 @@ def install_dev_pkg(
                 f"--pre --dest '{tmp_dir}' '{package_name}'"
             )
             try:
-                Session.run_cmd_venv(venv_path, download_cmd, env=dict(os.environ))
+                run_cmd_venv(venv_path, download_cmd, env=dict(os.environ))
             except CmdFailure as e:
                 logger.error(
                     "Wheel download failed. Ensure wheel exists at %s\n%s",
@@ -131,7 +132,7 @@ def install_dev_pkg(
             # Step 2: Install the downloaded wheel
             install_cmd = f"pip --disable-pip-version-check install '{tmp_dir}'/*.whl"
             try:
-                Session.run_cmd_venv(venv_path, install_cmd, env=dict(os.environ))
+                run_cmd_venv(venv_path, install_cmd, env=dict(os.environ))
                 dev_pkg_lockfile.touch()
             except CmdFailure as e:
                 logger.error("Wheel installation failed!\n%s", e.proc.stdout)
@@ -140,7 +141,7 @@ def install_dev_pkg(
         # Install in editable mode (current behavior)
         logger.info("Installing dev package (edit mode) in %s.", venv_path)
         try:
-            Session.run_cmd_venv(
+            run_cmd_venv(
                 venv_path,
                 "pip --disable-pip-version-check install -e .",
                 env=dict(os.environ),
