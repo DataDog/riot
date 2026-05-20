@@ -449,3 +449,174 @@ def test_requirements_skips_pip_tools_install_when_sentinel_exists(
 
     # pip install should not appear in calls
     assert not any(c[2:4] == ["-m", "pip"] for c in calls)
+
+
+def test_requirements_uses_uv_backend(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """RIOT_PIP_COMPILE_BACKEND=uv runs ``uv pip compile`` instead of pip-tools."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "uv")
+    monkeypatch.delenv("RIOT_PIP_COMPILE_EXCLUDE_NEWER", raising=False)
+
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    monkeypatch.setattr(
+        "riot.venv.shutil.which", lambda name: "/fake/uv" if name == "uv" else None
+    )
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        # uv writes the lockfile via --output-file; mimic that side effect.
+        if cmd[0] == "/fake/uv":
+            try:
+                out_idx = cmd.index("--output-file") + 1
+            except ValueError:
+                out_idx = None
+            if out_idx is not None:
+                with open(cmd[out_idx], "w") as f:
+                    f.write("# uv compiled output\nrequests==2.31.0\n")
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    result = venv.requirements
+
+    assert any(
+        c[0] == "/fake/uv" and c[1:4] == ["pip", "compile", "--quiet"] for c in calls
+    ), calls
+    # No pip-tools install fallback when uv is the backend
+    assert not any(c[2:4] == ["-m", "pip"] for c in calls)
+    assert "requests==2.31.0" in result
+
+
+def test_requirements_uv_backend_forwards_exclude_newer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """RIOT_PIP_COMPILE_EXCLUDE_NEWER is passed through to ``uv pip compile``."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "uv")
+    monkeypatch.setenv("RIOT_PIP_COMPILE_EXCLUDE_NEWER", "2026-05-18T00:00:00Z")
+
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+    monkeypatch.setattr(
+        "riot.venv.shutil.which", lambda name: "/fake/uv" if name == "uv" else None
+    )
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        if cmd[0] == "/fake/uv":
+            out_idx = cmd.index("--output-file") + 1
+            with open(cmd[out_idx], "w") as f:
+                f.write("requests==2.31.0\n")
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    _ = venv.requirements
+
+    uv_call = next(c for c in calls if c[0] == "/fake/uv")
+    assert "--exclude-newer" in uv_call
+    assert uv_call[uv_call.index("--exclude-newer") + 1] == "2026-05-18T00:00:00Z"
+
+
+def test_requirements_uv_backend_raises_when_uv_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """An uv backend request with no uv on PATH must fail loudly."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "uv")
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+    monkeypatch.setattr("riot.venv.shutil.which", lambda name: None)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    with pytest.raises(RuntimeError, match="uv"):
+        _ = venv.requirements
+
+
+def test_requirements_rejects_unknown_backend(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "poetry")
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    with pytest.raises(ValueError, match="poetry"):
+        _ = venv.requirements
+
+
+def test_requirements_piptools_warns_about_exclude_newer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """RIOT_PIP_COMPILE_EXCLUDE_NEWER is ignored with a warning for the pip-tools backend."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("RIOT_PIP_COMPILE_BACKEND", raising=False)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_EXCLUDE_NEWER", "2026-05-18T00:00:00Z")
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
+            return b"requests==2.31.0\n"
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    with caplog.at_level("WARNING", logger="riot.venv"):
+        _ = venv.requirements
+
+    assert any(
+        "RIOT_PIP_COMPILE_EXCLUDE_NEWER" in record.message for record in caplog.records
+    )
