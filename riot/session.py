@@ -9,8 +9,8 @@ import traceback
 import typing as t
 
 import click
-import pexpect
 from packaging.version import Version
+import pexpect
 from rich import print as rich_print
 from rich.pretty import Pretty
 from rich.status import Status
@@ -21,7 +21,7 @@ from .exceptions import CmdFailure
 from .interpreter import Interpreter
 from .runner import install_dev_pkg, run_cmd_venv
 from .utils import env_to_str
-from .venv import Venv, VenvInstanceResult, nspkgs
+from .venv import nspkgs, Venv, VenvInstanceResult
 
 logger = logging.getLogger(__name__)
 

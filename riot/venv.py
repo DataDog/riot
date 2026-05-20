@@ -4,8 +4,8 @@ import logging
 import os
 import shutil
 import subprocess
-import typing as t
 from contextlib import contextmanager
+import typing as t
 from hashlib import sha256
 from pathlib import Path
 

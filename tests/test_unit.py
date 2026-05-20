@@ -8,7 +8,6 @@ import sysconfig as _sysconfig
 from typing import Any, Dict, Generator, List
 
 import pytest
-
 from riot.interpreter import Interpreter
 from riot.runner import run_cmd
 from riot.session import Session
@@ -478,16 +477,14 @@ def test_wheel_path_cli_option_passes_through(monkeypatch, tmp_path):
         os.chdir(tmp_path)
 
         # Create a minimal riotfile
-        Path("riotfile.py").write_text(
-            """
+        Path("riotfile.py").write_text("""
 from riot import Venv
 venv = Venv(
     name="test",
     command="echo 'test'",
     pys=["3.8"],
 )
-"""
-        )
+""")
 
         # Create pyproject.toml
         Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')

@@ -2,8 +2,8 @@ import logging
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+import tempfile
 import typing as t
 
 from .constants import _T_CompletedProcess, _T_stdio, ENCODING, SHELL
