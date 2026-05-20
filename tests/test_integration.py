@@ -3,11 +3,16 @@ import pathlib
 import re
 import subprocess
 import sys
+import sysconfig as _sysconfig
 from typing import Any, Dict, Generator, Optional, Sequence, Union
 
 import pytest
-from riot.riot import _T_CompletedProcess
+from riot.constants import _T_CompletedProcess
 from typing_extensions import Protocol
+
+_ft_suffix = getattr(sys, "abiflags", None) or (
+    "t" if _sysconfig.get_config_var("Py_GIL_DISABLED") == 1 else ""
+)
 
 _T_Path = Union[str, "os.PathLike[Any]"]
 
@@ -59,9 +64,7 @@ def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
 
 def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot")
-    assert (
-        result.stderr
-        == """Usage: riot [OPTIONS] COMMAND [ARGS]...
+    assert result.stderr == """Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
   -f, --file PATH    [default: riotfile.py]
@@ -80,35 +83,28 @@ Commands:
   run           Run virtualenv instances with names matching a pattern.
   shell         Launch a shell inside a venv.
 """
-    )
     assert result.stdout == ""
     assert result.returncode == 2
 
     result = tmp_run("riot -P list")
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 """.lstrip()
-    )
     assert result.stdout == ""
     assert result.returncode == 2
 
 
 def test_bad_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --file rf.py", tmp_path)
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'rf.py' does not exist.
 """.lstrip()
-    )
     assert result.returncode == 2
 
     rf_path = tmp_path / "rf"
@@ -119,13 +115,10 @@ venv = Venv()
 """,
     )
     result = tmp_run("riot --file rf list")
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Failed to construct config file:
 Invalid file format for riotfile. Expected file with .py extension got 'rf'.
 """.lstrip()
-    )
     assert result.returncode == 1
 
     rf_path = tmp_path / "riotfile.py"
@@ -136,27 +129,19 @@ venv = Venv()typo1234
 """,
     )
     result = tmp_run("riot --file riotfile.py list")
-    assert (
-        """
+    assert """
 Failed to construct config file:
 Failed to parse riotfile 'riotfile.py'.
-""".lstrip()
-        in result.stderr
-    )
-    assert (
-        """
+""".lstrip() in result.stderr
+    assert """
 SyntaxError: invalid syntax
-""".strip()
-        in result.stderr
-    )
+""".strip() in result.stderr
     assert result.returncode == 1
 
 
 def test_help(tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --help")
-    assert (
-        result.stdout
-        == """
+    assert result.stdout == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -176,7 +161,6 @@ Commands:
   run           Run virtualenv instances with names matching a pattern.
   shell         Launch a shell inside a venv.
 """.lstrip()
-    )
     assert result.stderr == ""
     assert result.returncode == 0
 
@@ -190,15 +174,12 @@ def test_version(tmp_run: _T_TmpRun) -> None:
 
 def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot -P list")
-    assert (
-        result.stderr
-        == """
+    assert result.stderr == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 """.lstrip()
-    )
     assert result.returncode == 2
 
     rf_path = tmp_path / "riotfile.py"
@@ -578,12 +559,9 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot run -s -pDNE test")
-    assert (
-        """
+    assert """
 FileNotFoundError: Python interpreter DNE not found
-""".strip()
-        in result.stderr
-    )
+""".strip() in result.stderr
     assert result.returncode == 1
 
 
@@ -609,9 +587,9 @@ venv = Venv(
         tmp_path
         / os.path.join(
             ".riot",
-            f"venv_py{version}",
+            f"venv_py{version}{_ft_suffix}",
             "lib",
-            f"python{py_dot_version}",
+            f"python{py_dot_version}{_ft_suffix}",
             "site-packages",
         )
     )
@@ -638,15 +616,15 @@ venv = Venv(
 
     version = "".join((str(_) for _ in sys.version_info[:3]))
 
-    venv_name = f"venv_py{version}_pip_pytest"
-    parent_venv_name = f"venv_py{version}_pip"
-    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2]))
+    venv_name = f"venv_py{version}{_ft_suffix}_pip_pytest"
+    parent_venv_name = f"venv_py{version}{_ft_suffix}_pip"
+    py_dot_version = ".".join((str(_) for _ in sys.version_info[:2])) + _ft_suffix
 
     py_venv_path = str(
         tmp_path
         / os.path.join(
             ".riot",
-            f"venv_py{version}",
+            f"venv_py{version}{_ft_suffix}",
             "lib",
             "python{}".format(py_dot_version),
             "site-packages",
@@ -704,11 +682,11 @@ venv = Venv(
     env = dict(_.split("=", maxsplit=1) for _ in result.stdout.splitlines() if "=" in _)
     assert result.returncode == 0, result.stderr
 
-    venv_name = "venv_py{}_pip_pytest".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
+    venv_name = "venv_py{}{}_pip_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3])), _ft_suffix
     )
-    parent_venv_name = "venv_py{}_pip".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
+    parent_venv_name = "venv_py{}{}_pip".format(
+        "".join((str(_) for _ in sys.version_info[:3])), _ft_suffix
     )
 
     parent_venv_path = str(
@@ -779,8 +757,8 @@ venv = Venv(
 """,
     )
     result = tmp_run("riot -Pv run -s child")
-    venv_path = tmp_path / ".riot/venv_py{}_pip_pytest".format(
-        "".join((str(_) for _ in sys.version_info[:3]))
+    venv_path = tmp_path / ".riot/venv_py{}{}_pip_pytest".format(
+        "".join((str(_) for _ in sys.version_info[:3])), _ft_suffix
     )
     assert f"Creating virtualenv '{venv_path}'" in result.stderr, result.stderr
     assert (
@@ -824,11 +802,11 @@ venv = Venv(
     result = tmp_run("riot -vd --pipe shell '#0'", input="exit\n")
     assert (
         re.search(
-            r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
+            r"Setting venv path to .+[.]riot/venv_py[0-9]+t?_requests", result.stderr
         )
         is None
     )
-    assert re.search(r"Setting venv path to .+[.]riot/venv_py[0-9]+", result.stderr)
+    assert re.search(r"Setting venv path to .+[.]riot/venv_py[0-9]+t?", result.stderr)
 
     assert result.returncode == 0, result.stderr
 
@@ -866,7 +844,7 @@ setup(
     )
     result = tmp_run("riot -vd --pipe shell '#0'", input="exit\n")
     assert re.search(
-        r"Setting venv path to .+[.]riot/venv_py[0-9]+_requests", result.stderr
+        r"Setting venv path to .+[.]riot/venv_py[0-9]+t?_requests", result.stderr
     )
     assert result.returncode == 0, result.stderr
 
@@ -892,7 +870,7 @@ venv = Venv(
 
     assert result.returncode == 0, result.stderr
 
-    assert re.search(r"venv_py[0-9]+_requests", result.stderr) is None
+    assert re.search(r"venv_py[0-9]+t?_requests", result.stderr) is None
     assert "TEST OK" in result.stdout
 
 
@@ -945,9 +923,7 @@ venv = Venv(
     command="env",
     venvs=[Venv(pys=["{}"], name="child")]
 )
-""".format(
-            version
-        ),
+""".format(version),
     )
     _hash = tmp_run("riot list --hash-only child").stdout.strip("\n")
     result = tmp_run("riot run -p {} {}".format(version, _hash))

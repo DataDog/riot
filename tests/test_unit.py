@@ -1,18 +1,26 @@
 import os
+import pathlib
 import re
 import shutil
 import subprocess
 import sys
-from typing import Dict, Generator
+import sysconfig as _sysconfig
+from typing import Any, Dict, Generator, List
 
 import pytest
-from riot.riot import Interpreter, run_cmd, Session, Venv, VenvInstance
-from tests.test_cli import DATA_DIR
 
+from riot.interpreter import Interpreter
+from riot.runner import run_cmd
+from riot.session import Session
+from riot.venv import Venv, VenvInstance
+from tests.test_cli import DATA_DIR
 
 RIOT_TESTS_PATH = os.path.join(os.path.dirname(__file__), ".riot")
 default_venv_pattern = re.compile(r".*")
 current_py_hint = "%s.%s" % (sys.version_info.major, sys.version_info.minor)
+_ft_suffix = getattr(sys, "abiflags", None) or (
+    "t" if _sysconfig.get_config_var("Py_GIL_DISABLED") == 1 else ""
+)
 
 
 @pytest.fixture
@@ -66,7 +74,7 @@ def _get_env(env_name: str) -> Dict[str, str]:
     """Return a dictionary with riot venv paths to add to the environment."""
     venv_path = os.path.join(RIOT_TESTS_PATH, env_name)
     venv_site_packages_path = os.path.join(
-        venv_path, "lib", f"python{current_py_hint}", "site-packages"
+        venv_path, "lib", f"python{current_py_hint}{_ft_suffix}", "site-packages"
     )
 
     venv_python_path = os.path.join(venv_path, "bin")
@@ -120,10 +128,15 @@ def test_interpreter(v1, v2, equal):
         assert repr(Interpreter(v1)) != repr(Interpreter(v2))
 
 
+def test_interpreter_abiflags(current_interpreter: Interpreter) -> None:
+    assert current_interpreter.abiflags() == _ft_suffix
+
+
 def test_interpreter_venv_path(current_interpreter: Interpreter) -> None:
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    suffix = _ft_suffix
     assert current_interpreter.venv_path == os.path.abspath(
-        os.path.join(".riot", "venv_py{}".format(py_version))
+        os.path.join(".riot", "venv_py{}{}".format(py_version, suffix))
     )
 
 
@@ -136,8 +149,9 @@ def test_venv_instance_venv_path(current_interpreter: Interpreter) -> None:
     )
 
     py_version = "".join((str(_) for _ in sys.version_info[:3]))
+    suffix = _ft_suffix
     assert venv.prefix == os.path.abspath(
-        os.path.join(".riot", "venv_py{}_pip".format(py_version))
+        os.path.join(".riot", "venv_py{}{}_pip".format(py_version, suffix))
     )
 
 
@@ -248,10 +262,11 @@ def _get_base_env_path() -> str:
     return os.path.abspath(
         os.path.join(
             RIOT_TESTS_PATH,
-            "venv_py{}{}{}".format(
+            "venv_py{}{}{}{}".format(
                 sys.version_info.major,
                 sys.version_info.minor,
                 sys.version_info.micro,
+                _ft_suffix,
             ),
         )
     )
@@ -273,7 +288,10 @@ def test_session_run(session_virtualenv: Session) -> None:
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     # Check exists and is empty of packages
     result = _get_pip_freeze(command_env)
@@ -292,7 +310,10 @@ def test_session_run_check_environment_modifications(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
     # Check exists and is empty of packages
@@ -313,7 +334,10 @@ def test_session_run_check_environment_modifications_and_recreate_false(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
 
@@ -336,7 +360,10 @@ def test_session_run_check_environment_modifications_and_recreate_true(
     """
     session_virtualenv.run(re.compile(""), re.compile(""), False, False)
 
-    env_name = "venv_py%s%s%s_itsdangerous110_isort5101_six1150" % sys.version_info[:3]
+    env_name = "venv_py%s%s%s%s_itsdangerous110_isort5101_six1150" % (
+        *sys.version_info[:3],
+        _ft_suffix,
+    )
     command_env = _get_env(env_name)
     _run_pip_install("itsdangerous==0.24", command_env)
 
@@ -350,8 +377,9 @@ def test_session_run_check_environment_modifications_and_recreate_true(
 
 def test_get_package_name_from_env_var(monkeypatch):
     """Test get_package_name() with RIOT_PACKAGE_NAME environment variable."""
-    import tempfile
     import os
+    import tempfile
+
     from riot.riot import get_package_name
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -370,6 +398,7 @@ def test_get_package_name_from_env_var(monkeypatch):
 def test_get_package_name_from_pyproject_toml(monkeypatch, tmp_path):
     """Test get_package_name() parsing from pyproject.toml [project] table."""
     import os
+
     from riot.riot import get_package_name
 
     old_cwd = os.getcwd()
@@ -393,6 +422,7 @@ version = "1.0.0"
 def test_get_package_name_env_var_takes_precedence(monkeypatch, tmp_path):
     """Test that RIOT_PACKAGE_NAME env var takes precedence over pyproject.toml."""
     import os
+
     from riot.riot import get_package_name
 
     old_cwd = os.getcwd()
@@ -418,8 +448,10 @@ name = "file-package"
 def test_get_package_name_raises_without_config(monkeypatch, tmp_path):
     """Test get_package_name() raises RuntimeError when no config is found."""
     import os
-    from riot.riot import get_package_name
+
     import pytest
+
+    from riot.riot import get_package_name
 
     old_cwd = os.getcwd()
     try:
@@ -462,8 +494,9 @@ venv = Venv(
 
         # Mock the Session.run method to verify wheel_path is passed
         with patch("riot.riot.Session.run") as mock_run:
-            from riot.cli import main
             from click.testing import CliRunner
+
+            from riot.cli import main
 
             runner = CliRunner()
             # Test with wheel-path flag
@@ -474,3 +507,251 @@ venv = Venv(
             assert result.exit_code == 0 or "wheel_path" in str(mock_run.call_args)
     finally:
         os.chdir(old_cwd)
+
+
+def test_requirements_upgrades_compatible_pip_tools(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """When no sentinel exists, pip-tools should be installed and the sentinel created."""
+    monkeypatch.chdir(tmp_path)
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
+            return b"# compiled output\nrequests==2.31.0\n"
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    _ = venv.requirements
+
+    assert calls[0] == [
+        "/fake/python",
+        "-m",
+        "pip",
+        "install",
+        "--upgrade",
+        "pip<26",
+        "pip-tools>=7.5.0,<8",
+    ]
+
+
+def test_requirements_skips_pip_tools_install_when_sentinel_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """When the sentinel file exists, the pip install should be skipped."""
+    monkeypatch.chdir(tmp_path)
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    # Pre-create the sentinel to simulate pip-tools already being installed
+    sentinel_dir = tmp_path / ".riot"
+    sentinel_dir.mkdir()
+    venv_basename = os.path.basename(interpreter.venv_path)
+    (sentinel_dir / f"pip-tools-{venv_basename}.installed").touch()
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
+            return b"# compiled output\nrequests==2.31.0\n"
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    _ = venv.requirements
+
+    # pip install should not appear in calls
+    assert not any(c[2:4] == ["-m", "pip"] for c in calls)
+
+
+def test_requirements_uses_uv_backend(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """RIOT_PIP_COMPILE_BACKEND=uv runs ``uv pip compile`` instead of pip-tools."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "uv")
+    monkeypatch.delenv("RIOT_PIP_COMPILE_EXCLUDE_NEWER", raising=False)
+
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    monkeypatch.setattr(
+        "riot.venv.shutil.which", lambda name: "/fake/uv" if name == "uv" else None
+    )
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        # uv writes the lockfile via --output-file; mimic that side effect.
+        if cmd[0] == "/fake/uv":
+            try:
+                out_idx = cmd.index("--output-file") + 1
+            except ValueError:
+                out_idx = None
+            if out_idx is not None:
+                with open(cmd[out_idx], "w") as f:
+                    f.write("# uv compiled output\nrequests==2.31.0\n")
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    result = venv.requirements
+
+    assert any(
+        c[0] == "/fake/uv" and c[1:4] == ["pip", "compile", "--quiet"] for c in calls
+    ), calls
+    # No pip-tools install fallback when uv is the backend
+    assert not any(c[2:4] == ["-m", "pip"] for c in calls)
+    assert "requests==2.31.0" in result
+
+
+def test_requirements_uv_backend_forwards_exclude_newer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """RIOT_PIP_COMPILE_EXCLUDE_NEWER is passed through to ``uv pip compile``."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "uv")
+    monkeypatch.setenv("RIOT_PIP_COMPILE_EXCLUDE_NEWER", "2026-05-18T00:00:00Z")
+
+    calls: List[List[str]] = []
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+    monkeypatch.setattr(
+        "riot.venv.shutil.which", lambda name: "/fake/uv" if name == "uv" else None
+    )
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        calls.append(cmd)
+        if cmd[0] == "/fake/uv":
+            out_idx = cmd.index("--output-file") + 1
+            with open(cmd[out_idx], "w") as f:
+                f.write("requests==2.31.0\n")
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    _ = venv.requirements
+
+    uv_call = next(c for c in calls if c[0] == "/fake/uv")
+    assert "--exclude-newer" in uv_call
+    assert uv_call[uv_call.index("--exclude-newer") + 1] == "2026-05-18T00:00:00Z"
+
+
+def test_requirements_uv_backend_raises_when_uv_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """An uv backend request with no uv on PATH must fail loudly."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "uv")
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+    monkeypatch.setattr("riot.venv.shutil.which", lambda name: None)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    with pytest.raises(RuntimeError, match="uv"):
+        _ = venv.requirements
+
+
+def test_requirements_rejects_unknown_backend(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_BACKEND", "poetry")
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    with pytest.raises(ValueError, match="poetry"):
+        _ = venv.requirements
+
+
+def test_requirements_piptools_warns_about_exclude_newer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """RIOT_PIP_COMPILE_EXCLUDE_NEWER is ignored with a warning for the pip-tools backend."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("RIOT_PIP_COMPILE_BACKEND", raising=False)
+    monkeypatch.setenv("RIOT_PIP_COMPILE_EXCLUDE_NEWER", "2026-05-18T00:00:00Z")
+
+    interpreter = Interpreter("3")
+    monkeypatch.setattr(interpreter, "path", lambda: "/fake/python")
+    monkeypatch.setattr(interpreter, "version", lambda: "3.14.2")
+
+    def _fake_check_output(cmd: List[str], *args: Any, **kwargs: Any) -> bytes:
+        if cmd[:4] == ["/fake/python", "-m", "piptools", "compile"]:
+            return b"requests==2.31.0\n"
+        return b""
+
+    monkeypatch.setattr("riot.venv.subprocess.check_output", _fake_check_output)
+
+    venv = VenvInstance(
+        venv=Venv(name="test", command="echo test"),
+        env={},
+        pkgs={"requests": ""},
+        py=interpreter,
+    )
+
+    with caplog.at_level("WARNING", logger="riot.venv"):
+        _ = venv.requirements
+
+    assert any(
+        "RIOT_PIP_COMPILE_EXCLUDE_NEWER" in record.message for record in caplog.records
+    )

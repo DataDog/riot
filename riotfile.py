@@ -6,7 +6,17 @@ venv = Venv(
         Venv(
             name="test",
             command="pytest -n auto --dist loadscope {cmdargs}",
-            pys=["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"],
+            pys=[
+                "3.8",
+                "3.9",
+                "3.10",
+                "3.11",
+                "3.12",
+                "3.13",
+                "3.13t",
+                "3.14",
+                "3.14t",
+            ],
             pkgs={
                 "pytest": latest,
                 "pytest-cov": latest,
@@ -22,7 +32,7 @@ venv = Venv(
             venvs=[
                 Venv(
                     name="black",
-                    command="black {cmdargs}",
+                    command="black . {cmdargs}",
                 ),
                 Venv(
                     name="fmt",

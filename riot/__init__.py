@@ -1,5 +1,6 @@
 __all__ = ["latest", "Session", "Venv"]
 
-from .riot import Session, Venv
+from .session import Session
+from .venv import Venv
 
 latest = ""

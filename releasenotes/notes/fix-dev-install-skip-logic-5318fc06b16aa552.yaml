@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fixed a logic bug where the dev package was incorrectly installed when
+    either ``skip_dev_install`` or ``skip_deps`` was set, but not both. The
+    dev package is now correctly skipped if either flag is set.

@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Bump ``virtualenv`` to ``>=20.36.1,<21`` to address
+    ``GHSA-597g-3phw-6986``.

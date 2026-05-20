@@ -29,13 +29,13 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "click>=7",
-        "virtualenv<=20.26.6",
+        "virtualenv>=20.36.1,<21",
         "rich",
         "pexpect",
         "packaging",
         "setuptools; python_version>='3.12'",
     ],
-    setup_requires=["setuptools_scm"],
+    setup_requires=["setuptools_scm~=9.2.2"],
     use_scm_version=True,
     # Required for mypy compatibility, see
     # https://mypy.readthedocs.io/en/stable/installed_packages.html#making-pep-561-compatible-packages
