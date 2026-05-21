@@ -118,7 +118,7 @@ def install_dev_pkg(
         with tempfile.TemporaryDirectory() as tmp_dir:
             download_cmd = (
                 f"pip --disable-pip-version-check download "
-                f"--no-index --no-deps --find-links '{wheel_path}' "
+                f"--no-index --no-deps {find_links_flag} "
                 f"--pre --dest '{tmp_dir}' '{package_name}'"
             )
             try:
