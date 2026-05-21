@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Add an opt-in ``uv pip compile`` backend (``RIOT_PIP_COMPILE_BACKEND=uv``) that forwards ``RIOT_PIP_COMPILE_EXCLUDE_NEWER`` as ``--exclude-newer``.

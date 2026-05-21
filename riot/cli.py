@@ -80,9 +80,17 @@ RECOMPILE_REQS_ARG = click.option(
     default=False,
     help="Pipe mode. Makes riot emit plain output.",
 )
+@click.option(
+    "--wheel-path",
+    "wheel_path",
+    type=str,
+    default=None,
+    envvar="RIOT_WHEEL_PATH",
+    help="Path or URL to wheel files. When set, installs from wheels instead of editable mode.",
+)
 @click.version_option(__version__)
 @click.pass_context
-def main(ctx, riotfile, log_level, pipe_mode):
+def main(ctx, riotfile, log_level, pipe_mode, wheel_path):
     if pipe_mode:
         if log_level:
             logging.basicConfig(level=log_level)
@@ -96,6 +104,7 @@ def main(ctx, riotfile, log_level, pipe_mode):
 
     ctx.ensure_object(dict)
     ctx.obj["pipe"] = pipe_mode
+    ctx.obj["wheel_path"] = wheel_path
 
     # Check if file exists first (before checking for subcommand)
     import os
@@ -168,9 +177,9 @@ can be used for the run command to avoid having to install the local package."""
 @SKIP_BASE_INSTALL_ARG
 @PYTHON_VERSIONS_ARG
 @PATTERN_ARG
-@WHEEL_PATH_ARG
 @click.pass_context
-def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern, wheel_path):
+def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
+    wheel_path = ctx.obj.get("wheel_path")
     ctx.obj["session"].generate_base_venvs(
         pattern=re.compile(pattern),
         recreate=recreate_venvs,
@@ -208,6 +217,7 @@ def run(
     recompile_reqs,
     wheel_path,
 ):
+    wheel_path = ctx.obj.get("wheel_path")
     ctx.obj["session"].run(
         pattern=re.compile(pattern),
         venv_pattern=re.compile(venv_pattern),
@@ -228,13 +238,26 @@ def run(
 @click.option("--pass-env", "pass_env", is_flag=True, default=False)
 @click.pass_context
 def shell(ctx, ident, pass_env):
+    wheel_path = ctx.obj.get("wheel_path")
     ctx.obj["session"].shell(
         ident=ident,
         pass_env=pass_env,
+        wheel_path=wheel_path,
     )
 
 
-@main.command("requirements", help="""Cache requirements for a venv.""")
+@main.command(
+    "requirements",
+    help=(
+        "Cache requirements for a venv.\n\n"
+        "The compiler is selectable via the RIOT_PIP_COMPILE_BACKEND env var: "
+        "'piptools' (default) or 'uv' (requires the uv executable on PATH).\n\n"
+        "When RIOT_PIP_COMPILE_BACKEND=uv, the RIOT_PIP_COMPILE_EXCLUDE_NEWER "
+        "env var is forwarded as --exclude-newer=<value> to 'uv pip compile' "
+        "(useful for supply-chain cooldown). Ignored with a warning when the "
+        "backend is pip-tools."
+    ),
+)
 @click.argument("ident", type=str)
 @click.pass_context
 def requirements(ctx, ident):

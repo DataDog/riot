@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Add support for installing from pre-built wheels instead of editable mode via the
+    ``--wheel-path`` global option and ``RIOT_WHEEL_PATH`` environment variable.
+    See https://riot.readthedocs.io/en/latest/wheel_sources.html for details.
