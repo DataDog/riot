@@ -5,6 +5,7 @@
    self
    quickstart
    configuration
+   wheel_sources
    usage
    release_notes
    contributing

@@ -483,6 +483,7 @@ class VenvInstance:
         skip_deps: bool = False,
         recompile_reqs: bool = False,
         child_was_installed: bool = False,
+        wheel_path: t.Optional[str] = None,
     ) -> None:
         # Propagate the interpreter down the parenting relation
         self.py = py = py or self.py
@@ -506,7 +507,7 @@ class VenvInstance:
             if self.created:
                 py.create_venv(recreate, venv_path)
                 if not (self.venv.skip_dev_install or skip_deps):
-                    install_dev_pkg(venv_path, force=True)
+                    install_dev_pkg(venv_path, force=True, wheel_path=wheel_path)
 
             pkg_str = self.pkg_str
             compiled_requirements_file = (
@@ -541,7 +542,10 @@ class VenvInstance:
 
         if not self.created and self.parent is not None:
             self.parent.prepare(
-                env, py, child_was_installed=installed or exists or child_was_installed
+                env,
+                py,
+                child_was_installed=installed or exists or child_was_installed,
+                wheel_path=wheel_path,
             )
 
 

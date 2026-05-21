@@ -78,6 +78,7 @@ class Session:
         skip_missing: bool = False,
         exit_first: bool = False,
         recompile_reqs: bool = False,
+        wheel_path: t.Optional[str] = None,
     ) -> None:
         results = []
 
@@ -86,6 +87,7 @@ class Session:
             recreate=recreate_venvs,
             skip_deps=skip_base_install,
             pythons=pythons,
+            wheel_path=wheel_path,
         )
 
         for inst in self.venv.instances():
@@ -153,6 +155,7 @@ class Session:
                 skip_deps=skip_base_install or inst.venv.skip_dev_install,
                 recreate=recreate_venvs,
                 recompile_reqs=recompile_reqs,
+                wheel_path=wheel_path,
             )
 
             pythonpath = inst.pythonpath
@@ -316,6 +319,7 @@ class Session:
         recreate: bool,
         skip_deps: bool,
         pythons: t.Optional[t.Set[Interpreter]],
+        wheel_path: t.Optional[str] = None,
     ) -> None:
         """Generate all the required base venvs."""
         # Find all the python interpreters used.
@@ -352,7 +356,7 @@ class Session:
                     continue
 
                 # Install the dev package into the base venv.
-                install_dev_pkg(py.venv_path, force=True)
+                install_dev_pkg(py.venv_path, force=True, wheel_path=wheel_path)
 
     def _venvs_matching_identifier(self, identifier):
         for n, inst in enumerate(self.venv.instances()):
@@ -371,7 +375,9 @@ class Session:
             with Status("Producing requirements.txt"):
                 _ = inst.requirements
 
-    def shell(self, ident, pass_env):
+    def shell(
+        self, ident: str, pass_env: bool, wheel_path: t.Optional[str] = None
+    ) -> None:
         for inst, venv_path in self._venvs_matching_identifier(ident):
             logger.info("Launching shell inside venv instance %s", inst)
             logger.debug("Setting venv path to %s", venv_path)
@@ -386,7 +392,7 @@ class Session:
             # Should we expect the venv to be ready?
             with Status("Preparing shell virtual environment"):
                 inst.py.create_venv(False)
-                inst.prepare(env)
+                inst.prepare(env, wheel_path=wheel_path)
 
             pythonpath = inst.pythonpath
             if pythonpath:

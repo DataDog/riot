@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import typing as t
 
 from .constants import _T_CompletedProcess, _T_stdio, ENCODING, SHELL
@@ -86,7 +87,9 @@ def run_cmd_venv(
     return run_cmd(args, stdout=stdout, executable=executable, env=env, shell=True)
 
 
-def install_dev_pkg(venv_path: str, force: bool = False) -> None:
+def install_dev_pkg(
+    venv_path: str, force: bool = False, wheel_path: t.Optional[str] = None
+) -> None:
     dev_pkg_lockfile = Path(venv_path) / ".riot-dev-pkg-installed"
     if dev_pkg_lockfile.exists() and not force:
         logger.info("Dev package already installed. Skipping.")
@@ -99,14 +102,93 @@ def install_dev_pkg(venv_path: str, force: bool = False) -> None:
         logger.warning("No Python setup file found. Skipping dev package installation.")
         return
 
-    logger.info("Installing dev package (edit mode) in %s.", venv_path)
-    try:
-        run_cmd_venv(
-            venv_path,
-            "pip --disable-pip-version-check install -e .",
-            env=dict(os.environ),
+    find_links_flag = f"--find-links {wheel_path}" if wheel_path else ""
+
+    # Determine installation method
+    if wheel_path:
+        # Install from wheels (two-step process to ensure we use only wheels from source)
+        package_name = get_package_name()
+        logger.info(
+            "Installing dev package from wheels: %s (source: %s)",
+            package_name,
+            wheel_path,
         )
-        dev_pkg_lockfile.touch()
-    except CmdFailure as e:
-        logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
-        sys.exit(1)
+
+        # Step 1: Download wheel to temp directory using --no-index to avoid PyPI
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            download_cmd = (
+                f"pip --disable-pip-version-check download "
+                f"--no-index --no-deps {find_links_flag} "
+                f"--pre --dest '{tmp_dir}' '{package_name}'"
+            )
+            try:
+                run_cmd_venv(venv_path, download_cmd, env=dict(os.environ))
+            except CmdFailure as e:
+                logger.error(
+                    "Wheel download failed. Ensure wheel exists at %s\n%s",
+                    wheel_path,
+                    e.proc.stdout,
+                )
+
+            # Step 2: Install the downloaded wheel
+            install_cmd = f"pip --disable-pip-version-check install {find_links_flag} '{tmp_dir}'/*.whl"
+            try:
+                run_cmd_venv(venv_path, install_cmd, env=dict(os.environ))
+                dev_pkg_lockfile.touch()
+            except CmdFailure as e:
+                logger.error("Wheel installation failed!\n%s", e.proc.stdout)
+
+    if not dev_pkg_lockfile.exists():
+        # Install in editable mode (legacy behavior)
+
+        logger.info("Installing dev package (edit mode) in %s.", venv_path)
+        try:
+            run_cmd_venv(
+                venv_path,
+                f"pip --disable-pip-version-check install {find_links_flag} -e .",
+                env=dict(os.environ),
+            )
+            dev_pkg_lockfile.touch()
+        except CmdFailure as e:
+            logger.error("Dev install failed, aborting!\n%s", e.proc.stdout)
+            sys.exit(1)
+
+
+def get_package_name() -> str:
+    """Extract package name from pyproject.toml or environment variable.
+
+    Returns:
+        str: The package name
+
+    Raises:
+        RuntimeError: If package name cannot be determined
+    """
+    # Check environment variable first
+    env_pkg_name = os.getenv("RIOT_PACKAGE_NAME")
+    if env_pkg_name:
+        return env_pkg_name
+
+    # Try pyproject.toml [project] table
+    pyproject_path = Path("pyproject.toml")
+    if pyproject_path.exists():
+        # Python 3.11+ has tomllib built-in
+        tomllib: t.Any = None
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            try:
+                import tomli as tomllib  # type: ignore[no-redef]
+            except ImportError:
+                pass  # Fall through to error
+
+        if tomllib is not None:
+            with open(pyproject_path, "rb") as f:
+                data = tomllib.load(f)
+                # Check [project] table
+                if "project" in data and "name" in data["project"]:
+                    return t.cast(str, data["project"]["name"])
+
+    raise RuntimeError(
+        "Could not determine package name from pyproject.toml [project] table. "
+        "Ensure pyproject.toml exists with [project] name, or set RIOT_PACKAGE_NAME environment variable."
+    )
