@@ -129,7 +129,6 @@ def install_dev_pkg(
                     wheel_path,
                     e.proc.stdout,
                 )
-                sys.exit(1)
 
             # Step 2: Install the downloaded wheel
             install_cmd = f"pip --disable-pip-version-check install {find_links_flag} '{tmp_dir}'/*.whl"
@@ -138,8 +137,8 @@ def install_dev_pkg(
                 dev_pkg_lockfile.touch()
             except CmdFailure as e:
                 logger.error("Wheel installation failed!\n%s", e.proc.stdout)
-                sys.exit(1)
-    else:
+
+    if not dev_pkg_lockfile.exists():
         # Install in editable mode (legacy behavior)
 
         logger.info("Installing dev package (edit mode) in %s.", venv_path)
