@@ -1,13 +1,13 @@
+from contextlib import contextmanager
 import dataclasses
 import functools
+from hashlib import sha256
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import typing as t
-from contextlib import contextmanager
-from hashlib import sha256
-from pathlib import Path
 
 from .constants import DEFAULT_RIOT_PATH
 from .exceptions import CmdFailure

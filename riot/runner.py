@@ -1,12 +1,12 @@
 import logging
 import os
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import typing as t
-from pathlib import Path
 
-from .constants import ENCODING, SHELL, _T_CompletedProcess, _T_stdio
+from .constants import _T_CompletedProcess, _T_stdio, ENCODING, SHELL
 from .exceptions import CmdFailure
 
 logger = logging.getLogger(__name__)

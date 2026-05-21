@@ -31,7 +31,6 @@ class InterpreterParamType(click.ParamType):
 
 PATTERN_ARG = click.argument("pattern", envvar="RIOT_PATTERN", default=r".*")
 VENV_PATTERN_ARG = click.option("--venv-pattern", "venv_pattern", default=r".*")
-WHEEL_PATH_ARG = click.option("--wheel-path", "wheel_path", default=r"")
 RECREATE_VENVS_ARG = click.option(
     "-r",
     "--recreate-venvs",
@@ -202,7 +201,6 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @PATTERN_ARG
 @VENV_PATTERN_ARG
 @RECOMPILE_REQS_ARG
-@WHEEL_PATH_ARG
 @click.pass_context
 def run(
     ctx,
@@ -215,7 +213,6 @@ def run(
     pattern,
     venv_pattern,
     recompile_reqs,
-    wheel_path,
 ):
     wheel_path = ctx.obj.get("wheel_path")
     ctx.obj["session"].run(
