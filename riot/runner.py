@@ -102,6 +102,8 @@ def install_dev_pkg(
         logger.warning("No Python setup file found. Skipping dev package installation.")
         return
 
+    find_links_flag = f"--find-links {wheel_path}" if wheel_path else ""
+
     # Determine installation method
     if wheel_path:
         # Install from wheels (two-step process to ensure we use only wheels from source)
@@ -130,7 +132,7 @@ def install_dev_pkg(
                 sys.exit(1)
 
             # Step 2: Install the downloaded wheel
-            install_cmd = f"pip --disable-pip-version-check install '{tmp_dir}'/*.whl"
+            install_cmd = f"pip --disable-pip-version-check install {find_links_flag} '{tmp_dir}'/*.whl"
             try:
                 run_cmd_venv(venv_path, install_cmd, env=dict(os.environ))
                 dev_pkg_lockfile.touch()
@@ -138,12 +140,13 @@ def install_dev_pkg(
                 logger.error("Wheel installation failed!\n%s", e.proc.stdout)
                 sys.exit(1)
     else:
-        # Install in editable mode (current behavior)
+        # Install in editable mode (legacy behavior)
+
         logger.info("Installing dev package (edit mode) in %s.", venv_path)
         try:
             run_cmd_venv(
                 venv_path,
-                "pip --disable-pip-version-check install -e .",
+                f"pip --disable-pip-version-check install {find_links_flag} -e .",
                 env=dict(os.environ),
             )
             dev_pkg_lockfile.touch()
