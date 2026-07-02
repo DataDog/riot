@@ -506,6 +506,88 @@ venv = Venv(
         os.chdir(old_cwd)
 
 
+def _make_cmd_failure():
+    from riot.exceptions import CmdFailure
+
+    proc = subprocess.CompletedProcess(args=["pip"], returncode=1, stdout="boom")
+    return CmdFailure("cmd failed", proc)
+
+
+def test_install_dev_pkg_exits_when_wheel_download_fails(monkeypatch, tmp_path):
+    """A failed wheel download must abort, never fall back to an editable install."""
+    from unittest.mock import patch
+
+    from riot.runner import install_dev_pkg
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        pathlib.Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')
+
+        with patch("riot.runner.run_cmd_venv", side_effect=_make_cmd_failure()) as mock_run:
+            with pytest.raises(SystemExit) as exc_info:
+                install_dev_pkg(str(tmp_path / "venv"), force=True, wheel_path="/tmp/wheels")
+
+            assert exc_info.value.code == 1
+            # Only the download step should have been attempted -- no
+            # fallback `pip install -e .` call.
+            assert mock_run.call_count == 1
+            assert "download" in mock_run.call_args.args[1]
+    finally:
+        os.chdir(old_cwd)
+
+
+def test_install_dev_pkg_exits_when_wheel_install_fails(monkeypatch, tmp_path):
+    """A failed wheel install must abort, never fall back to an editable install."""
+    from unittest.mock import patch
+
+    from riot.runner import install_dev_pkg
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        pathlib.Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')
+
+        # First call (download) succeeds, second call (install) fails.
+        with patch(
+            "riot.runner.run_cmd_venv", side_effect=[None, _make_cmd_failure()]
+        ) as mock_run:
+            with pytest.raises(SystemExit) as exc_info:
+                install_dev_pkg(str(tmp_path / "venv"), force=True, wheel_path="/tmp/wheels")
+
+            assert exc_info.value.code == 1
+            assert mock_run.call_count == 2
+            assert "install" in mock_run.call_args.args[1]
+    finally:
+        os.chdir(old_cwd)
+
+
+def test_install_dev_pkg_wheel_success_skips_editable_fallback(monkeypatch, tmp_path):
+    """A successful wheel install must not also attempt an editable install."""
+    from unittest.mock import patch
+
+    from riot.runner import install_dev_pkg
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        pathlib.Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')
+        venv_path = tmp_path / "venv"
+        venv_path.mkdir()
+
+        with patch("riot.runner.run_cmd_venv") as mock_run:
+            install_dev_pkg(str(venv_path), force=True, wheel_path="/tmp/wheels")
+
+            assert mock_run.call_count == 2
+            download_cmd, install_cmd = (c.args[1] for c in mock_run.call_args_list)
+            assert "download" in download_cmd
+            assert "install" in install_cmd
+            assert "-e ." not in install_cmd
+            assert (venv_path / ".riot-dev-pkg-installed").exists()
+    finally:
+        os.chdir(old_cwd)
+
+
 def test_requirements_upgrades_compatible_pip_tools(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:

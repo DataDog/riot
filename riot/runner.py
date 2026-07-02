@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -102,7 +103,7 @@ def install_dev_pkg(
         logger.warning("No Python setup file found. Skipping dev package installation.")
         return
 
-    find_links_flag = f"--find-links {wheel_path}" if wheel_path else ""
+    find_links_flag = f"--find-links {shlex.quote(wheel_path)}" if wheel_path else ""
 
     # Determine installation method
     if wheel_path:
@@ -129,6 +130,7 @@ def install_dev_pkg(
                     wheel_path,
                     e.proc.stdout,
                 )
+                sys.exit(1)
 
             # Step 2: Install the downloaded wheel
             install_cmd = f"pip --disable-pip-version-check install {find_links_flag} '{tmp_dir}'/*.whl"
@@ -137,6 +139,7 @@ def install_dev_pkg(
                 dev_pkg_lockfile.touch()
             except CmdFailure as e:
                 logger.error("Wheel installation failed!\n%s", e.proc.stdout)
+                sys.exit(1)
 
     if not dev_pkg_lockfile.exists():
         # Install in editable mode (legacy behavior)
