@@ -46,11 +46,12 @@ class _T_TmpRun(Protocol):
 
 
 def _normalize_click_usage(text: str) -> str:
-    """Click >=8.2 (Python >=3.10) renders the usage line as
+    """Normalize Click's usage line across Click versions.
+
+    Click >=8.2 (Python >=3.10) renders it as
     ``Usage: riot [OPTIONS] [COMMAND] [ARGS]...`` while older Click versions
     (still resolved on Python 3.8/3.9, which Click >=8.2 no longer supports)
-    render it as ``Usage: riot [OPTIONS] COMMAND [ARGS]...``. Normalize away
-    the difference so these assertions pass under both.
+    render it as ``Usage: riot [OPTIONS] COMMAND [ARGS]...``.
     """
     return text.replace("[COMMAND]", "COMMAND")
 
