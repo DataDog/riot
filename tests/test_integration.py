@@ -64,7 +64,7 @@ def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
 
 def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot")
-    assert result.stderr == """Usage: riot [OPTIONS] COMMAND [ARGS]...
+    assert result.stderr == """Usage: riot [OPTIONS] [COMMAND] [ARGS]...
 
 Options:
   -f, --file PATH    [default: riotfile.py]
@@ -88,7 +88,7 @@ Commands:
 
     result = tmp_run("riot -P list")
     assert result.stderr == """
-Usage: riot [OPTIONS] COMMAND [ARGS]...
+Usage: riot [OPTIONS] [COMMAND] [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
@@ -100,7 +100,7 @@ Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 def test_bad_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --file rf.py", tmp_path)
     assert result.stderr == """
-Usage: riot [OPTIONS] COMMAND [ARGS]...
+Usage: riot [OPTIONS] [COMMAND] [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'rf.py' does not exist.
@@ -142,7 +142,7 @@ SyntaxError: invalid syntax
 def test_help(tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --help")
     assert result.stdout == """
-Usage: riot [OPTIONS] COMMAND [ARGS]...
+Usage: riot [OPTIONS] [COMMAND] [ARGS]...
 
 Options:
   -f, --file PATH    [default: riotfile.py]
@@ -175,7 +175,7 @@ def test_version(tmp_run: _T_TmpRun) -> None:
 def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot -P list")
     assert result.stderr == """
-Usage: riot [OPTIONS] COMMAND [ARGS]...
+Usage: riot [OPTIONS] [COMMAND] [ARGS]...
 Try 'riot --help' for help.
 
 Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.

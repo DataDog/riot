@@ -524,9 +524,13 @@ def test_install_dev_pkg_exits_when_wheel_download_fails(monkeypatch, tmp_path):
         os.chdir(tmp_path)
         pathlib.Path("pyproject.toml").write_text('[project]\nname = "test-pkg"')
 
-        with patch("riot.runner.run_cmd_venv", side_effect=_make_cmd_failure()) as mock_run:
+        with patch(
+            "riot.runner.run_cmd_venv", side_effect=_make_cmd_failure()
+        ) as mock_run:
             with pytest.raises(SystemExit) as exc_info:
-                install_dev_pkg(str(tmp_path / "venv"), force=True, wheel_path="/tmp/wheels")
+                install_dev_pkg(
+                    str(tmp_path / "venv"), force=True, wheel_path="/tmp/wheels"
+                )
 
             assert exc_info.value.code == 1
             # Only the download step should have been attempted -- no
@@ -553,7 +557,9 @@ def test_install_dev_pkg_exits_when_wheel_install_fails(monkeypatch, tmp_path):
             "riot.runner.run_cmd_venv", side_effect=[None, _make_cmd_failure()]
         ) as mock_run:
             with pytest.raises(SystemExit) as exc_info:
-                install_dev_pkg(str(tmp_path / "venv"), force=True, wheel_path="/tmp/wheels")
+                install_dev_pkg(
+                    str(tmp_path / "venv"), force=True, wheel_path="/tmp/wheels"
+                )
 
             assert exc_info.value.code == 1
             assert mock_run.call_count == 2
