@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    ``--wheel-path``/``RIOT_WHEEL_PATH`` now aborts the run if the wheel fails to
+    download or install, instead of silently falling back to an editable install.
+    This ensures that a specified wheel is always the one that gets used.

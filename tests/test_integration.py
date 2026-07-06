@@ -45,6 +45,17 @@ class _T_TmpRun(Protocol):
     ) -> _T_CompletedProcess: ...
 
 
+def _normalize_click_usage(text: str) -> str:
+    """Normalize Click's usage line across Click versions.
+
+    Click >=8.2 (Python >=3.10) renders it as
+    ``Usage: riot [OPTIONS] [COMMAND] [ARGS]...`` while older Click versions
+    (still resolved on Python 3.8/3.9, which Click >=8.2 no longer supports)
+    render it as ``Usage: riot [OPTIONS] COMMAND [ARGS]...``.
+    """
+    return text.replace("[COMMAND]", "COMMAND")
+
+
 @pytest.fixture
 def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
     """Run a command by default in tmp_path."""
@@ -64,7 +75,9 @@ def tmp_run(tmp_path: pathlib.Path) -> Generator[_T_TmpRun, None, None]:
 
 def test_no_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot")
-    assert result.stderr == """Usage: riot [OPTIONS] COMMAND [ARGS]...
+    assert (
+        _normalize_click_usage(result.stderr)
+        == """Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
   -f, --file PATH    [default: riotfile.py]
@@ -83,11 +96,12 @@ Commands:
   run           Run virtualenv instances with names matching a pattern.
   shell         Launch a shell inside a venv.
 """
+    )
     assert result.stdout == ""
     assert result.returncode == 2
 
     result = tmp_run("riot -P list")
-    assert result.stderr == """
+    assert _normalize_click_usage(result.stderr) == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
@@ -99,7 +113,7 @@ Error: Invalid value for '-f' / '--file': Path 'riotfile.py' does not exist.
 
 def test_bad_riotfile(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --file rf.py", tmp_path)
-    assert result.stderr == """
+    assert _normalize_click_usage(result.stderr) == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
@@ -141,7 +155,7 @@ SyntaxError: invalid syntax
 
 def test_help(tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot --help")
-    assert result.stdout == """
+    assert _normalize_click_usage(result.stdout) == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -174,7 +188,7 @@ def test_version(tmp_run: _T_TmpRun) -> None:
 
 def test_list_no_file_empty_file(tmp_path: pathlib.Path, tmp_run: _T_TmpRun) -> None:
     result = tmp_run("riot -P list")
-    assert result.stderr == """
+    assert _normalize_click_usage(result.stderr) == """
 Usage: riot [OPTIONS] COMMAND [ARGS]...
 Try 'riot --help' for help.
 
