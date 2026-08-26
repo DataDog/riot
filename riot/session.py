@@ -77,6 +77,7 @@ class Session:
         pythons: t.Optional[t.Set[Interpreter]] = None,
         skip_missing: bool = False,
         exit_first: bool = False,
+        command_override: t.Optional[str] = None,
         recompile_reqs: bool = False,
         wheel_path: t.Optional[str] = None,
     ) -> None:
@@ -91,7 +92,7 @@ class Session:
         )
 
         for inst in self.venv.instances():
-            if inst.command is None:
+            if command_override is None and inst.command is None:
                 logger.debug("Skipping venv instance %s due to missing command", inst)
                 continue
 
@@ -173,7 +174,9 @@ class Session:
 
             try:
                 # Finally, run the test in the base venv.
-                command = inst.command
+                command = (
+                    command_override if command_override is not None else inst.command
+                )
                 assert command is not None
                 if cmdargs is not None:
                     command = command.format(
