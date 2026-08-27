@@ -196,6 +196,12 @@ def generate(ctx, recreate_venvs, skip_base_install, pythons, pattern):
 @PYTHON_VERSIONS_ARG
 @click.option("--skip-missing", "skip_missing", is_flag=True, default=False)
 @click.option("--exitfirst", "-x", "exit_first", is_flag=True, default=False)
+@click.option(
+    "--command",
+    "command_override",
+    default=None,
+    help="Override the venv's command. When set, run this command in the venv instead of the venv's baked command. {cmdargs} is substituted within the override.",
+)
 @PATTERN_ARG
 @VENV_PATTERN_ARG
 @RECOMPILE_REQS_ARG
@@ -208,6 +214,7 @@ def run(
     pythons,
     skip_missing,
     exit_first,
+    command_override,
     pattern,
     venv_pattern,
     recompile_reqs,
@@ -223,6 +230,7 @@ def run(
         pythons=pythons,
         skip_missing=skip_missing,
         exit_first=exit_first,
+        command_override=command_override,
         recompile_reqs=recompile_reqs,
         wheel_path=wheel_path,
     )

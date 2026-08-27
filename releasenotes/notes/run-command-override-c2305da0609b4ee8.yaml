@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    Add ``riot run --command`` to override a venv's baked command. When
+    set, riot runs the given command inside the matched venv(s) instead of
+    the venv's configured ``command``, using the same environment
+    preparation, ``--pass-env`` and dependency-install semantics. ``{cmdargs}``
+    is substituted within the override, just like with a venv's regular
+    command. This allows external runners to execute inside a riot venv and
+    inherit its full environment without reconstructing the activation env
+    themselves.

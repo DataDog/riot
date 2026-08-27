@@ -79,3 +79,32 @@ If you want to test with pre-built wheels instead, use the ``--wheel-path`` opti
 
 See :doc:`wheel_sources` for more details on using pre-built wheels.
 
+
+Overriding the Command
+-----------------------
+
+Each venv instance runs the command it was configured with. To run a
+different command inside a matching venv without changing ``riotfile.py``,
+pass ``--command`` to ``run``:
+
+.. code-block:: bash
+
+        $ riot run --command "mypy --strict" test
+
+The override replaces the venv's ``command`` entirely, but still benefits
+from the venv's dependencies and environment setup, including
+``--pass-env`` and any environment variables declared on the ``Venv``.
+Instances with no ``command`` of their own are otherwise skipped, but will
+still run when ``--command`` is given.
+
+As with a venv's regular command, ``{cmdargs}`` in the override is replaced
+with any extra arguments passed after ``--``:
+
+.. code-block:: bash
+
+        $ riot run --command "pytest {cmdargs}" test -- -k test_foo
+
+This is useful for running external tooling (e.g. a separate test runner)
+inside a riot venv so that it inherits the venv's full environment without
+having to reconstruct riot's activation logic itself.
+
