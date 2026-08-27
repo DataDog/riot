@@ -770,3 +770,70 @@ def test_run_command_override_long_arg(cli: click.testing.CliRunner) -> None:
             run.assert_called_once()
             kwargs = run.call_args.kwargs
             assert kwargs["command_override"] == "echo override"
+
+
+def test_run_command_override_without_baked_command(
+    cli: click.testing.CliRunner,
+) -> None:
+    """--command runs venv instances that have no baked command of their own."""
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write("""
+from riot import Venv
+
+venv = Venv(
+    venvs=[
+        Venv(
+            pys=[3],
+            name="test",
+            pkgs={},
+        ),
+    ],
+)
+            """)
+
+        with mock.patch("subprocess.run") as subprocess_run:
+            subprocess_run.return_value.returncode = 0
+            result = cli.invoke(
+                riot.cli.main,
+                ["run", "-s", "--command", "echo override", "test"],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0, result.stdout
+
+            subprocess_run.assert_called()
+            cmd = subprocess_run.call_args_list[-1].args[0]
+            assert cmd.endswith("echo override"), cmd
+
+
+def test_run_without_command_override_skips_missing_command(
+    cli: click.testing.CliRunner,
+) -> None:
+    """Without --command, venv instances with no baked command are still skipped."""
+    with cli.isolated_filesystem():
+        with open("riotfile.py", "w") as f:
+            f.write("""
+from riot import Venv
+
+venv = Venv(
+    venvs=[
+        Venv(
+            pys=[3],
+            name="test",
+            pkgs={},
+        ),
+    ],
+)
+            """)
+
+        with mock.patch("subprocess.run") as subprocess_run, mock.patch(
+            "riot.session.run_cmd_venv"
+        ) as run_cmd_venv:
+            subprocess_run.return_value.returncode = 0
+            result = cli.invoke(
+                riot.cli.main,
+                ["run", "-s", "test"],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0, result.stdout
+            run_cmd_venv.assert_not_called()
